@@ -14,7 +14,9 @@ n_arms  =   10
 avg_R1  =   np.zeros([n_iter,n_bins])
 avg_R2  =   np.zeros([n_iter,n_bins])
 avg_R3  =   np.zeros([n_iter,n_bins])
-
+temp0 = 0.01
+temp1 = 0.1
+temp2 = 0.5
 
 # Loop on all iterations
 for hh in range(0, n_iter):
@@ -32,32 +34,30 @@ for hh in range(0, n_iter):
     # Loop on time samples
     for ii in range(0, n_bins):
         # Select an action
-        # --- method1 : greedy
-        id_sel =   np.argmax(q_estim1) # select arm with highest q
+        # --- Temperature=0 : greedy
+        softmax     =   np.divide( np.exp(q_estim1/temp0), np.sum(np.exp(q_estim1/temp0)) )
+        id_sel =   np.argmax( np.multiply( softmax, np.random.normal(0, 1, [1, n_arms])) ) # select arm with highest q
         reward =   q_star[0,id_sel] + np.random.normal(0, 1, 1) # draw reward q(a) + random number
         n_visit1[0,id_sel] += 1
         q_estim1[0,id_sel] = q_estim1[0,id_sel] + (reward - q_estim1[0,id_sel])/n_visit1[0,id_sel]
         avg_R1[hh,ii] = reward
 
-        # --- method2 : e-greedy 0.01
-        if np.random.uniform(0,1)>=0.99:
-            id_sel  =   np.random.randint(0,n_arms)
-        else:
-            id_sel  =   np.argmax(q_estim2)  # select arm with highest q
+        # --- Temperature1 : 0.1
+        softmax = np.divide(np.exp(q_estim2 / temp1), np.sum(np.exp(q_estim2 / temp1)))
+        id_sel = np.argmax(np.multiply(softmax, np.random.normal(0, 1, [1, n_arms])))  # select arm with highest q
         reward = q_star[0, id_sel] + np.random.normal(0, 1, 1)  # draw reward q(a) + random number
         n_visit2[0, id_sel] += 1
-        q_estim2[0,id_sel] = q_estim2[0,id_sel] + (reward - q_estim2[0,id_sel])/n_visit2[0,id_sel]
+        q_estim2[0, id_sel] = q_estim2[0, id_sel] + (reward - q_estim2[0, id_sel]) / n_visit2[0, id_sel]
         avg_R2[hh, ii] = reward
 
-        # --- method3 : e-greedy 0.1
-        if np.random.uniform(0, 1) >= 0.9:
-            id_sel = np.random.randint(0, n_arms)
-        else:
-            id_sel = np.argmax(q_estim3)  # select arm with highest q
+        # --- Temperature2 : 0.5
+        softmax = np.divide(np.exp(q_estim3 / temp2), np.sum(np.exp(q_estim3 / temp2)))
+        id_sel = np.argmax(np.multiply(softmax, np.random.normal(0, 1, [1, n_arms])))  # select arm with highest q
         reward = q_star[0, id_sel] + np.random.normal(0, 1, 1)  # draw reward q(a) + random number
         n_visit3[0, id_sel] += 1
-        q_estim3[0, id_sel] = q_estim3[0,id_sel] + (reward - q_estim3[0,id_sel])/n_visit3[0,id_sel]
+        q_estim3[0, id_sel] = q_estim3[0, id_sel] + (reward - q_estim3[0, id_sel]) / n_visit3[0, id_sel]
         avg_R3[hh, ii] = reward
+
 
 # display
 plt.plot( np.mean(avg_R1,0), 'g')
