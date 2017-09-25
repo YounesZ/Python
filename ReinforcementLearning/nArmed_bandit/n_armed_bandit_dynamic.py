@@ -12,9 +12,13 @@ from random_walk import *
 n_bins  =   1000
 n_iter  =   1000
 n_arms  =   10
+alpha   =   0.8
 avg_R1  =   np.zeros([n_iter,n_bins])
 avg_R2  =   np.zeros([n_iter,n_bins])
 avg_R3  =   np.zeros([n_iter,n_bins])
+avg_R4  =   np.zeros([n_iter,n_bins])
+avg_R5  =   np.zeros([n_iter,n_bins])
+avg_R6  =   np.zeros([n_iter,n_bins])
 
 rW = random_walk(n_arms, n_bins, range(0, 1000, 500), 2)
 
@@ -29,6 +33,7 @@ for hh in range(0, n_iter):
     q_starD =   np.divide(q_starD - np.min(np.min(q_starD)), np.max(np.max(q_starD)) - np.min(np.min(q_starD)) )
     q_starD =   q_starD * (np.max(q_star)-np.min(q_star)) + np.min(q_star)
 
+    # Static bandits
     q_estim1 =  np.random.normal(0, .0001, [1, n_arms])
     n_visit1 =  np.zeros([1, n_arms])
     q_estim2 =  np.random.normal(0, .0001, [1, n_arms])
@@ -36,6 +41,10 @@ for hh in range(0, n_iter):
     q_estim3 =  np.random.normal(0, .0001, [1, n_arms])
     n_visit3 =  np.zeros([1, n_arms])
 
+    # Dynamic bandits
+    q_estim4 = np.random.normal(0, .0001, [1, n_arms])
+    q_estim5 = np.random.normal(0, .0001, [1, n_arms])
+    q_estim6 = np.random.normal(0, .0001, [1, n_arms])
 
     # Loop on time samples
     for ii in range(0, n_bins):
@@ -67,15 +76,42 @@ for hh in range(0, n_iter):
         q_estim3[0, id_sel] = q_estim3[0,id_sel] + (reward - q_estim3[0,id_sel])/n_visit3[0,id_sel]
         avg_R3[hh, ii] = reward
 
+        # --- method4 : greedy Non-stationary
+        id_sel = np.argmax(q_estim4)  # select arm with highest q
+        reward = q_starD[id_sel, ii] + np.random.normal(0, 1, 1)  # draw reward q(a) + random number
+        q_estim4[0, id_sel] = q_estim4[0, id_sel] + (reward - q_estim4[0, id_sel]) * alpha
+        avg_R4[hh, ii] = reward
+
+        # --- method5 : e-greedy 0.01 Non-stationary
+        if np.random.uniform(0, 1) >= 0.99:
+            id_sel = np.random.randint(0, n_arms)
+        else:
+            id_sel = np.argmax(q_estim5)  # select arm with highest q
+        reward = q_starD[id_sel, ii] + np.random.normal(0, 1, 1)  # draw reward q(a) + random number
+        q_estim5[0, id_sel] = q_estim5[0, id_sel] + (reward - q_estim5[0, id_sel]) * alpha
+        avg_R5[hh, ii] = reward
+
+        # --- method6 : e-greedy 0.1 Non-stationary
+        if np.random.uniform(0, 1) >= 0.9:
+            id_sel = np.random.randint(0, n_arms)
+        else:
+            id_sel = np.argmax(q_estim6)  # select arm with highest q
+        reward = q_starD[id_sel, ii] + np.random.normal(0, 1, 1)  # draw reward q(a) + random number
+        q_estim6[0, id_sel] = q_estim6[0, id_sel] + (reward - q_estim6[0, id_sel]) * alpha
+        avg_R6[hh, ii] = reward
+
 # display
 plt.plot( [500, 500], [0, 1.5], 'r--')
 plt.plot( np.mean(avg_R1,0), 'g', label='e=0 - greedy')
 plt.plot( np.mean(avg_R2,0), 'r', label='e=0.01 - +expl')
 plt.plot( np.mean(avg_R3,0) ,'k', label='e=0.1 - ++expl')
+plt.plot( np.mean(avg_R4,0), 'g--', label='e=0 - greedyNS')
+plt.plot( np.mean(avg_R5,0), 'r--', label='e=0.01 - +explNS')
+plt.plot( np.mean(avg_R6,0) ,'k--', label='e=0.1 - ++explNS')
 plt.ylabel('Average reward')
 plt.legend(loc='upper left')
 plt.xlabel('Nb of plays')
 axes = plt.gca()
-axes.annotate('random walk', xy=(500, 1), xytext=(650, 1.3), arrowprops=dict(facecolor='black', shrink=0.05),)
+axes.annotate('random walk', xy=(500, 0.2), xytext=(100, 0.2), arrowprops=dict(facecolor='black', shrink=0.05),)
 axes.set_ylim([0, 1.5])
 plt.show()
