@@ -19,7 +19,7 @@ def main(siz, ind):
     for ii in range(nEl):
         # Fill containers
         row[ii]     =   ind[ii]%siz[0]
-        col[ii]     =   ind[ii]/siz[0]
+        col[ii]     =   int(np.floor(ind[ii]/siz[0]))
 
     return row, col
 
