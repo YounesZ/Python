@@ -16,11 +16,32 @@ import math
 from Utils.programming import ut_sum_diagonals, ut_closest, ut_ind2sub
 from Utils.maths import poisson_proba
 from random import shuffle
+import time
 
 
 # ===============
 # Helper functions
 # ===============
+def precompute_variables(params):
+    # Add vehicles moved according to pi
+    carflow     =   list(range(-params.get('total_cars') - 5, 0, 1)) + list(range(params.get('total_cars') + 6))
+    params['carflow']   =   carflow
+
+    # Probability of rents and returns - agency1
+    proba1_rent =   poisson_proba.main(params.get('expected_rent')[0], list(range(params.get('total_cars') + 1 + 5)))
+    proba1_rtrn =   poisson_proba.main(params.get('expected_return')[0], list(range(params.get('total_cars') + 1 + 5)))
+    jointProba1 =   np.reshape(proba1_rent, [params.get('total_cars') + 1 + 5, 1]) * proba1_rtrn
+    jp1sum      =   ut_sum_diagonals.main(jointProba1)
+    params['jp1sum']    =   jp1sum
+
+    # Probability of rents and returns - agency1
+    proba2_rent =   poisson_proba.main(params.get('expected_rent')[1], range(params.get('total_cars') + 1 + 5))
+    proba2_rtrn =   poisson_proba.main(params.get('expected_return')[1], range(params.get('total_cars') + 1 + 5))
+    jointProba2 =   np.reshape(proba2_rent, [params.get('total_cars') + 1 + 5, 1]) * proba2_rtrn
+    jp2sum      =   ut_sum_diagonals.main(jointProba2)
+    params['jp2sum']    =   jp2sum
+
+
 def update_value(moved, state_value, ag_cars, params):
     # Convert state to nb of cars in each agency
     ag2, ag1    =   ag_cars
@@ -111,6 +132,10 @@ def improve_policy(optimal_policy, state_value, params):
 # ===============
 def main():
 
+    print("\n\n\t***\tStarted to solve 2D MDP: the car rental problem\n\n")
+
+    start_time  =   time.time()
+
     # Problem settings
     params  =   {'total_cars'   : 20,       # among the 2 agencies\
                 'rental_profit' : 10,       # per car, per day
@@ -126,15 +151,23 @@ def main():
     state_value     =   np.zeros([params.get('total_cars')+1, params.get('total_cars')+1])
     optimal_policy  =   np.zeros([params.get('total_cars')+1, params.get('total_cars')+1])
 
+    # Pre-compute redudant variables
+    # params          =   precompute_variables(params)
+
     # Solve MDP
     stable_policy   =   False
     n_passes        =   0
     while ~stable_policy:
+        print("\tPass number ", n_passes+1, )
         state_value, _                  =   evaluate_policy(optimal_policy, state_value, params)
-        optimal_policy, policy_stable   =   improve_policy(optimal_policy, state_value, params)
+        print("evaluation done, ")
+        optimal_policy, stable_policy   =   improve_policy(optimal_policy, state_value, params)
+        print("improvement done.\n")
         n_passes    +=  1
 
-    return state_value, n_passes
+    print("\t--- All done in %s seconds ---" % (time.time() - start_time))
+
+    return state_value, optimal_policy, n_passes
 
 
 
