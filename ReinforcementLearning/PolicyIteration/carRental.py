@@ -15,72 +15,95 @@ import matplotlib.pyplot as plt
 import math
 from Utils.programming import ut_sum_diagonals, ut_closest, ut_ind2sub
 from Utils.maths import poisson_proba
+from random import shuffle
 
 
 # ===============
 # Helper functions
 # ===============
-def update_value(optimal_policy, state_value, s, params):
+def update_value(moved, state_value, ag_cars, params):
     # Convert state to nb of cars in each agency
-    agency1_cars = s % (params.get('total_cars') + 1)
-    agency2_cars = int(np.floor(s / (params.get('total_cars') + 1)))
+    ag2, ag1    =   ag_cars
 
     # Add vehicles moved according to pi
-    moved = optimal_policy[agency1_cars, agency2_cars]
-    carflow = list(range(-params.get('total_cars'), 0, 1)) + list(range(params.get('total_cars') + 1))
+    carflow     =   list(range(-params.get('total_cars'), 0, 1)) + list(range(params.get('total_cars') + 1))
 
     # Probability of rents and returns - agency1
-    proba1_rent = poisson_proba.main(params.get('expected_rent')[0], list(range(params.get('total_cars') + 1)))
-    proba1_rtrn = poisson_proba.main(params.get('expected_return')[0], list(range(params.get('total_cars') + 1)))
-    jointProba1 = np.reshape(proba1_rent, [params.get('total_cars') + 1, 1]) * proba1_rtrn
-    jp1sum = ut_sum_diagonals.main(jointProba1)
-    nex_state1 = agency1_cars + moved + carflow
-    idX = ut_closest.main([0, params.get('total_cars')], nex_state1)
-    proba_ag1 = jp1sum[0, [range(idX[0], idX[1] + 1)]]
+    proba1_rent =   poisson_proba.main(params.get('expected_rent')[0], list(range(params.get('total_cars') + 1)))
+    proba1_rtrn =   poisson_proba.main(params.get('expected_return')[0], list(range(params.get('total_cars') + 1)))
+    jointProba1 =   np.reshape(proba1_rent, [params.get('total_cars') + 1, 1]) * proba1_rtrn
+    jp1sum      =   ut_sum_diagonals.main(jointProba1)
+    nex_state1  =   ag1 + moved + carflow
+    idX         =   ut_closest.main([0, params.get('total_cars')], nex_state1)
+    proba_ag1   =   jp1sum[0, [range(idX[0], idX[1] + 1)]]
 
     # Probability of rents and returns - agency1
-    proba2_rent = poisson_proba.main(params.get('expected_rent')[1], range(params.get('total_cars') + 1))
-    proba2_rtrn = poisson_proba.main(params.get('expected_return')[1], range(params.get('total_cars') + 1))
-    jointProba2 = np.reshape(proba2_rent, [params.get('total_cars') + 1, 1]) * proba2_rtrn
-    jp2sum = ut_sum_diagonals.main(jointProba2)
-    nex_state2 = agency2_cars - moved + carflow
-    idX = ut_closest.main([0, params.get('total_cars')], nex_state2)
-    proba_ag2 = jp2sum[0, [range(idX[0], idX[1] + 1)]]
+    proba2_rent =   poisson_proba.main(params.get('expected_rent')[1], range(params.get('total_cars') + 1))
+    proba2_rtrn =   poisson_proba.main(params.get('expected_return')[1], range(params.get('total_cars') + 1))
+    jointProba2 =   np.reshape(proba2_rent, [params.get('total_cars') + 1, 1]) * proba2_rtrn
+    jp2sum      =   ut_sum_diagonals.main(jointProba2)
+    nex_state2  =   ag2 - moved + carflow
+    idX         =   ut_closest.main([0, params.get('total_cars')], nex_state2)
+    proba_ag2   =   jp2sum[0, [range(idX[0], idX[1] + 1)]]
 
     # State probabilities
-    stateProba = np.reshape(proba_ag2, [params.get('total_cars') + 1, 1]) * proba_ag1
+    stateProba  =   np.reshape(proba_ag2, [params.get('total_cars') + 1, 1]) * proba_ag1
 
     # State rewards
-    poss_rent1 = agency1_cars + moved - list(range(params.get('total_cars') + 1))
-    poss_rent1 = np.maximum(poss_rent1, 0)
-    reward1 = poss_rent1 * 10
-    poss_rent2 = agency2_cars - moved - list(range(params.get('total_cars') + 1))
-    poss_rent2 = np.maximum(poss_rent2, 0)
-    reward2 = poss_rent2 * 10
-    state_reward = np.reshape(reward2, [params.get('total_cars') + 1, 1]) + reward1 - np.abs(moved) * 2
+    poss_rent1  =   ag1 + moved - list(range(params.get('total_cars') + 1))
+    poss_rent1  =   np.maximum(poss_rent1, 0)
+    reward1     =   poss_rent1 * 10
+    poss_rent2  =   ag2 - moved - list(range(params.get('total_cars') + 1))
+    poss_rent2  =   np.maximum(poss_rent2, 0)
+    reward2     =   poss_rent2 * 10
+    state_reward=   np.reshape(reward2, [params.get('total_cars') + 1, 1]) + reward1 - np.abs(moved) * 2
 
     # Issue state value
     v = np.sum(np.multiply(stateProba, state_reward + state_value * params.get('gamma')))
-    state_value[agency2_cars, agency1_cars] = v
-    return state_value, v
+    return v
 
 
 def evaluate_policy(optimal_policy, state_value, params):
     # intialize change
-    n_passes        =   0
-    value_change    =   float('Inf')
-    VV              =   []
-    while value_change > params.get('theta'):
-        value_change    = 0
-        proceed         =   False
-        for sii in range(np.prod(np.shape(state_value))):
-            r,c     =   ut_ind2sub.main(np.shape(state_value), [sii])
+    n_passes    =   0
+    delta_v     =   float('Inf')
+    while delta_v > params.get('theta'):
+        delta_v = 0
+        VV      = np.zeros([21,21])
+        # Shuffle the order of value evaluation
+        shufI   =   [[i] for i in range( (params.get('total_cars')+1) ** 2 )]
+        shuffle(shufI)
+        for sii in shufI:
+            r,c     =   ut_ind2sub.main(np.shape(state_value), sii)
             temp    =   state_value[r,c]
-            state_value, Vs = update_value(optimal_policy, state_value, sii, params)
-            value_change    = np.maximum(value_change, np.abs(temp - Vs))
-        VV.append( float(value_change) )
+            new_v   =   update_value(optimal_policy[r, c], state_value, (r,c), params)
+            state_value[r,c]    =   new_v
+            delta_v =   np.maximum(delta_v, np.abs(temp - new_v))
+            VV[r,c] =   float(np.abs(temp - new_v))
         n_passes += 1
     return state_value, n_passes
+
+
+def improve_policy(optimal_policy, state_value, params):
+    policy_stable   =   True
+    n_states        =   (params.get('total_cars')+1) ** 2
+    # Predefined actions
+    actions_poss    =   list( range(-5,6,1) )
+    for sii in range(n_states):
+        ag2, ag1    =   ut_ind2sub.main(np.shape(state_value), [sii])
+        temp        =   optimal_policy[ag2, ag1]
+        # Loop on all possible actions and recompute the value
+        max_value   =   -float('Inf')
+        for sjj in actions_poss:
+            new_val =   update_value(sjj, state_value, (ag2, ag1), params)
+            if new_val>max_value:
+                optimal_policy[ag2, ag1]    =   sjj
+        if temp!=optimal_policy[ag2, ag1]:
+            policy_stable   =   False
+    return optimal_policy, policy_stable
+
+
+
 
 
 
@@ -115,8 +138,8 @@ def main():
             stable_policy   =   compare_policy(optimal_policy, new_policy)
             optimal_policy  =   new_policy   """
 
-    state_value, n_passes = evaluate_policy(optimal_policy, state_value, params)
-
+    state_value, n_passes           =   evaluate_policy(optimal_policy, state_value, params)
+    optimal_policy, policy_stable   =   improve_policy(optimal_policy, state_value, params)
     return state_value, n_passes
 
 
