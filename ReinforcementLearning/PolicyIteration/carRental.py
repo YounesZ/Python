@@ -26,21 +26,21 @@ def update_value(moved, state_value, ag_cars, params):
     ag2, ag1    =   ag_cars
 
     # Add vehicles moved according to pi
-    carflow     =   list(range(-params.get('total_cars'), 0, 1)) + list(range(params.get('total_cars') + 1))
+    carflow     =   list(range(-params.get('total_cars')-5, 0, 1)) + list(range(params.get('total_cars') + 6))
 
     # Probability of rents and returns - agency1
-    proba1_rent =   poisson_proba.main(params.get('expected_rent')[0], list(range(params.get('total_cars') + 1)))
-    proba1_rtrn =   poisson_proba.main(params.get('expected_return')[0], list(range(params.get('total_cars') + 1)))
-    jointProba1 =   np.reshape(proba1_rent, [params.get('total_cars') + 1, 1]) * proba1_rtrn
+    proba1_rent =   poisson_proba.main(params.get('expected_rent')[0], list(range(params.get('total_cars') + 1 + 5)))
+    proba1_rtrn =   poisson_proba.main(params.get('expected_return')[0], list(range(params.get('total_cars') + 1 + 5)))
+    jointProba1 =   np.reshape(proba1_rent, [params.get('total_cars') + 1 + 5, 1]) * proba1_rtrn
     jp1sum      =   ut_sum_diagonals.main(jointProba1)
     nex_state1  =   ag1 + moved + carflow
     idX         =   ut_closest.main([0, params.get('total_cars')], nex_state1)
     proba_ag1   =   jp1sum[0, [range(idX[0], idX[1] + 1)]]
 
     # Probability of rents and returns - agency1
-    proba2_rent =   poisson_proba.main(params.get('expected_rent')[1], range(params.get('total_cars') + 1))
-    proba2_rtrn =   poisson_proba.main(params.get('expected_return')[1], range(params.get('total_cars') + 1))
-    jointProba2 =   np.reshape(proba2_rent, [params.get('total_cars') + 1, 1]) * proba2_rtrn
+    proba2_rent =   poisson_proba.main(params.get('expected_rent')[1], range(params.get('total_cars') + 1 + 5))
+    proba2_rtrn =   poisson_proba.main(params.get('expected_return')[1], range(params.get('total_cars') + 1 + 5))
+    jointProba2 =   np.reshape(proba2_rent, [params.get('total_cars') + 1 + 5, 1]) * proba2_rtrn
     jp2sum      =   ut_sum_diagonals.main(jointProba2)
     nex_state2  =   ag2 - moved + carflow
     idX         =   ut_closest.main([0, params.get('total_cars')], nex_state2)
@@ -88,15 +88,14 @@ def improve_policy(optimal_policy, state_value, params):
     policy_stable   =   True
     n_states        =   (params.get('total_cars')+1) ** 2
     # Predefined actions
-    actions_poss    =   list( range(-5,6,1) )
+    actions_poss    =   np.array( range(-5,6,1) )
     for sii in range(n_states):
         ag2, ag1    =   ut_ind2sub.main(np.shape(state_value), [sii])
         temp        =   optimal_policy[ag2, ag1]
         # Loop on all possible actions and recompute the value
-        max_value   =   -float('Inf')
         for sjj in actions_poss:
             new_val =   update_value(sjj, state_value, (ag2, ag1), params)
-            if new_val>max_value:
+            if new_val>state_value[ag2, ag1]:
                 optimal_policy[ag2, ag1]    =   sjj
         if temp!=optimal_policy[ag2, ag1]:
             policy_stable   =   False
@@ -127,23 +126,15 @@ def main():
     state_value     =   np.zeros([params.get('total_cars')+1, params.get('total_cars')+1])
     optimal_policy  =   np.zeros([params.get('total_cars')+1, params.get('total_cars')+1])
 
-    """     def improve_policy():
+    # Solve MDP
+    stable_policy   =   False
+    n_passes        =   0
+    while ~stable_policy:
+        state_value, _                  =   evaluate_policy(optimal_policy, state_value, params)
+        optimal_policy, policy_stable   =   improve_policy(optimal_policy, state_value, params)
+        n_passes    +=  1
 
-        def compare_policy():
-
-       # Solve MDP
-        while ~stable_policy:
-            state_value     =   evaluate_policy()
-            new_policy      =   improve_policy()
-            stable_policy   =   compare_policy(optimal_policy, new_policy)
-            optimal_policy  =   new_policy   """
-
-    state_value, n_passes           =   evaluate_policy(optimal_policy, state_value, params)
-    optimal_policy, policy_stable   =   improve_policy(optimal_policy, state_value, params)
     return state_value, n_passes
-
-
-
 
 
 
