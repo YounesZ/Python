@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 from Utils.programming import ut_sum_diagonals, ut_closest, ut_ind2sub
-from Utils.maths import poisson_proba
+from Utils.maths import ut_poisson_proba
 from random import shuffle
 import time
 
@@ -28,15 +28,15 @@ def precompute_variables(params):
     params['carflow']   =   carflow
 
     # Probability of rents and returns - agency1
-    proba1_rent =   poisson_proba.main(params.get('expected_rent')[0], list(range(params.get('total_cars') + 1 + 5)))
-    proba1_rtrn =   poisson_proba.main(params.get('expected_return')[0], list(range(params.get('total_cars') + 1 + 5)))
+    proba1_rent =   ut_poisson_proba.main(params.get('expected_rent')[0], list(range(params.get('total_cars') + 1 + 5)))
+    proba1_rtrn =   ut_poisson_proba.main(params.get('expected_return')[0], list(range(params.get('total_cars') + 1 + 5)))
     jointProba1 =   np.reshape(proba1_rent, [params.get('total_cars') + 1 + 5, 1]) * proba1_rtrn
     jp1sum      =   ut_sum_diagonals.main(jointProba1)
     params['jp1sum']    =   jp1sum
 
     # Probability of rents and returns - agency1
-    proba2_rent =   poisson_proba.main(params.get('expected_rent')[1], range(params.get('total_cars') + 1 + 5))
-    proba2_rtrn =   poisson_proba.main(params.get('expected_return')[1], range(params.get('total_cars') + 1 + 5))
+    proba2_rent =   ut_poisson_proba.main(params.get('expected_rent')[1], range(params.get('total_cars') + 1 + 5))
+    proba2_rtrn =   ut_poisson_proba.main(params.get('expected_return')[1], range(params.get('total_cars') + 1 + 5))
     jointProba2 =   np.reshape(proba2_rent, [params.get('total_cars') + 1 + 5, 1]) * proba2_rtrn
     jp2sum      =   ut_sum_diagonals.main(jointProba2)
     params['jp2sum']    =   jp2sum
@@ -81,8 +81,8 @@ def evaluate_policy(optimal_policy, state_value, params):
     carflow     =   list(range(-params.get('total_cars')-5, 0, 1)) + list(range(params.get('total_cars') + 6))
 
     # Probability of rents and returns - agency1
-    proba1_rent =   poisson_proba.main(params.get('expected_rent')[0], list(range(params.get('total_cars') + 1 + 5)))
-    proba1_rtrn =   poisson_proba.main(params.get('expected_return')[0], list(range(params.get('total_cars') + 1 + 5)))
+    proba1_rent =   ut_poisson_proba.main(params.get('expected_rent')[0], list(range(params.get('total_cars') + 1 + 5)))
+    proba1_rtrn =   ut_poisson_proba.main(params.get('expected_return')[0], list(range(params.get('total_cars') + 1 + 5)))
     jointProba1 =   np.reshape(proba1_rent, [params.get('total_cars') + 1 + 5, 1]) * proba1_rtrn
     jp1sum      =   ut_sum_diagonals.main(jointProba1)
     nex_state1  =   ag1 + moved + carflow
@@ -90,8 +90,8 @@ def evaluate_policy(optimal_policy, state_value, params):
     proba_ag1   =   jp1sum[0, [range(idX[0], idX[1] + 1)]]
 
     # Probability of rents and returns - agency1
-    proba2_rent =   poisson_proba.main(params.get('expected_rent')[1], range(params.get('total_cars') + 1 + 5))
-    proba2_rtrn =   poisson_proba.main(params.get('expected_return')[1], range(params.get('total_cars') + 1 + 5))
+    proba2_rent =   ut_poisson_proba.main(params.get('expected_rent')[1], range(params.get('total_cars') + 1 + 5))
+    proba2_rtrn =   ut_poisson_proba.main(params.get('expected_return')[1], range(params.get('total_cars') + 1 + 5))
     jointProba2 =   np.reshape(proba2_rent, [params.get('total_cars') + 1 + 5, 1]) * proba2_rtrn
     jp2sum      =   ut_sum_diagonals.main(jointProba2)
     nex_state2  =   ag2 - moved + carflow
