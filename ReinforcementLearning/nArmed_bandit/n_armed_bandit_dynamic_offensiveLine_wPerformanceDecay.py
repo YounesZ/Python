@@ -41,6 +41,8 @@ avg_R3  =   np.zeros([n_iter,len(changeT)])
 
 for hh in range(n_iter):
 
+    print('\tIteration ', str(hh), '/', str(n_iter), ': ', end="")
+
     # Make random combinations: lineups
     lsLines =   list( combinations( range(n_arms), n_pulls ) )
     priorL  =   [(0,1,2), (3,4,5), (6,7,8), (9,10,11)]
@@ -53,45 +55,121 @@ for hh in range(n_iter):
         lineV[0,idx]=   1 - 0.1*ii
 
     # Static bandits
+    # --- Bandit1
     q_estim1 = np.random.normal(0.05, .25, [1, len(lsLines)])
     q_estim1[0, priorIx] = list(1 - np.multiply(0.1, range(4)))
     n_visit1 = np.zeros([1, len(lsLines)])
+    # --- Bandit2
+    q_estim2 = np.random.normal(0.05, .25, [1, len(lsLines)])
+    q_estim2[0, priorIx] = list(1 - np.multiply(0.1, range(4)))
+    n_visit2 = np.zeros([1, len(lsLines)])
+    # --- Bandit3
+    q_estim3 = np.random.normal(0.05, .25, [1, len(lsLines)])
+    q_estim3[0, priorIx] = list(1 - np.multiply(0.1, range(4)))
+    n_visit3 = np.zeros([1, len(lsLines)])
 
+    ### PASS1 : GREEDY METHOD
     # Simulate value changes: players and lines
     playerFitness   =   np.ones([2, n_arms+1])
     playerRested    =   np.zeros([1, n_arms+1])
     selectedLine    =   []
     for jj in range(len(changeT)):
-        # Select line --- method1 : greedy
+        # Heuristic on line value
         pF          =   playerFitness + (playerFitness[0, :] - playerFitness[1, :]) * recovery(np.minimum(300,np.maximum(1, playerRested[0, :])))
         lF          =   [np.prod(pF[0,x]) for x in lsLines]
+        # Select line --- method1 : greedy
         id_sel      =   np.argmax( np.multiply(q_estim1, np.reshape(lF, [1, len(lsLines)])) )  # select arm with highest q
         selectedLine.append(id_sel)
-
         # Update players: fitness
         playersOn   =   lsLines[id_sel]
         for kk in playersOn:
             playerFitness[0,kk]     =   playerFitness[1,kk] + (playerFitness[0,kk]-playerFitness[1,kk])*recovery(max(1,playerRested[0,kk]))
-
         # Update line value
         lineValue   =   lineV[0,id_sel] * np.prod(playerFitness[0,playersOn])
-
         # Compute reward
         reward      =   lineValue + np.random.normal(0, .005, 1)  # draw reward q(a) + random number
-
         # Update line value estimate
         n_visit1[0, id_sel] += 1
         q_estim1[0, id_sel] = q_estim1[0, id_sel] + (reward - q_estim1[0, id_sel]) / n_visit1[0, id_sel]
         avg_R1[hh, jj] = reward
-
         # Update players: fatigue
         for kk in playersOn:
             playerFitness[1, kk] = playerFitness[0, kk] * decay(changeT[jj]*15)
-
         # Update players: rest
         playerRested[0, playersOn] = -changeT[jj] * 15
         playerRested    +=  changeT[jj]*15
 
+    ### PASS2 : e-GREEDY METHOD : epsilon=0.01
+    # Simulate value changes: players and lines
+    playerFitness   =   np.ones([2, n_arms+1])
+    playerRested    =   np.zeros([1, n_arms+1])
+    selectedLine    =   []
+    for jj in range(len(changeT)):
+        # Heuristic on line value
+        pF          =   playerFitness + (playerFitness[0, :] - playerFitness[1, :]) * recovery(np.minimum(300,np.maximum(1, playerRested[0, :])))
+        lF          =   [np.prod(pF[0,x]) for x in lsLines]
+        # Select line --- method2 : e-greedy 0.01
+        if np.random.uniform(0, 1) >= 0.99:
+            id_sel  =   np.random.randint(0, len(lsLines))
+        else:
+            id_sel  =   np.argmax( np.multiply(q_estim1, np.reshape(lF, [1, len(lsLines)])) )  # select arm with highest q
+        selectedLine.append(id_sel)
+        # Update players: fitness
+        playersOn   =   lsLines[id_sel]
+        for kk in playersOn:
+            playerFitness[0,kk]     =   playerFitness[1,kk] + (playerFitness[0,kk]-playerFitness[1,kk])*recovery(max(1,playerRested[0,kk]))
+        # Update line value
+        lineValue   =   lineV[0,id_sel] * np.prod(playerFitness[0,playersOn])
+        # Compute reward
+        reward      =   lineValue + np.random.normal(0, .005, 1)  # draw reward q(a) + random number
+        # Update line value estimate
+        n_visit1[0, id_sel] += 1
+        q_estim1[0, id_sel] = q_estim1[0, id_sel] + (reward - q_estim1[0, id_sel]) / n_visit1[0, id_sel]
+        avg_R2[hh, jj] = reward
+        # Update players: fatigue
+        for kk in playersOn:
+            playerFitness[1, kk] = playerFitness[0, kk] * decay(changeT[jj]*15)
+        # Update players: rest
+        playerRested[0, playersOn] = -changeT[jj] * 15
+        playerRested    +=  changeT[jj]*15
+
+    ### PASS3 : e-GREEDY METHOD : epsilon=0.1
+    # Simulate value changes: players and lines
+    playerFitness   =   np.ones([2, n_arms+1])
+    playerRested    =   np.zeros([1, n_arms+1])
+    selectedLine    =   []
+    for jj in range(len(changeT)):
+        # Heuristic on line value
+        pF          =   playerFitness + (playerFitness[0, :] - playerFitness[1, :]) * recovery(np.minimum(300,np.maximum(1, playerRested[0, :])))
+        lF          =   [np.prod(pF[0,x]) for x in lsLines]
+        # Select line --- method2 : e-greedy 0.01
+        if np.random.uniform(0, 1) >= 0.9:
+            id_sel  =   np.random.randint(0, len(lsLines))
+        else:
+            id_sel  =   np.argmax( np.multiply(q_estim1, np.reshape(lF, [1, len(lsLines)])) )  # select arm with highest q
+        selectedLine.append(id_sel)
+        # Update players: fitness
+        playersOn   =   lsLines[id_sel]
+        for kk in playersOn:
+            playerFitness[0,kk]     =   playerFitness[1,kk] + (playerFitness[0,kk]-playerFitness[1,kk])*recovery(max(1,playerRested[0,kk]))
+        # Update line value
+        lineValue   =   lineV[0,id_sel] * np.prod(playerFitness[0,playersOn])
+        # Compute reward
+        reward      =   lineValue + np.random.normal(0, .005, 1)  # draw reward q(a) + random number
+        # Update line value estimate
+        n_visit1[0, id_sel] += 1
+        q_estim1[0, id_sel] = q_estim1[0, id_sel] + (reward - q_estim1[0, id_sel]) / n_visit1[0, id_sel]
+        avg_R3[hh, jj] = reward
+        # Update players: fatigue
+        for kk in playersOn:
+            playerFitness[1, kk] = playerFitness[0, kk] * decay(changeT[jj]*15)
+        # Update players: rest
+        playerRested[0, playersOn] = -changeT[jj] * 15
+        playerRested    +=  changeT[jj]*15
+
+    printf('done.')
+
+    
 plt.figure();   plt.plot( [0, 60], [0, 0], 'r--', label='line1')
 plt.plot( [0, 60], [136, 136], 'm--', label='line2')
 plt.plot( [0, 60], [200, 200], 'y--', label='line3')
