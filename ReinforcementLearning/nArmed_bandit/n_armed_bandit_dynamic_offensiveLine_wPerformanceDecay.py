@@ -21,7 +21,7 @@ alpha   =   0.8
 
 # Set decay and recovery functions
 decay   =   lambda ltd: np.exp(-ltd/186)
-recovery=   lambda ltr: np.log(ltr)*0.9/np.log(300)
+recovery=   lambda ltr: np.log(ltr)*0.7/np.log(300)
 
 # Sample line changes: hard-coded median line shift = 45s
 # https://www.sportingcharts.com/nhl/stats/average-ice-time-per-shift/2016/
@@ -167,9 +167,10 @@ for hh in range(n_iter):
         playerRested[0, playersOn] = -changeT[jj] * 15
         playerRested    +=  changeT[jj]*15
 
-    printf('done.')
+    print('done.')
 
-    
+
+# Plot the selected line along time
 plt.figure();   plt.plot( [0, 60], [0, 0], 'r--', label='line1')
 plt.plot( [0, 60], [136, 136], 'm--', label='line2')
 plt.plot( [0, 60], [200, 200], 'y--', label='line3')
@@ -180,7 +181,21 @@ axes.set_xlim([0, 60])
 plt.legend(loc='lower right')
 plt.xlabel('Time on ice (m)')
 plt.ylabel('Selected line (index)')
-
 plt.figure(); plt.plot(avg_R1[0,:])
+
+
+# Plot the average reward for each policy
+plt.figure()
+plt.plot( np.mean(avg_R1, axis=0), 'r', label='greedy-0' )
+plt.plot( np.mean(avg_R2, axis=0), 'g', label='greedy-0.01' )
+plt.plot( np.mean(avg_R3, axis=0), 'b', label='greedy-0.1' )
+axes    =   plt.gca()
+axes.set_xlim([0, 60])
+axes.set_ylim([0, 1])
+plt.title('Players recovery factor: ' + str(0.7))
+plt.legend(loc='upper right')
+plt.xlabel('Time on ice (m)')
+plt.ylabel('Avg reward')
+plt.plot([10, 10], [0, 1], 'k--')
 
 
