@@ -3,7 +3,7 @@ import csv
 import re
 from os import getcwd, listdir, chdir, stat
 from Utils.programming import ut_unique
-
+from Utils.data.dt_tools import *
 
 class Table:
 
@@ -93,7 +93,8 @@ class ROSTERtable(Table):
 
 
 # Read the tables
-REP     =   '/home/younesz/Documents/Databases/Hockey/PlayByPlay/Season_2015_2016'
+#REP     =   '/home/younesz/Documents/Databases/Hockey/PlayByPlay/Season_2015_2016'
+REP     =   '/Users/younes_zerouali/Documents/Stradigi/Databases/Hockey/PlayByPlay/Season_2015_2016'
 RSTR    =   ROSTERtable(REP, 'roster_20152016.csv')
 RSTR.read()
 PBP     =   PBPtable(REP, 'playbyplay_20152016.csv')
@@ -110,7 +111,8 @@ P_gameCode_ix, _    =   PBP.get_column_idx('gcode')         # index of the colum
 P_homeGame_ix       =   PBP.filter_column(P_gameCode_ix, P_homeTeam_ix, 'MTL')
 P_awayGame_ix       =   PBP.filter_column(P_gameCode_ix, P_awayTeam_ix, 'MTL')
 mtlGame_code, _     =   ut_unique.main(P_homeGame_ix+P_awayGame_ix)
-mtlGame_code        =   sorted(mtlGame_code)                # Codes of the Canadians games
+mtlGame_code        =   sorted(mtlGame_code)  # Codes of the Canadians games
+mtlGame_home        =   [x in P_homeGame_ix for x in mtlGame_code ]
 # Get the ranges for games
 mtlGame_range       =   [PBP.get_column_range(P_gameCode_ix, x) for x in mtlGame_code]
 
@@ -118,18 +120,31 @@ mtlGame_range       =   [PBP.get_column_range(P_gameCode_ix, x) for x in mtlGame
 # Step2: Keep the plays in 5on5
 # ======
 # Extract mtl games
-P_type_ix, _    =   PBP.get_column_idx('type')
+P_type_ix, _    =   PBP.get_column_idx('powerplay')
 mtlGames        =   [PBP.slice_table( mtlGame_range[x].get('start')+mtlGame_range[x].get('end'), [0, P_type_ix] ) for x in list(range(len(mtlGame_range)))]
 # Detect power plays
+powerplay       =   [[(x[-1]%11)!=0 for x in y] for y in mtlGames]
 
 
-# Step3: find time played by the different lineups
+# ======
+#  Step3: find time played by the different lineups
+# ======
+lineTime        =   time_lineups(mtlGames[0], PBP.header, mtlGame_home[0], powerplay[0])
 
-# Step4: find the fraction of exploration
 
-# Step5: find #points/#games won
+# ======
+#  Step4: find the fraction of exploration
+# ======
 
-# Step6: correlate #points/#games won with fraction of exploration
+
+# ======
+#  Step5: find #points/#games won
+# ======
+
+
+# ======
+#  Step6: correlate #points/#games won with fraction of exploration
+# ======
 
 
 """
