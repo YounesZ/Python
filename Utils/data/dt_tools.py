@@ -16,6 +16,7 @@ def time_lineups(seq, header, gameHome=True, filter=None):
         timii   =   float( ii[tmCol] )
 
         if jj:
+            prevTm = timii
             continue
 
         if not(linii in lines):
