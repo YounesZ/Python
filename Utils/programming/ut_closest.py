@@ -8,14 +8,15 @@ def main(values, ref_vec):
     #Loop on values
     nEl     =   len(values)
     idX     =   [0]*nEl
+    Vl      =   [0]*nEl
     for ii in range(nEl):
         # Subtract
         subV    =   abs( np.array(ref_vec) - values[ii] )
         ix      =   np.argmin( subV )
 
         # Add to vector
-        idX[ii]    =   ix
-
+        idX[ii] =   ix
+        Vl[ii]  =   ref_vec[ix]
     return idX
 
 

@@ -1,14 +1,18 @@
+import copy
+
 def main(dico, value):
 
+    dico2   =   copy.deepcopy(dico)
+    valueCp =   copy.deepcopy(value)
     # Prepare holder
-    eqKeys  =   ['']*len(value)
-    keys    =   dico.keys()
-    for k,v in dico.items():
-        if v in value:
-            idx             =   value.index(v)
+    eqKeys  =   ['']*len(valueCp)
+    keys    =   dico2.keys()
+    for k,v in dico2.items():
+        if v in valueCp:
+            idx             =   valueCp.index(v)
             eqKeys[idx]     =   k
-            dico[k]         =   -1
-            value[idx]      =   -1
+            dico2[k]        =   -1
+            valueCp[idx]    =   -1
 
     return eqKeys
 
