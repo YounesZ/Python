@@ -46,6 +46,8 @@ class Table:
                 vRng['start'].append(count)
             elif ii[colId] != value and prev:
                 vRng['end'].append(count - 1)
+            elif ii[colId] == value and count==len(self.dataRaw)-1:
+                vRng['end'].append(count)
             prev = ii[colId] == value
             count += 1
         return vRng

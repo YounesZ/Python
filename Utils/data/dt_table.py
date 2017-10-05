@@ -3,8 +3,8 @@ from Utils.data.dt_tools import *
 from Utils.programming import ut_unique, ut_get_key_by_value
 
 # Read the tables
-REP     =   '/home/younesz/Documents/Databases/Hockey/PlayByPlay/Season_2015_2016'
-#REP     =   '/Users/younes_zerouali/Documents/Stradigi/Databases/Hockey/PlayByPlay/Season_2015_2016'
+#REP     =   '/home/younesz/Documents/Databases/Hockey/PlayByPlay/Season_2015_2016'
+REP     =   '/Users/younes_zerouali/Documents/Stradigi/Databases/Hockey/PlayByPlay/Season_2015_2016'
 RSTR    =   ROSTERtable(REP, 'roster_20152016.csv')
 RSTR.read()
 PBP     =   PBPtable(REP, 'playbyplay_20152016.csv')
@@ -45,6 +45,7 @@ for tii in allTeams:
     mtlGame_home        =   [x in P_homeGame_ix for x in mtlGame_code ]
     # Get the ranges for games
     mtlGame_range       =   [PBP.get_column_range(P_gameCode_ix, x) for x in mtlGame_code]
+    mtlGame_range       =   mtlGame_range[:82]
 
     # ======
     # Step2: Keep the plays in 5on5

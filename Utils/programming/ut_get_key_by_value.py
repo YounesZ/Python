@@ -8,6 +8,7 @@ def main(dico, value):
             idx             =   value.index(v)
             eqKeys[idx]     =   k
             dico[k]         =   -1
+            value[idx]      =   -1
 
     return eqKeys
 
