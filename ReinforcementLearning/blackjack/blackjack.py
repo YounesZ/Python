@@ -14,7 +14,6 @@
     This exercise is drawn from the book of Sutton and Berto (2002) p.108
 
     TODO:
-        -   Debug game execution
         -   Hand evaluation at game start to check for "naturals"
         -   Implement infinite card deck
         -   Monte-Carlo method for finding optimal policy by simulating state-action
@@ -125,8 +124,8 @@ class blackJack:
         bust            =   [x>21 for x in plDict['value']]
         bkjack          =   [x==21 for x in plDict['value']]
         # Keep highest value
-        highB           =   [x if y==True for x,y in zip(plDict['value'], bust)]
-        plDict['value'] =   max( plDict['value'][not bust] )
+        highB           =   [x if y==False else 0 for x,y in zip(plDict['value'], bust)]
+        plDict['value'] =   max(highB)
         if any(bust):
             plDict['usable']=   False
         if all(bust):
@@ -136,42 +135,49 @@ class blackJack:
         setattr(self, player, plDict)
 
     def game_status(self):
+        rehit   =   False
         # Check agent's hand
+        oldTurn         =   self.turn
         if self.agent['status'] == 'bust':
             msg         =   'agent loses, busted'
             status      =   -1
             self.turn   =   'dealer'
-        elif self.dealer['status'] == 'bust':
-            msg         =   'agent wins, dealer busted'
-            status      =   1
-            self.turn   = 'agent'
+        elif any(self.agent['status']==x for x in ['blackjack', 'stick']) and self.turn=='agent':
+            msg         =   self.agent['status']+", dealer's turn"
+            status      =   2
+            self.turn   =   'dealer'
+            rehit       =   True
         elif self.agent['status'] == 'On':
             msg         =   "Game is on, agent's turn"
             status      =   2
+        # Check dealer's hand
+        elif self.dealer['status'] == 'bust':
+            msg         =   'agent wins, dealer busted'
+            status      =   1
+        elif self.agent['value'] < self.dealer['value']:
+            msg         =   "agent loses, lower value"
+            status      =   -1
         elif self.dealer['status'] == 'On':
             msg         =   "Game is on, dealer's turn"
             status      =   2
             self.turn   =   'dealer'
-        else:  # both stuck
-            # Agent value
-            agent       =   ut_remove_value.main(self.agent['value'], '>21')
-            dealer      =   ut_remove_value.main(self.dealer['value'], '>21')
-            if agent    >   dealer:
-                msg     =   'Agent wins, higher value'
-                status  =   1
-            elif agent  <   dealer:
-                msg     =   'Agent loses, lower value'
-                status  =   -1
+        else:
+            # Compare hand value
+            if self.agent['value'] > self.dealer['value']:
+                msg         =   "agent wins, higher value"
+                status      =   2
             else:
-                msg     =   'Tied game'
-                status  =   0
+                msg         =   'Tied game'
+                status      =   0
         self.status_print(msg, status)
-        if status < 2:
+        if status   <   2:
             # Episode over
-            msg     =   'Game is over, draw new hand'
             self.history.append(status)
             self.dealer_clear_table()
             self.game_start()
+        elif self.turn=='dealer' and self.turn!=oldTurn:
+            # Dealer shows hidden card
+            self.hand_do('hit')
 
     def dealer_clear_table(self):
         # Put cards back in the deck
@@ -184,12 +190,14 @@ class blackJack:
     def status_print(self, msg, status):
 
         # Common prints
-        dlh = []
+        dlh =   []
+        dlv =   str(self.dealer['value'])
         for ii, jj in zip(self.dealer['hand'], self.dealer['shown']):
             if jj:
                 dlh.append(ii)
             else:
                 dlh.append('Hidden')
+                dlv     =   'Hidden'
 
         # Start print
         if msg=='New game':
@@ -198,8 +206,8 @@ class blackJack:
             print('-'*110)
         else: # Print status
             # Print results
-            print('Agent'.ljust(12)+', '.join(self.agent['hand']).ljust(50)+str(self.agent['value'][0]).ljust(12)+self.agent['status'].ljust(12)+msg.ljust(36))
-            print('Dealer'.ljust(12)+', '.join(dlh).ljust(50)+str(self.dealer['value'][0]).ljust(12)+self.dealer['status'].ljust(12))
+            print('Agent'.ljust(12)+', '.join(self.agent['hand']).ljust(50)+str(self.agent['value']).ljust(12)+self.agent['status'].ljust(12)+msg.ljust(36))
+            print('Dealer'.ljust(12)+', '.join(dlh).ljust(50)+dlv.ljust(12)+self.dealer['status'].ljust(12))
 
             # Game ending
             if status<2:
@@ -212,5 +220,8 @@ class blackJack:
 # Demo
 game    =   blackJack()
 #game    =   blackJack()
+game.hand_do('hit')
+game.hand_do('stick')
+game.hand_do('hit')
 game.hand_do('hit')
 game.hand_do('stick')
