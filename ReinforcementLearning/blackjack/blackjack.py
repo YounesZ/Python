@@ -73,37 +73,33 @@ class blackJack:
             self.drawn  =   0
             self.game_start()
 
-    def hand_hit(self):
+    def hand_do(self, action):
         # Take a card from the deck and put into agent's head
         player  =   self.turn
         plDict  =   getattr(self, player)
-        if player=='dealer' and self.agent['status']=='On':
-            print('\tWrong play: dealer must wait for agent to stick or bust')
-            return
-        elif plDict['status']=='stick':
-            print('\tWrong play: '+player+' chose to stick')
-            return
-        elif plDict['status']=='bust':
-            print('\tWrong play: '+player+' busted already')
-            return
-        if self.drawn==52:
-            print('\tDeck emptied, game restarted')
-            self.dealer_clear_table()
-            shuffle(self.deck)
-            self.drawn  =   0
-            self.game_start()
-        else:
-            if player=='dealer' and not self.dealer['shown'][-1]:
-                self.dealer['shown'][-1]    =   True
+
+        if action=='hit':
+            if self.drawn==52:
+                print('\tDeck emptied, game restarted')
+                self.dealer_clear_table()
+                shuffle(self.deck)
+                self.drawn  =   0
+                self.game_start()
             else:
-                plDict['hand'].append(self.deck.pop(0))
-                plDict['shown'].append(True)
-                self.drawn  +=  1
-                setattr(self, player, plDict)
-            # Evaluate new hand value
-            self.hand_value()
-            # Evaluate game status
-            self.game_status()
+                if player=='dealer' and not self.dealer['shown'][-1]:
+                    self.dealer['shown'][-1]    =   True
+                else:
+                    plDict['hand'].append(self.deck.pop(0))
+                    plDict['shown'].append(True)
+                    self.drawn  +=  1
+                    setattr(self, player, plDict)
+                # Evaluate new hand value
+                self.hand_value()
+                # Evaluate game status
+        elif action=='stick':
+            plDict['status']    =   'stick'
+            setattr(self, player, plDict)
+        self.game_status()
 
     def hand_value(self):
         # Evaluate player's hand
@@ -135,11 +131,11 @@ class blackJack:
     def game_status(self):
         # Check agent's hand
         if self.agent['status'] == 'bust':
-            msg         =   'Agent loses, busted'
+            msg1, msg2  =   'loses', 'busted'
             status      =   -1
             self.turn   =   'dealer'
         elif self.dealer['status'] == 'bust':
-            msg         =   'Agent wins, dealer busted'
+            msg1, msg2  =   'wins', 'dealer busted'
             status      =   1
             self.turn   = 'agent'
         elif self.agent['status'] == 'On':
@@ -151,24 +147,24 @@ class blackJack:
             self.turn   =   'dealer'
         else:  # both stuck
             # Agent value
-            agent   =   ut_remove_value.main(self.agent['value'], '>21')
-            dealer  =   ut_remove_value.main(self.dealer['value'], '>21')
-            if agent > dealer:
+            agent       =   ut_remove_value.main(self.agent['value'], '>21')
+            dealer      =   ut_remove_value.main(self.dealer['value'], '>21')
+            if agent    >   dealer:
                 msg     =   'Agent wins, higher value'
                 status  =   1
-            elif agent < dealer:
+            elif agent  <   dealer:
                 msg     =   'Agent loses, lower value'
                 status  =   -1
             else:
-                print('\tTied game')
+                msg     =   'Tied game'
                 status  =   0
+        self.status_print(msg, status)
         if status < 2:
             # Episode over
             msg     =   'Game is over, draw new hand'
             self.history.append(status)
             self.dealer_clear_table()
             self.game_start()
-        self.status_print(msg, status)
 
     def dealer_clear_table(self):
         # Put cards back in the deck
@@ -178,27 +174,36 @@ class blackJack:
         self.agent['hand']  = []
         self.dealer['hand'] = []
 
-    def status_print(self, msg, status):
+    def status_print(self, status, msg1, msg2):
+
         # Common prints
-        dlh     =   []
-        for ii,jj in zip(self.dealer['hand'], self.dealer['shown']):
+        dlh = []
+        for ii, jj in zip(self.dealer['hand'], self.dealer['shown']):
             if jj:
                 dlh.append(ii)
             else:
                 dlh.append('Hidden')
-        print('======GAME #'+str(len(self.history)+1)+'======')
-        print('\tAgent hand: '+', '.join(self.agent['hand']))
-        print('\tDealer hand: ' + ', '.join(dlh))
-        print('\t'+msg)
-        # Follwing status
-        if status:
+
+        # Start print
+        if status=='start':
+            print('======GAME #' + str(len(self.history) + 1) + '======')
+            print('\tPlayer\tHand\t\t\t\t\t\tValue\tStatus\tGame')
+            print('\t'+'-'*70)
+        else: # Print status
+            # Print results
+            print('\tAgent\t'+', '.join(self.agent['hand'])+'\t'+str(self.agent['value'][0])+'\t'+self.agent['status']+'\t'+msg2)
+            print('\tDealer\t'+', '.join(self.dealer['hand'])+'\t'+str(self.dealer['value'][0])+'\t'+ self.agent['status']+'\t'+msg2-0p)
+
+        # Game ending
+        if status<2:
             print('======\n\n')
         else:
-            print('\tNew draw...\n')
+            print('\n')
 
 
 
 # Demo
 game    =   blackJack()
-game.hand_hit()
+#game    =   blackJack()
+game.hand_do('hit')
 
