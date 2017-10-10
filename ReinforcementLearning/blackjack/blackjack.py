@@ -63,8 +63,10 @@ class blackJack:
             self.drawn  +=  4
             # Evaluate new hand value
             self.turn   =   'agent'
-            self.hand_value()
+            self.hand_value(player='agent')
+            self.hand_value(player='dealer')
             # Evaluate game status
+            self.status_print('New game', 2)
             self.game_status()
         else:
             # Deck exhausted
@@ -99,11 +101,13 @@ class blackJack:
         elif action=='stick':
             plDict['status']    =   'stick'
             setattr(self, player, plDict)
+        self.hand_value()
         self.game_status()
 
-    def hand_value(self):
+    def hand_value(self, player=None):
         # Evaluate player's hand
-        player          =   self.turn
+        if player==None:
+            player      =   self.turn
         plDict          =   getattr(self, player)
         # Make sure all cards are converted to value
         cards           =   [x.split('_')[0] for x in plDict['hand']]
@@ -120,6 +124,9 @@ class blackJack:
         # Check if busting
         bust            =   [x>21 for x in plDict['value']]
         bkjack          =   [x==21 for x in plDict['value']]
+        # Keep highest value
+        highB           =   [x if y==True for x,y in zip(plDict['value'], bust)]
+        plDict['value'] =   max( plDict['value'][not bust] )
         if any(bust):
             plDict['usable']=   False
         if all(bust):
@@ -131,11 +138,11 @@ class blackJack:
     def game_status(self):
         # Check agent's hand
         if self.agent['status'] == 'bust':
-            msg1, msg2  =   'loses', 'busted'
+            msg         =   'agent loses, busted'
             status      =   -1
             self.turn   =   'dealer'
         elif self.dealer['status'] == 'bust':
-            msg1, msg2  =   'wins', 'dealer busted'
+            msg         =   'agent wins, dealer busted'
             status      =   1
             self.turn   = 'agent'
         elif self.agent['status'] == 'On':
@@ -174,7 +181,7 @@ class blackJack:
         self.agent['hand']  = []
         self.dealer['hand'] = []
 
-    def status_print(self, status, msg1, msg2):
+    def status_print(self, msg, status):
 
         # Common prints
         dlh = []
@@ -185,20 +192,20 @@ class blackJack:
                 dlh.append('Hidden')
 
         # Start print
-        if status=='start':
+        if msg=='New game':
             print('======GAME #' + str(len(self.history) + 1) + '======')
-            print('\tPlayer\tHand\t\t\t\t\t\tValue\tStatus\tGame')
-            print('\t'+'-'*70)
+            print('Player'.ljust(12)+'Hand'.ljust(50)+'Value'.ljust(12)+'Status'.ljust(12)+'Game'.ljust(36))
+            print('-'*110)
         else: # Print status
             # Print results
-            print('\tAgent\t'+', '.join(self.agent['hand'])+'\t'+str(self.agent['value'][0])+'\t'+self.agent['status']+'\t'+msg2)
-            print('\tDealer\t'+', '.join(self.dealer['hand'])+'\t'+str(self.dealer['value'][0])+'\t'+ self.agent['status']+'\t'+msg2-0p)
+            print('Agent'.ljust(12)+', '.join(self.agent['hand']).ljust(50)+str(self.agent['value'][0]).ljust(12)+self.agent['status'].ljust(12)+msg.ljust(36))
+            print('Dealer'.ljust(12)+', '.join(dlh).ljust(50)+str(self.dealer['value'][0]).ljust(12)+self.dealer['status'].ljust(12))
 
-        # Game ending
-        if status<2:
-            print('======\n\n')
-        else:
-            print('\n')
+            # Game ending
+            if status<2:
+                print('======\n\n')
+            else:
+                print('\n')
 
 
 
@@ -206,4 +213,4 @@ class blackJack:
 game    =   blackJack()
 #game    =   blackJack()
 game.hand_do('hit')
-
+game.hand_do('stick')
