@@ -69,7 +69,6 @@ class blackJack:
             self.game_status()
 
     def hand_do(self, action, player=None, statUpd=True):
-        # Take a card from the deck and put into agent's head
         if player   ==  None:
             player  =   self.turn
         plDict      =   getattr(self, player)
@@ -172,6 +171,7 @@ class blackJack:
             self.hand_do('hit')
         elif self.deck_empty:
             self.deck_new()
+        return status
 
     def status_print(self, msg, status):
         # Common prints
@@ -200,8 +200,6 @@ class blackJack:
 # Demo
 game    =   blackJack('infinite')
 #game    =   blackJack()
-game.hand_do('hit')
-game.hand_do('stick')
-game.hand_do('hit')
-game.hand_do('hit')
-game.hand_do('stick')
+#game.hand_do('hit')
+#game.hand_do('stick')
+
