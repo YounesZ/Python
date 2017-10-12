@@ -90,7 +90,6 @@ class blackJack:
                     setattr(self, player, plDict)
                 # Evaluate new hand value
                 self.hand_value(player=player)
-                # Evaluate game status
         elif action=='stick':
             plDict['status']    =   'stick'
             setattr(self, player, plDict)
@@ -128,7 +127,7 @@ class blackJack:
             plDict['status']=   'blackjack'
         setattr(self, player, plDict)
 
-    def game_status(self):
+    def game_status(self, statusOnly=False):
         # Check agent's hand
         oldTurn         =   self.turn
         if self.agent['status'] == 'bust':
@@ -162,6 +161,9 @@ class blackJack:
                 msg         =   'Tied game'
                 status      =   0
         self.status_print(msg, status)
+        # Exit
+        if statusOnly:
+            return status
         if status < 2:
             # Episode over
             self.history.append(status)
@@ -171,7 +173,6 @@ class blackJack:
             self.hand_do('hit')
         elif self.deck_empty:
             self.deck_new()
-        return status
 
     def status_print(self, msg, status):
         # Common prints
