@@ -47,8 +47,8 @@ class blackJack:
         #self.game_start()
 
     def game_start(self, statusOnly=False, printStatus=True):
-        self.agent  =   {'hand': [], 'shown': [], 'plays': [], 'value': 0, 'status': 'On'}
-        self.dealer =   {'hand': [], 'shown': [], 'plays': [], 'value': 0, 'status': 'On'}
+        self.agent  =   {'hand': [], 'shown': [], 'plays': [], 'value': 0, 'status': 'On', 'usable': False}
+        self.dealer =   {'hand': [], 'shown': [], 'plays': [], 'value': 0, 'status': 'On', 'usable': False}
         # Dealer gives two cards to agent
         self.hand_do('hit','agent',False)
         self.hand_do('hit','agent',False)
@@ -111,6 +111,7 @@ class blackJack:
             idx         =   cards.index(1)
             cards[idx]  =   11
             plDict['plays'] +=  [deepcopy(cards)]
+            plDict['usable']=   True
         # Compute values
         plDict['value'] =   [sum(x) for x in plDict['plays']]
         # Check if busting
