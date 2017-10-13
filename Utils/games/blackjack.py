@@ -65,7 +65,7 @@ class blackJack:
             # Evaluate new hand value
             self.turn   =   'agent'
             # Evaluate game status
-            self.status_print('New game', 2)
+            if printStatus: self.status_print('New game', 2)
             self.game_status(statusOnly=statusOnly, printStatus=printStatus)
 
     def hand_do(self, action, player=None, statUpd=True):
