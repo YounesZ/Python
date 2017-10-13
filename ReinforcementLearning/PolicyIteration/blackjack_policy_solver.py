@@ -56,6 +56,9 @@ class policySolver_blackjack(blackJack):
                 idStart =   list( range(len(self.nUpdates)) )
             shuffle(idStart)
             idStart     =   idStart[0]
+            idStart
+            type(idStart)
+            self.nEvaluations[idStart]    +=  1
             # Get states doublet
             y, x        =   ut_ind2sub.main([11, 10], [idStart])
             # Possible cards: dealer
@@ -107,10 +110,11 @@ class policySolver_blackjack(blackJack):
 # LAUNCHER
 # ========
 # Instantiate the solver
-#BJS     =   policySolver_blackjack()
+BJS     =   policySolver_blackjack()
 # Make the agent's policy
-#policyAG=   np.reshape([x<20 for x in BJS.agent_states], [len(BJS.agent_states),1]) * [x>0 for x in BJS.dealer_states]
-#policyAG=   np.reshape(policyAG, [1, BJS.nStates])
-#BJS.set_policy( policyAG)
+policyAG=   np.reshape([x<20 for x in BJS.agent_states], [len(BJS.agent_states),1]) * [x>0 for x in BJS.dealer_states]
+policyAG=   np.reshape(policyAG, [1, BJS.nStates])
+BJS.set_policy( policyAG)
 # Evaluate that policy
-#BJS.evaluate_policy()
+BJS.evaluate_policy()
+print('Stopped here')
