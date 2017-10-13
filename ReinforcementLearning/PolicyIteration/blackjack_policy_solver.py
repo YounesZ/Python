@@ -24,7 +24,7 @@ class policySolver_blackjack(blackJack):
         self.state_value    =   np.random.random([1, self.nStates])
         # Initialize cards pairs
         self.cardMat        =   np.reshape(np.array(range(1, 12)), [11, 1]) + np.array(range(1, 12))
-        self.cardVec        =   {1:[1], 2:[2], 3:[3], 4:[4], 5:[5], 6:[6], 7:[7], 8:[8], 9:[9], 10:['Jack', 'Queen', 'King'], 11:[1]}
+        self.cardVec        =   {1:[1], 2:[2], 3:[3], 4:[4], 5:[5], 6:[6], 7:[7], 8:[8], 9:[9], 10:['jack', 'queen', 'king'], 11:[1]}
         self.colors         =   ['Heart', 'Diamond', 'Club', 'Spade']
 
     def set_policy(self, policy=None):
@@ -59,6 +59,7 @@ class policySolver_blackjack(blackJack):
             # Get states doublet
             y, x        =   ut_ind2sub.main([11, 10], [idStart])
             # Possible cards: dealer
+            self.game_start(statusOnly=True, printStatus=False)
             self.dealer['hand'][0]=   str(choice(self.cardVec[y[0]+1]))+'_'+choice(self.colors)
             self.hand_value(player='dealer')
             # Possible cards: agent
@@ -66,6 +67,7 @@ class policySolver_blackjack(blackJack):
             idChoice    =   choice( list(range(len(iy))) )
             self.agent['hand']  =   [str(xlp+1)+'_'+choice(self.colors) for xlp in [iy[idChoice], ix[idChoice]]]
             self.hand_value(player='agent')
+            self.game_status(statusOnly=True)
             # ----------
             # --- step2: generate/sample a state-action-reward
             # ----------
@@ -91,6 +93,7 @@ class policySolver_blackjack(blackJack):
                 else:
                     self.hand_do('stick', statUpd=False)
                 reward  =   self.game_status(statusOnly=True)
+            self.history.append(reward)
             # Unfold the reward onto chain
             returns     =   [returns[x]+[reward] if x in state_chain else returns[x] for x in range(self.nStates)]
             # Update policy
@@ -104,10 +107,10 @@ class policySolver_blackjack(blackJack):
 # LAUNCHER
 # ========
 # Instantiate the solver
-BJS     =   policySolver_blackjack()
+#BJS     =   policySolver_blackjack()
 # Make the agent's policy
-policyAG=   np.reshape([x>0 for x in BJS.dealer_states], [len(BJS.dealer_states),1]) * [x<20 for x in BJS.agent_states]
-policyAG=   np.reshape(policyAG, [1, BJS.nStates])
-BJS.set_policy( policyAG)
+#policyAG=   np.reshape([x<20 for x in BJS.agent_states], [len(BJS.agent_states),1]) * [x>0 for x in BJS.dealer_states]
+#policyAG=   np.reshape(policyAG, [1, BJS.nStates])
+#BJS.set_policy( policyAG)
 # Evaluate that policy
-BJS.evaluate_policy()
+#BJS.evaluate_policy()

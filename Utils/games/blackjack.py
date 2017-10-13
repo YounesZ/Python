@@ -44,9 +44,9 @@ class blackJack:
         self.deck           =   list( np.concatenate([[x+'_'+y for x in numbers] for y in colors][:]) )
         self.deck_empty     =   False
         self.cardP          =   [1/52]*52
-        self.game_start()
+        #self.game_start()
 
-    def game_start(self):
+    def game_start(self, statusOnly=False, printStatus=True):
         self.agent  =   {'hand': [], 'shown': [], 'plays': [], 'value': 0, 'status': 'On'}
         self.dealer =   {'hand': [], 'shown': [], 'plays': [], 'value': 0, 'status': 'On'}
         # Dealer gives two cards to agent
@@ -66,7 +66,7 @@ class blackJack:
             self.turn   =   'agent'
             # Evaluate game status
             self.status_print('New game', 2)
-            self.game_status()
+            self.game_status(statusOnly=statusOnly, printStatus=printStatus)
 
     def hand_do(self, action, player=None, statUpd=True):
         if player   ==  None:
@@ -127,7 +127,7 @@ class blackJack:
             plDict['status']=   'blackjack'
         setattr(self, player, plDict)
 
-    def game_status(self, statusOnly=False):
+    def game_status(self, statusOnly=False, printStatus=True):
         # Check agent's hand
         oldTurn         =   self.turn
         if self.agent['status'] == 'bust':
@@ -160,7 +160,8 @@ class blackJack:
             else:
                 msg         =   'Tied game'
                 status      =   0
-        self.status_print(msg, status)
+        if printStatus:
+            self.status_print(msg, status)
         # Exit
         if statusOnly:
             return status
@@ -199,7 +200,7 @@ class blackJack:
 
 
 # Demo
-game    =   blackJack('infinite')
+#game    =   blackJack('infinite')
 #game    =   blackJack()
 #game.hand_do('hit')
 #game.hand_do('stick')
