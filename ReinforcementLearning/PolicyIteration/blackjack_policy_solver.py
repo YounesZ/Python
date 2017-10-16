@@ -35,10 +35,14 @@ class policySolver_blackjack(blackJack):
         # Dealer policy: hard-coded - dealer sticks on 17 and higher
         self.policy_dealer  =   np.array([1] * 16 + [0] * 5) > 0  # True means HIT, False means STICK
         # Agent policy
-        self.policy_agent   =   policy
         if policy is None:
             # Initialize a random one
-            self.policy_agent=   np.random.random([1, self.nStates]) > .5  # True means HIT, False means STICK
+            self.policy_usable  =   np.random.random(self.nStates) > .5  # True means HIT, False means STICK
+            self.policy_unusable=   np.random.random(self.nStates) > .5
+        else:
+            # True means HIT, False means STICK
+            self.policy_usable  =   policy[0]
+            self.policy_unusable=   policy[1]
         self.nEvaluations   =   [0] * self.nStates
         self.nUpdates       =   [0] * self.nStates
 
@@ -69,16 +73,22 @@ class policySolver_blackjack(blackJack):
         # play the game
         self.turn       =   'agent'
         curState        =   self.agent_states.index(self.agent['value']) * len(self.dealer_states) + self.dealer_states.index(self.dealer['value'])
+        print(self.current_state, curState)
         reward          =   2
         state_chain     =   [curState]
         usable_chain    =   [self.agent['usable']]
         while self.turn == 'agent' and reward == 2:
             # --- Pick action according to agent's policy
             # Pick agent action at that state according to policy
-            if self.policy_agent[0, curState]:  # Hit
+            action      =   'stick'
+            if self.agent['usable'] and self.policy_usable[curState]:  # Hit
+                action  =   'hit'
+            elif not self.agent['usable'] and self.policy_unusable[curState]:
+                action  =   'hit'
+            if action   ==  'hit':
                 self.hand_do('hit', statUpd=False)
-                # Determine in which state we are now
                 if self.agent['value']>0:
+                    # Determine in which state we are now
                     curState = self.agent_states.index(self.agent['value']) * len(self.dealer_states) + self.dealer_states.index(self.dealer['value'])
                     # Append it to state chain
                     state_chain.append(curState)
@@ -120,8 +130,6 @@ class policySolver_blackjack(blackJack):
         returns_unusable    =   [[[] for _ in range(self.nStates)] for _ in range(2)]
         # Start looping
         for ii in range(nIterations):
-            # --- Step0: generate random policy
-            self.set_policy()
             # --- step1: initialize the episode
             self.episode_initialize()
             # --- step2: run the episode
@@ -129,39 +137,40 @@ class policySolver_blackjack(blackJack):
             self.nEvaluations[self.current_state] += 1
             self.history.append(reward)
             # Unfold the reward onto chain
-            action_chain            =   [int(self.policy_agent[0,x]) for x in state_chain]
+            action_chain            =   [1]*(len(state_chain)-1) + [0]
+            #action_chain            =   [int(self.policy_agent[0,x]) for x in state_chain]
             for st, ac, us in zip(state_chain, action_chain, usable_chain):
                 if us:
                     returns_usable[ac][st]  +=   [reward]
                 else:
                     returns_unusable[ac][st]+=   [reward]
-
-        # Store new state values
-        self.action_value_usable    =   [[np.mean(y) for y in x] for x in returns_usable]
-        self.action_value_unusable  =   [[np.mean(y) for y in x] for x in returns_unusable]
-        self.optimalpolicy_usable   =   [self.action_value_usable[1][x] > self.action_value_usable[0][x] for x in range(self.nStates)]
-        self.optimalpolicy_unusable =   [self.action_value_unusable[1][x] > self.action_value_unusable[0][x] for x in range(self.nStates)]
+            # Store new state values
+            self.action_value_usable    =   [[np.mean(y) if len(y)>0 else (np.random.random()-.5)/10 for y in x] for x in returns_usable]
+            self.action_value_unusable  =   [[np.mean(y) if len(y)>0 else (np.random.random()-.5)/10 for y in x] for x in returns_unusable]
+            self.policy_usable          =   [self.action_value_usable[1][x] > self.action_value_usable[0][x] for x in range(self.nStates)]
+            self.policy_unusable        =   [self.action_value_unusable[1][x] > self.action_value_unusable[0][x] for x in range(self.nStates)]
 
 
 # ========
 # LAUNCHER
 # ========
 # Instantiate the solver
-#BJS     =   policySolver_blackjack(method='sampling', gameType='infinite')
+BJS     =   policySolver_blackjack(method='sampling', gameType='infinite')
 # -----POLICY EVALUATION
 # Make the agent's policy
 #policyAG=   np.reshape([x<20 for x in BJS.agent_states], [len(BJS.agent_states),1]) * [x>0 for x in BJS.dealer_states]
 #policyAG=   np.reshape(policyAG, [1, BJS.nStates])
-#BJS.set_policy( policyAG)
+#BJS.set_policy(policyAG)
 # Evaluate that policy
 #BJS.evaluate_policy(nIterations=10000)
 # -----POLICY ITERATION
 # Solve for policy - Monte-Carlo algorithm
-#BJS.solve_policy_MC(nIterations=10000)
-
+BJS.set_policy()
+BJS.solve_policy_MC(nIterations=10000)
 
 
 """
+
 # ========
 # DISPLAY
 # ========
@@ -169,6 +178,37 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import time
 from mpl_toolkits.mplot3d import Axes3D
+
+
+# --- POLICY ---
+fig     =   plt.figure()
+# Axis 1: usable ace
+Z       =   np.reshape(BJS.policy_usable, [len(BJS.agent_states), len(BJS.dealer_states)])
+ax1     =   fig.add_subplot(121)
+surf1   =   ax1.imshow( Z )
+ax1.set_xlabel("Dealer's states")
+ax1.set_ylabel("Agent's states")
+ax1.set_title('$\pi_*$: usable ace')
+ax1.set_xticks(list(range(0,len(BJS.dealer_states),2)))
+ax1.set_xticklabels([BJS.dealer_states[x] for x in range(0,len(BJS.dealer_states),2)])
+ax1.set_yticks(list(range(0,len(BJS.agent_states),2)))
+ax1.set_yticklabels([BJS.agent_states[x] for x in range(0,len(BJS.agent_states),2)])
+# Axis 2: unusable ace
+Z       =   np.reshape(BJS.policy_unusable, [len(BJS.agent_states), len(BJS.dealer_states)])
+ax2     =   fig.add_subplot(122)
+surf2   =   ax2.imshow(Z)
+ax2.set_xlabel("Dealer's states")
+ax2.set_ylabel("Agent's states")
+ax2.set_title('$\pi_*$: unusable ace')
+ax2.set_xticks(list(range(0,len(BJS.dealer_states),2)))
+ax2.set_xticklabels([BJS.dealer_states[x] for x in range(0,len(BJS.dealer_states),2)])
+ax2.set_yticks(list(range(0,len(BJS.agent_states),2)))
+ax2.set_yticklabels([BJS.agent_states[x] for x in range(0,len(BJS.agent_states),2)])
+
+
+
+
+# --- STATE VALUE ---
 fig     =   plt.figure()
 X, Y    =   np.meshgrid(BJS.agent_states, np.flipud(BJS.dealer_states))
 # Axis 1: usable ace
@@ -197,4 +237,4 @@ ax2.set_zlabel('Value')
 ax2.set_zticks([-1, 0, 1])
 ax2.set_title('Unusable ace')
 ax2.invert_yaxis()
-
+"""
