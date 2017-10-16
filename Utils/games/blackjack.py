@@ -46,17 +46,23 @@ class blackJack:
         self.cardP          =   [1/52]*52
         #self.game_start()
 
-    def game_start(self, statusOnly=False, printStatus=True):
-        self.agent  =   {'hand': [], 'shown': [], 'plays': [], 'value': 0, 'status': 'On', 'usable': False}
-        self.dealer =   {'hand': [], 'shown': [], 'plays': [], 'value': 0, 'status': 'On', 'usable': False}
-        # Dealer gives two cards to agent
-        self.hand_do('hit','agent',False)
-        self.hand_do('hit','agent',False)
+    def game_start(self, statusOnly=False, printStatus=True, initCards=None):
+        # Initialize game: either random or from input argument
+        if initCards is None:
+            self.agent  =   {'hand': [], 'shown': [], 'plays': [], 'value': 0, 'status': 'On', 'usable': False}
+            self.dealer =   {'hand': [], 'shown': [], 'plays': [], 'value': 0, 'status': 'On', 'usable': False}
+            # Dealer gives two cards to agent
+            self.hand_do('hit','agent',False)
+            self.hand_do('hit','agent',False)
+            self.dealer['shown'] = [True, True]
+            # Dealer gives two cards to himself
+            self.hand_do('hit','dealer',False)
+            self.hand_do('hit','dealer',False)
+            self.dealer['shown'] = [True, False]
+        else:
+            self.agent  =   initCards[0]
+            self.dealer =   initCards[1]
         self.hand_value(player='agent')
-        # Dealer gives two cards to himself
-        self.hand_do('hit','dealer',False)
-        self.hand_do('hit','dealer',False)
-        self.dealer['shown'] = [True, False]
         self.hand_value(player='dealer')
         if self.deck_empty:
             print('\n\tDeck empty, restarting, ...\n\n')
