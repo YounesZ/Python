@@ -85,9 +85,9 @@ class policySolver_blackjack(blackJack):
             # Pick agent action at that state according to policy
             if randomInit:
                 action      =   bool( choice([0,1]) )
+                randomInit  =   False
             else:
                 action      =   self.policy_agent[curState[0], curState[1], int(self.agent['usable'])]
-                randomInit  =   False
             if action:
                 self.hand_do('hit', statUpd=False)
                 action_chain.append(1)
@@ -163,7 +163,7 @@ class policySolver_blackjack(blackJack):
 # LAUNCHER
 # ========
 # Instantiate the solver
-BJS     =   policySolver_blackjack(method='sampling', gameType='infinite')
+#BJS     =   policySolver_blackjack(method='sampling', gameType='infinite')
 # -----POLICY EVALUATION
 # Make the agent's policy
 #policyAG=   np.reshape([x<20 for x in BJS.agent_states], [len(BJS.agent_states),1]) * [x>0 for x in BJS.dealer_states]
@@ -173,8 +173,8 @@ BJS     =   policySolver_blackjack(method='sampling', gameType='infinite')
 #BJS.evaluate_policy(nIterations=10000)
 # -----POLICY ITERATION
 # Solve for policy - Monte-Carlo algorithm
-BJS.set_policy()
-BJS.solve_policy_MC(nIterations=500000)
+#BJS.set_policy()
+#BJS.solve_policy_MC(nIterations=500000)
 
 
 """
