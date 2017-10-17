@@ -126,6 +126,7 @@ class blackJack:
         # Keep highest value
         highB           =   [x if y==False else 0 for x,y in zip(plDict['value'], bust)]
         plDict['value'] =   max(highB)
+        plDict['status']=   'On'
         if any(bust):
             plDict['usable']=   False
         if all(bust):
@@ -141,11 +142,11 @@ class blackJack:
             msg         =   'agent loses, busted'
             status      =   -1
             self.turn   =   'dealer'
-        elif any(self.agent['status']==x for x in ['blackjack', 'stick']) and self.turn=='agent':
+        elif self.agent['status']=='stick' and self.turn=='agent':
             msg         =   self.agent['status']+", dealer's turn"
             status      =   2
             self.turn   =   'dealer'
-        elif self.agent['status'] == 'On':
+        elif self.agent['status'] == 'On' or self.agent['status'] == 'blackjack':
             msg         =   "Game is on, agent's turn"
             status      =   2
         # Check dealer's hand

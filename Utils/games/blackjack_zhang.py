@@ -222,7 +222,7 @@ def monteCarloES(nEpisodes):
                        np.random.choice(range(12, 22)),
                        np.random.choice(range(1, 11))]
         initialAction = np.random.choice(actions)
-        _, reward, trajectory = play(behaviorPolicy, initialState, initialAction=None)
+        _, reward, trajectory = play(behaviorPolicy, initialState, initialAction)
         for action, (usableAce, playerSum, dealerCard) in trajectory:
             usableAce = int(usableAce)
             playerSum -= 12

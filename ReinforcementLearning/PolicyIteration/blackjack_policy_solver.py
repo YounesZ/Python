@@ -41,13 +41,15 @@ class policySolver_blackjack(blackJack):
             self.policy_agent   =   policy
         self.nEvaluations       =   np.zeros([len(self.agent_states), len(self.dealer_states)])
 
-    def episode_initialize(self):
+    def episode_initialize(self, method='simulation'):
         # Select starting state - min nb of updates
-        if self.method == 'simulation':
+        if method       ==  'simulation':
             # In case we "simulate" the states, we can chose to sample states for which sampling is lowest
             idStart     =   (np.where(self.nEvaluations==np.min(self.nEvaluations)))
             chxSt       =   choice( list(range(len(idStart[0]))) )
             y,x         =   idStart[0][chxSt], idStart[1][chxSt]
+        elif method     ==  'exploringStarts':
+            y,x         =   [choice(range(len(self.agent_states))), choice(range(len(self.dealer_states)))]
         else:
             # In case we "sample" the states, we simply draw them randomly
             y,x         =   choice(range(len(self.agent_states))), choice(range(len(self.dealer_states)))
@@ -57,23 +59,22 @@ class policySolver_blackjack(blackJack):
         # Set cards: agent
         iy, ix      =   np.where(self.agent_states[y] == self.cardMat)
         iy          +=  1
-        ix          += 1
+        ix          +=  1
         idUsable    =   choice( np.where([iy[lp]==11 or ix[lp]==11 for lp in range(len(iy))])[0] )
         idUnusable  =   np.where([iy[lp]!=11 and ix[lp]!=11 for lp in range(len(iy))])[0]
         if bool(choice([0,1])) or not len(idUnusable):
             # Usable - need an ace
-            agent       =   {'hand': [str(xlp % 11 + 1) + '_' + choice(self.colors) for xlp in [iy[idUsable], ix[idUsable]]], 'shown': [True, True], 'plays': [], 'value': 0, 'status': 'On', 'usable': False}
+            agent       =   {'hand': [str(min(xlp%11+1, xlp)) + '_' + choice(self.colors) for xlp in [iy[idUsable], ix[idUsable]]], 'shown': [True, True], 'plays': [], 'value': 0, 'status': 'On', 'usable': False}
         else: # Unusable ace
             idUnusable  =   choice(idUnusable)
-            agent       =   {'hand': [str(xlp % 11 + 1) + '_' + choice(self.colors) for xlp in [iy[idUnusable], ix[idUnusable]]], 'shown': [True, True], 'plays': [], 'value': 0, 'status': 'On', 'usable': False}
+            agent       =   {'hand': [str(min(xlp%11+1, xlp)) + '_' + choice(self.colors) for xlp in [iy[idUnusable], ix[idUnusable]]], 'shown': [True, True], 'plays': [], 'value': 0, 'status': 'On', 'usable': False}
         # Init game
         self.game_start(statusOnly=True, printStatus=False, initCards=[agent, dealer])
 
-    def episode_run(self):
+    def episode_run(self, randomInit=True):
         # ----------
         # play the game
         self.turn       =   'agent'
-        action          =   None
         curState        =   self.current_state
         reward          =   2
         state_chain     =   [curState]
@@ -82,10 +83,11 @@ class policySolver_blackjack(blackJack):
         while self.turn == 'agent' and reward == 2:
             # --- Pick action according to agent's policy
             # Pick agent action at that state according to policy
-            if action is None:
-                action  =   bool( choice([0,1]) )
+            if randomInit:
+                action      =   bool( choice([0,1]) )
             else:
-                action  =   self.policy_agent[curState[0], curState[1], int(self.agent['usable'])]
+                action      =   self.policy_agent[curState[0], curState[1], int(self.agent['usable'])]
+                randomInit  =   False
             if action:
                 self.hand_do('hit', statUpd=False)
                 action_chain.append(1)
@@ -97,8 +99,8 @@ class policySolver_blackjack(blackJack):
                     usable_chain.append(self.agent['usable'])
             else:  # Stick
                 self.hand_do('stick', statUpd=False)
-                action_chain.append(0)
             reward = self.game_status(statusOnly=True, printStatus=False)
+        action_chain.append(0)
         while self.turn == 'dealer' and reward == 2:
             # --- Pick action according to dealer's policy
             if self.policy_dealer[self.dealer['value'] - 1]:  # Hit
@@ -110,8 +112,8 @@ class policySolver_blackjack(blackJack):
 
     def evaluate_policy(self, nIterations=10000):
         # Initialize the algorithm
-        returns_usable  =   [[]] * self.nStates
-        returns_unusable=   [[]] * self.nStates
+        returns =   np.random.random([len(self.agent_states), len(self.dealer_states), 2])
+        visits  =   np.random.random([len(self.agent_states), len(self.dealer_states), 2])
         # Start looping
         for ii in range(nIterations):
             # --- step1: initialize the episode
@@ -133,10 +135,14 @@ class policySolver_blackjack(blackJack):
         visits      =   np.ones(np.shape(self.action_value))
         # Start looping
         for ii in range(nIterations):
+            if not ii%1000: print('Iteration'+str(ii))
             # --- step1: initialize the episode
-            self.episode_initialize()
+            self.episode_initialize(method='exploringStarts')
             # --- step2: run the episode
-            reward, state_chain, usable_chain, action_chain     =   self.episode_run()
+            reward, state_chain, usable_chain, action_chain     =   self.episode_run(randomInit=True)
+            #self.game_status(statusOnly=True)
+            #print(state_chain)
+            #print(action_chain)
             self.nEvaluations[self.current_state] += 1
             self.history.append(reward)
             # Unfold the reward onto chain
@@ -148,13 +154,16 @@ class policySolver_blackjack(blackJack):
                     firstVisit[tuple(st)]               +=  1
             # Store new state values
             self.action_value   =   returns /   visits
+            # Set new policy
             self.policy_agent   =   np.argmax( self.action_value, axis=3 )
+
+
 
 # ========
 # LAUNCHER
 # ========
 # Instantiate the solver
-#BJS     =   policySolver_blackjack(method='sampling', gameType='infinite')
+BJS     =   policySolver_blackjack(method='sampling', gameType='infinite')
 # -----POLICY EVALUATION
 # Make the agent's policy
 #policyAG=   np.reshape([x<20 for x in BJS.agent_states], [len(BJS.agent_states),1]) * [x>0 for x in BJS.dealer_states]
@@ -164,8 +173,8 @@ class policySolver_blackjack(blackJack):
 #BJS.evaluate_policy(nIterations=10000)
 # -----POLICY ITERATION
 # Solve for policy - Monte-Carlo algorithm
-#BJS.set_policy()
-#BJS.solve_policy_MC(nIterations=10000)
+BJS.set_policy()
+BJS.solve_policy_MC(nIterations=500000)
 
 
 """
@@ -177,7 +186,6 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import time
 from mpl_toolkits.mplot3d import Axes3D
-
 
 # --- POLICY ---
 fig     =   plt.figure()
