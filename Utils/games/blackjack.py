@@ -37,14 +37,14 @@ class blackJack:
         # Initiate game deck
         self.deck_new()
 
-    def deck_new(self):
+    def deck_new(self, statusOnly=False, printStatus=True, initCards=None):
         # Make a new card deck
         colors              =   ['Heart', 'Diamond', 'Club', 'Spade']
         numbers             =   [str(x + 1) for x in range(10)] + ['jack', 'queen', 'king']
         self.deck           =   list( np.concatenate([[x+'_'+y for x in numbers] for y in colors][:]) )
         self.deck_empty     =   False
         self.cardP          =   [1/52]*52
-        #self.game_start()
+        self.game_start(statusOnly=statusOnly, printStatus=printStatus, initCards=initCards)
 
     def game_start(self, statusOnly=False, printStatus=True, initCards=None):
         # Initialize game: either random or from input argument
@@ -66,7 +66,7 @@ class blackJack:
         self.hand_value(player='dealer')
         if self.deck_empty:
             print('\n\tDeck empty, restarting, ...\n\n')
-            self.deck_new()
+            self.deck_new(statusOnly=False, printStatus=True, initCards=None)
         else:
             # Evaluate new hand value
             self.turn   =   'agent'
@@ -82,6 +82,7 @@ class blackJack:
         if action=='hit':
             if all(x==0 for x in self.cardP):
                 self.deck_empty     =   True
+                statUpd             =   True
             else:
                 if player=='dealer' and len(self.dealer['shown'])>0 and not self.dealer['shown'][-1]:
                     self.dealer['shown'][-1]    =   True

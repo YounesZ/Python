@@ -159,6 +159,9 @@ def play(policyPlayerFn, initialState=None, initialAction=None):
             break
         # if hit, get a new card
         dealerSum += getCard()
+
+        playerTrajectory.append([action, (usableAcePlayer, playerSum, dealerSum)])
+
         # dealer busts
         if dealerSum > 21:
             if usableAceDealer == True:
@@ -222,8 +225,13 @@ def monteCarloES(nEpisodes):
                        np.random.choice(range(12, 22)),
                        np.random.choice(range(1, 11))]
         initialAction = np.random.choice(actions)
+
+        initialState = [False, 12, 6]
+        initialAction = 0
+
         _, reward, trajectory = play(behaviorPolicy, initialState, initialAction)
         for action, (usableAce, playerSum, dealerCard) in trajectory:
+            print(action, (usableAce, playerSum, dealerCard), ' = ', reward)
             usableAce = int(usableAce)
             playerSum -= 12
             dealerCard -= 1

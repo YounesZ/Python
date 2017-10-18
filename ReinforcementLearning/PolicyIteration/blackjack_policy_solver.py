@@ -69,7 +69,7 @@ class policySolver_blackjack(blackJack):
             idUnusable  =   choice(idUnusable)
             agent       =   {'hand': [str(min(xlp%11+1, xlp)) + '_' + choice(self.colors) for xlp in [iy[idUnusable], ix[idUnusable]]], 'shown': [True, True], 'plays': [], 'value': 0, 'status': 'On', 'usable': False}
         # Init game
-        self.game_start(statusOnly=True, printStatus=False, initCards=[agent, dealer])
+        self.deck_new(statusOnly=True, printStatus=False, initCards=[agent, dealer])
 
     def episode_run(self, randomInit=True):
         # ----------
@@ -163,7 +163,7 @@ class policySolver_blackjack(blackJack):
 # LAUNCHER
 # ========
 # Instantiate the solver
-#BJS     =   policySolver_blackjack(method='sampling', gameType='infinite')
+BJS     =   policySolver_blackjack(method='sampling', gameType='finite')
 # -----POLICY EVALUATION
 # Make the agent's policy
 #policyAG=   np.reshape([x<20 for x in BJS.agent_states], [len(BJS.agent_states),1]) * [x>0 for x in BJS.dealer_states]
@@ -173,8 +173,8 @@ class policySolver_blackjack(blackJack):
 #BJS.evaluate_policy(nIterations=10000)
 # -----POLICY ITERATION
 # Solve for policy - Monte-Carlo algorithm
-#BJS.set_policy()
-#BJS.solve_policy_MC(nIterations=500000)
+BJS.set_policy()
+BJS.solve_policy_MC(nIterations=500000)
 
 
 """
