@@ -183,6 +183,12 @@ class blackjack_policy_solver_light():
                 self.policy_agent[st[0] - 12, st[1] - 2, us]        =   self.greedy_choice(self.action_value[st[0] - 12, st[1] - 2, us, :])
                 self.state_value[st[0] - 12, st[1] - 2, us]         =   np.max(self.action_value[st[0] - 12, st[1] - 2, us, :])
 
+    def TD0(self, nIterations):
+        # Basically, combination of pure TD learning with MC
+        # MC method when only 1 state in an episode
+        # TD learning when 2 or more states in an episode
+        print('work in progress')
+        
     def data_save(self, filename):
         # Package the data
         dataPack    =   {'policy':self.policy_agent, 'stateValues':self.state_value}

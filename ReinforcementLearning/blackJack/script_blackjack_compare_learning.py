@@ -47,3 +47,16 @@ for nIt in range(nIterations):
 pack    =   {'lerningTypes':learningTypes, 'iterSteps':iterSteps, 'groundT':groundT, 'MSE':MSE}
 pickle.dump( pack, open('ReinforcementLearning/blackJack/'+svFile+'.p', 'wb') )
 
+
+# Print results
+avgMSE  =   np.mean(MSE, axis=0)
+plt.figure()
+plt.plot(avgMSE[:,0], 'g', label='Exploratory starts')
+plt.plot(avgMSE[:,1], 'r', label='e-greedy: 0.05')
+plt.plot(avgMSE[:,2], 'k', label='e-greedy: 0.1')
+ax  =   plt.gca()
+ax.set_xlim([0,50])
+plt.legend(loc='upper right')
+ax.set_xticklabels( [int(x) for x in ax.get_xticks()*2000] )
+ax.set_xlabel('Number of games')
+ax.set_ylabel('Distance to optimal policy (MSE)')
