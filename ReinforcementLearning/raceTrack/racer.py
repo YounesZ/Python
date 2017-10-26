@@ -1,7 +1,7 @@
 """ This class codes racers that can run on class: raceTrack.py
 
     TO DO:
-        -   add the velocity dimension
+        -   restrict velocity to positive values
 
     TO TEST:
         -   velocity never goes down to 0
@@ -14,7 +14,7 @@ from random import choice
 
 class racer():
 
-    def __init__(self, position, velocity, spaceDim, learnType='monte_carlo', learnRate=0.1, eGreedy=0, discount=0.8):
+    def __init__(self, position, velocity, spaceDim, learnType='monteCarlo', learnRate=0.1, eGreedy=0, discount=0.8):
         # ==============
         # Learning agent
         # Agent type
@@ -27,25 +27,26 @@ class racer():
         actX                =   [-1]*3+[0]*3+[1]*3
         self.actions        =   [[actY[idx], actX[idx]] for idx in range(len(actX))]
         # Velocities
-        velX                =   list(range(6))*6
-        velY                =   [0]*6+[1]*6+[2]*6+[3]*6+[4]*6+[5]*6
+        velX                =   list(range(-5,6))*11
+        velY                =   [-5]*11+[-4]*11+[-3]*11+[-2]*11+[-1]*11+[0]*11+[1]*11+[2]*11+[3]*11+[4]*11+[5]*11
         self.velocities     =   [[velY[idx], velX[idx]] for idx in range(len(velX))]
         # Space dimensions for learning
         self.policy         =   np.zeros(spaceDim+[len(self.velocities), len(self.actions)])
         self.action_value   =   np.zeros(spaceDim+[len(self.velocities), len(self.actions)])
         self.returns        =   np.zeros(spaceDim+[len(self.velocities), len(self.actions)])
         self.visits         =   np.zeros(spaceDim+[len(self.velocities), len(self.actions)])
-        self.state_value    =   np.zeros(spaceDim)
+        self.state_value    =   np.zeros(spaceDim+[len(self.velocities)])
         # Empty learning variables
         self.position_chain =   [position]
-        self.action_chain   =   [self.velocities.index(velocity)]
-        self.velocity_chain =   []
+        self.action_chain   =   []
+        self.velocity_chain =   [self.velocities.index(velocity)]
         self.cumul_reward   =   0
         self.car_control()
 
     def car_control(self):
         # ==============
         # Pick action: stochastic
+        curVel = self.velocity_chain[-1]
         if len(self.action_chain)==0 and self.eGreedy==0:
             # First move must be exploratory
             x       =   list( range( len(self.actions) ) )
@@ -53,19 +54,18 @@ class racer():
             idX     =   choice( x )
         else:
             curPos  =   self.position_chain[-1]
-            curVel  =   self.velocity_chain[-1]
-            moveP   =   np.multiply(self.policy[curPos[0], curPos[1], curVel, :], np.random.random[1, len(self.actions)])
-            crit1   =   [sum(x - curVel) > 0 for x in self.actions]
-            crit2   =   [(x[0] - curVel[0]) >= 0 for x in self.actions]
-            crit3   =   [(x[1] - curVel[1]) >= 0 for x in self.actions]
-            moveP   =   [moveP[x] if y and z and w else 0 for x,y,z,w in zip(range(len(moveP)),crit1,crit2,crit3)]
-            _,x     =   np.where( moveP==max(moveP) )
-            idX     =   choice(range(len(x)))
-        iAction     =   self.actions[x[idX]]
+            moveP   =   np.multiply(self.policy[curPos[0], curPos[1], curVel, :], np.random.random([1, len(self.actions)]))[0]
+            crit1   =   [sum(np.add(x, self.velocities[curVel])) > 0 for x in self.actions]
+            crit2   =   [(x[0] + self.velocities[curVel][0]) >= 0 for x in self.actions]
+            crit3   =   [(x[1] + self.velocities[curVel][1]) >= 0 for x in self.actions]
+            moveP   =   [x if y and z and w else 0 for x,y,z,w in zip(list(moveP),crit1,crit2,crit3)]
+            x       =   np.where( np.array(moveP)==np.array(max(moveP)) )[0]
+            idX     =   choice(x)
+        iAction     =   self.actions[idX]
         # Set car acceleration/deceleration
-        velocity    =   curVel + iAction
-        velocity    =   [min(velocity[0],5), min(velocity[1],5)]
-        self.action_chain.append(x[idX])
+        velocity    =   np.add(self.velocities[curVel], iAction)
+        velocity    =   [max(min(velocity[0],5),-5), max(min(velocity[1],5),-5)]
+        self.action_chain.append(idX)
         self.velocity_chain.append(self.velocities.index(velocity))
 
     def car_set_policy(self, state, velocity):
