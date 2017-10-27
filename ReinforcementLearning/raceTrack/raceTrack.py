@@ -1,7 +1,12 @@
 """ This code solves the raceTrack problem in Sutton and Barto 5.6
 
     TO DO:
+        -   Somehow the rewards are not computed properly when car tries to run through walls
+            same reward is calculated whether the wall is hit with high or low speed
+        -   Set velocity to 0 after hitting a wall
+        -   No more racers than the number of starting blocks
         -   2 racers cannot start on the same spot - to be fixed
+        -   Seen a case where car hits the finish line but the episode does not end
 
 """
 
@@ -72,27 +77,25 @@ class raceTrack():
     def compute_displacement(self, position, velocity):
         # This function issues the new state and reward after displacement
         newPos      =   np.add(position, velocity)
-        newPos[0]   =   min( max(newPos[0], 0), self.track_dim[0]-1 )
-        newPos[1]   =   min( max(newPos[1], 0), self.track_dim[1]-1 )
         # Compute reward
-        reward      =   self.track_reward[newPos[0], newPos[1]]
+        reward      =   self.track_reward[min( max(newPos[0], 0), self.track_dim[0]-1 ), min( max(newPos[1], 0), self.track_dim[1]-1 )]
         reward2     =   reward
         decrement   =   [0, 0]
         while reward2==-5 or any(newPos<0) or any(newPos>np.subtract(self.track_dim,1)):
             # New decrement
-            decrement   =   np.add(decrement, [velocity[0]/sum(np.abs(velocity)), velocity[1]/sum(np.abs(velocity))])
+            decrement   =   np.add(decrement, [velocity[0]/max(np.abs(velocity)), velocity[1]/max(np.abs(velocity))])
             # Walk back
             newPos2     =   newPos - [int(decrement[0]), int(decrement[1])]
             # New reward
-            reward2     =   self.track_reward[newPos2[0], newPos2[1]]
+            reward2     =   self.track_reward[min( max(newPos2[0], 0), self.track_dim[0]-1 ), min( max(newPos2[1], 0), self.track_dim[1]-1 )]
             reward      +=  reward2
             if reward2>-5:
                 newPos  =   newPos2
         return reward, newPos
 
-    def add_racer(self):
+    def add_racer(self, learnType='TD0'):
         # New racer
-        self.racers.append(racer(self.track_pickStart(), [0,0], list(self.track_dim), learnType='TD0'))
+        self.racers.append(racer(self.track_pickStart(), [0,0], list(self.track_dim), learnType=learnType))
 
     def race_terminated(self, position):
         # Check if position is terminal
@@ -109,12 +112,24 @@ class raceTrack():
             while any(race_on):
                 # Compute displacement
                 rew_pos  =  [self.compute_displacement(self.racers[x].position_chain[-1], self.racers[x].velocities[self.racers[x].velocity_chain[-1]]) if y else [] for x,y in zip(range(len(self.racers)), race_on)]
+                print(self.racers[0].position_chain[-1])
+                print(self.racers[0].velocities[self.racers[0].velocity_chain[-2]])
+                print(self.racers[0].actions[self.racers[0].action_chain[-1]])
+                print(self.racers[0].velocities[self.racers[0].velocity_chain[-1]])
+                print(rew_pos[0][-1])
+                print('')
                 # Update racers
                 [self.racers[w].car_update(list(x[1]), x[0], self.race_terminated(x[1])) if y else [] for w,x,y in zip(range(len(self.racers)), rew_pos, race_on)]
                 # Update race status
                 race_on  =  [not self.race_terminated(x[1]) for x in rew_pos]
                 # Update display
                 if display: self.display()
+        # Pick new starting positions
+        [x.car_set_start(self.track_pickStart(), [0,0]) for x in self.racers]
+        # Close display
+        if display:
+            plt.close(self.figId)
+            self.figId  =   None
 
     def display(self):
         # Number of racers
@@ -161,5 +176,5 @@ class raceTrack():
 # LAUNCHER
 RT  =   raceTrack(trackType=1)
 RT.add_racer()
-RT.race_run(1)
-RT.race_run(100, display=False)
+RT.race_run(1, display=True)
+#RT.race_run(100, display=False)

@@ -14,7 +14,7 @@ from random import choice
 
 class racer():
 
-    def __init__(self, position, velocity, spaceDim, learnType='monteCarlo', learnRate=0.1, eGreedy=0, discount=0.8):
+    def __init__(self, position, velocity, spaceDim, learnType='monteCarlo', learnRate=0.1, eGreedy=0.1, discount=0.8):
         # ==============
         # Learning agent
         # Agent type
@@ -36,6 +36,10 @@ class racer():
         self.returns        =   np.zeros(spaceDim+[len(self.velocities), len(self.actions)])
         self.visits         =   np.zeros(spaceDim+[len(self.velocities), len(self.actions)])
         self.state_value    =   np.zeros(spaceDim+[len(self.velocities)])
+        # Initialize starting position
+        self.car_set_start(position, velocity)
+
+    def car_set_start(self, position, velocity):
         # Empty learning variables
         self.position_chain =   [position]
         self.action_chain   =   []
@@ -58,7 +62,7 @@ class racer():
             crit1   =   [sum(np.add(x, self.velocities[curVel])) > 0 for x in self.actions]
             crit2   =   [(x[0] + self.velocities[curVel][0]) >= 0 for x in self.actions]
             crit3   =   [(x[1] + self.velocities[curVel][1]) >= 0 for x in self.actions]
-            moveP   =   [x if y and z and w else 0 for x,y,z,w in zip(list(moveP),crit1,crit2,crit3)]
+            moveP   =   [x if y and z and w else -1 for x,y,z,w in zip(list(moveP),crit1,crit2,crit3)]
             x       =   np.where( np.array(moveP)==np.array(max(moveP)) )[0]
             idX     =   choice(x)
         iAction     =   self.actions[idX]
@@ -74,7 +78,9 @@ class racer():
         # Find the max
         values  =   self.action_value[state[0], state[1], velocity, :]
         nEl     =   len(values)
-        iMax    =   np.argmax(values)
+        # Pick a max randomly
+        x       =   np.where( values==max(values) )
+        iMax    =   choice(x[0])
         # Greedy value
         self.policy[state[0], state[1], velocity, :]      =   self.eGreedy / nEl
         self.policy[state[0], state[1], velocity, iMax]   =   1 - self.eGreedy * (1 - 1 / nEl)
@@ -100,8 +106,16 @@ class racer():
                     firstVisit[tuple(ac)]   =   False
         # TEMPORAL-DIFFERENCE LEARNING
         elif self.learnType == 'TD0':
-            Qold    =   self.action_value[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-2], self.action_chain[-2]]
-            Qnew    =   self.action_value[self.position_chain[-1][0], self.position_chain[-1][1], self.velocity_chain[-1], self.action_chain[-1]]
-            self.action_value[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-2], self.action_chain[-2]]  =   Qold + self.learnRate * (self.discount * Qnew - Qold)
-            self.car_set_policy(self.position_chain[-2], self.velocity_chain[-2])
+            Qold    =   self.action_value[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]
+            Qnew    =   self.action_value[self.position_chain[-1][0], self.position_chain[-1][1], self.velocity_chain[-2], self.action_chain[-1]]
+            self.action_value[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]  =   Qold + self.learnRate * (reward + self.discount * Qnew - Qold)
+            self.car_set_policy(self.position_chain[-2], self.velocity_chain[-3])
+
+
+
+
+
+
+
+
 
