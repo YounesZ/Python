@@ -14,6 +14,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from random import choice
 from time import sleep
+from copy import deepcopy
+from sys import stdout
 from ReinforcementLearning.raceTrack.racer import *
 
 # Init interactive display
@@ -83,7 +85,7 @@ class raceTrack():
         decrement   =   [0, 0]
         while reward2==-5 or any(newPos<0) or any(newPos>np.subtract(self.track_dim,1)):
             # New decrement
-            decrement   =   np.add(decrement, [velocity[0]/max(np.abs(velocity)), velocity[1]/max(np.abs(velocity))])
+            decrement   =   np.add(decrement, [velocity[0]/sum(np.abs(velocity)), velocity[1]/sum(np.abs(velocity))])
             # Walk back
             newPos2     =   newPos - [int(decrement[0]), int(decrement[1])]
             # New reward
@@ -91,11 +93,12 @@ class raceTrack():
             reward      +=  reward2
             if reward2>-5:
                 newPos  =   newPos2
-        return reward, newPos
+                #velocity=   [0,0]
+        return reward, newPos, velocity
 
-    def add_racer(self, learnType='TD0'):
+    def add_racer(self, learnType='TD0', eGreedy=0.1):
         # New racer
-        self.racers.append(racer(self.track_pickStart(), [0,0], list(self.track_dim), learnType=learnType))
+        self.racers.append(racer(self.track_pickStart(), [0,0], list(self.track_dim), learnType=learnType, eGreedy=eGreedy))
 
     def race_terminated(self, position):
         # Check if position is terminal
@@ -104,32 +107,52 @@ class raceTrack():
             terminated  =   terminated or [iy,ix]==list(position)
         return terminated
 
-    def race_run(self, nRaces, display=True):
+    def race_run(self, nRaces, display=True, pgbar=True):
+        # Loop on number of races
+        stepsBrace      =   np.zeros([1, nRaces])
+
         # Loop on number of races
         for iRc in range(nRaces):
             race_on     =   [True]*len(self.racers)
             if display: self.display()
+
+            # Count the steps
+            nSteps      =   0
             while any(race_on):
                 # Compute displacement
-                rew_pos  =  [self.compute_displacement(self.racers[x].position_chain[-1], self.racers[x].velocities[self.racers[x].velocity_chain[-1]]) if y else [] for x,y in zip(range(len(self.racers)), race_on)]
-                print(self.racers[0].position_chain[-1])
-                print(self.racers[0].velocities[self.racers[0].velocity_chain[-2]])
-                print(self.racers[0].actions[self.racers[0].action_chain[-1]])
-                print(self.racers[0].velocities[self.racers[0].velocity_chain[-1]])
-                print(rew_pos[0][-1])
-                print('')
+                nSteps  +=  1
+                rew_pos =   [self.compute_displacement(self.racers[x].position_chain[-1], self.racers[x].velocities[self.racers[x].velocity_chain[-1]]) if y else [] for x,y in zip(range(len(self.racers)), race_on)]
                 # Update racers
-                [self.racers[w].car_update(list(x[1]), x[0], self.race_terminated(x[1])) if y else [] for w,x,y in zip(range(len(self.racers)), rew_pos, race_on)]
+                [self.racers[w].car_update(list(x[1]), list(x[2]), x[0], self.race_terminated(x[1])) if y else [] for w,x,y in zip(range(len(self.racers)), rew_pos, race_on)]
                 # Update race status
                 race_on  =  [not self.race_terminated(x[1]) for x in rew_pos]
                 # Update display
                 if display: self.display()
-        # Pick new starting positions
-        [x.car_set_start(self.track_pickStart(), [0,0]) for x in self.racers]
+            # Update progress bar
+            if pgbar:
+                stdout.write('\r')
+                # the exact output you're looking for:
+                stdout.write("Running races: [%-40s] %d%%, completed in %i steps" % ('=' * int(iRc / nRaces * 40), 100 * iRc / nRaces, nSteps))
+                stdout.flush()
+            # Pick new starting positions
+            [x.car_set_start(self.track_pickStart(), [0,0]) for x in self.racers]
+            stepsBrace[0,iRc]   =   nSteps
         # Close display
         if display:
             plt.close(self.figId)
             self.figId  =   None
+        return stepsBrace
+
+    def race_log(self, steps, iterations, pgbOn=True):
+        # Prepare containers
+        nRaces  =   [1] + list( range(steps, iterations*steps+1, steps) )
+        Qlog    =   {'nRaces':[], 'nSteps':[], 'racerMirror':[]}
+        # Loop on iterations
+        for nIt in nRaces:
+            Qlog['nRaces'].append(nIt)
+            Qlog['nSteps'].append(np.mean(RT.race_run(nIt, display=False, pgbar=pgbOn)))
+            Qlog['racerMirror'].append([deepcopy(x) for x in self.racers])
+        return Qlog
 
     def display(self):
         # Number of racers
@@ -174,7 +197,8 @@ class raceTrack():
 
 
 # LAUNCHER
-RT  =   raceTrack(trackType=1)
-RT.add_racer()
-RT.race_run(1, display=True)
+RT      =   raceTrack(trackType=1)
+RT.add_racer(eGreedy=0.1)
+#RT.race_run(1, display=True)
 #RT.race_run(100, display=False)
+Qlog    =   RT.race_log(50, 200, pgbOn=True)

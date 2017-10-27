@@ -26,9 +26,23 @@ print(Qold + self.racers[0].learnRate * (reward + self.racers[0].discount * Qnew
 
 
 
+for i in range(21):
+    sys.stdout.write('\r')
+    # the exact output you're looking for:
+    sys.stdout.write("[%-20s] %d%%" % ('='*i, 5*i))
+    sys.stdout.flush()
+    sleep(0.25)
 
 
-
+import progressbar
+from time import sleep
+bar = progressbar.ProgressBar(maxval=20, \
+    widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage(), ' ', 'just testing'])
+bar.start()
+for i in range(20):
+    bar.update(i+1)
+    sleep(0.1)
+bar.finish()
 
 
 

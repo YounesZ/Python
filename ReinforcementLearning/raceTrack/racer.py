@@ -38,6 +38,8 @@ class racer():
         self.state_value    =   np.zeros(spaceDim+[len(self.velocities)])
         # Initialize starting position
         self.car_set_start(position, velocity)
+        # Print message
+        print('Initialized 1 racer')
 
     def car_set_start(self, position, velocity):
         # Empty learning variables
@@ -59,10 +61,11 @@ class racer():
         else:
             curPos  =   self.position_chain[-1]
             moveP   =   np.multiply(self.policy[curPos[0], curPos[1], curVel, :], np.random.random([1, len(self.actions)]))[0]
-            crit1   =   [sum(np.add(x, self.velocities[curVel])) > 0 for x in self.actions]
-            crit2   =   [(x[0] + self.velocities[curVel][0]) >= 0 for x in self.actions]
-            crit3   =   [(x[1] + self.velocities[curVel][1]) >= 0 for x in self.actions]
-            moveP   =   [x if y and z and w else -1 for x,y,z,w in zip(list(moveP),crit1,crit2,crit3)]
+            crit1   =   [abs(sum(np.add(x, self.velocities[curVel]))) > 0 for x in self.actions]
+            #crit2   =   [(x[0] + self.velocities[curVel][0]) >= 0 for x in self.actions]
+            #crit3   =   [(x[1] + self.velocities[curVel][1]) >= 0 for x in self.actions]
+            #moveP   =   [x if y and z and w else -1 for x,y,z,w in zip(list(moveP),crit1,crit2,crit3)]
+            moveP   =   [x if y else -1 for x, y in zip(list(moveP), crit1)]
             x       =   np.where( np.array(moveP)==np.array(max(moveP)) )[0]
             idX     =   choice(x)
         iAction     =   self.actions[idX]
@@ -85,11 +88,12 @@ class racer():
         self.policy[state[0], state[1], velocity, :]      =   self.eGreedy / nEl
         self.policy[state[0], state[1], velocity, iMax]   =   1 - self.eGreedy * (1 - 1 / nEl)
 
-    def car_update(self, newPos, reward, terminated):
+    def car_update(self, newPos, newVelo, reward, terminated):
         # ==============
         # Time to learn
         self.cumul_reward += reward
         self.position_chain.append(newPos)
+        self.velocity_chain[-1]     =   self.velocities.index(newVelo)     # Set to 0,0 in case car hits a wall
         self.car_control()
         # MONTE-CARLO LEARNING
         if self.learnType=='monteCarlo' and terminated:
