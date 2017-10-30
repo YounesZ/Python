@@ -12,6 +12,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+from Utils.programming.ut_make_video import make_video
 from random import choice
 from time import sleep
 from copy import deepcopy
@@ -107,9 +108,10 @@ class raceTrack():
             terminated  =   terminated or [iy,ix]==list(position)
         return terminated
 
-    def race_run(self, nRaces, display=True, pgbar=True):
+    def race_run(self, nRaces, display=True, videoTape=None, pgbar=True):
         # Loop on number of races
         stepsBrace      =   np.zeros([1, nRaces])
+        imgsBrace       =   []
 
         # Loop on number of races
         for iRc in range(nRaces):
@@ -127,7 +129,7 @@ class raceTrack():
                 # Update race status
                 race_on  =  [not self.race_terminated(x[1]) for x in rew_pos]
                 # Update display
-                if display: self.display()
+                if display or not videoTape is None: imgsBrace.append( self.display(draw=display) )
             # Update progress bar
             if pgbar:
                 stdout.write('\r')
@@ -141,7 +143,9 @@ class raceTrack():
         if display:
             plt.close(self.figId)
             self.figId  =   None
-        return stepsBrace
+        if videoTape is not None:
+            make_video(imgsBrace, videoTape)
+        return stepsBrace, imgsBrace
 
     def race_log(self, steps, iterations, pgbOn=True):
         # Prepare containers
@@ -154,7 +158,7 @@ class raceTrack():
             Qlog['racerMirror'].append([deepcopy(x) for x in self.racers])
         return Qlog
 
-    def display(self):
+    def display(self, draw=False):
         # Number of racers
         nRacers     =   len(self.racers)
         # ===========
@@ -179,6 +183,10 @@ class raceTrack():
             y,x =   self.racers[iRac].position_chain[-1]
             IMtrack[y,x,:]  =   lsRGB[iRac]
         # ===========
+        # NO DISPLAY MODE
+        if not draw:
+            return IMtrack
+        # ===========
         # CREATE FIGURE
         if self.figId is None:
             self.figId  =   plt.figure()
@@ -194,6 +202,7 @@ class raceTrack():
         self.ax1.set_yticks(np.arange(-.5, self.track_dim[0], 1), minor=True);
         self.ax1.grid(which='minor', color='k', linestyle='-', linewidth=1)
         plt.pause(0.2)
+        return IMtrack
 
 
 # LAUNCHER
@@ -201,4 +210,18 @@ RT      =   raceTrack(trackType=1)
 RT.add_racer(eGreedy=0.1)
 #RT.race_run(1, display=True)
 #RT.race_run(100, display=False)
-Qlog    =   RT.race_log(50, 200, pgbOn=True)
+#Qlog    =   RT.race_log(50, 200, pgbOn=True)
+
+import pickle
+with open('/home/younesz/Documents/Simulations/raceTrack/Type1/TD0log_racer_10Kraces', 'rb') as f:
+    Qlog = pickle.load(f)
+RT.racers[0].learnType = 'noLearning'
+# After 1 race
+RT.racers[0].policy = Qlog['racerMirror'][-1][0].policy
+RT.race_run(1, display=True, videoTape='/home/younesz/Documents/Simulations/raceTrack/Type1/Run_1race_iter1.mp4')
+# After 5K races
+RT.racers[0].policy = Qlog['racerMirror'][-1][0].policy
+RT.race_run(1, display=True, videoTape='/home/younesz/Documents/Simulations/raceTrack/Type1/Run_5Kraces_iter1.mp4')
+# After 10K races
+RT.racers[0].policy = Qlog['racerMirror'][-1][0].policy
+RT.race_run(1, display=True, videoTape='/home/younesz/Documents/Simulations/raceTrack/Type1/Run_10Kraces_iter1.mp4')
