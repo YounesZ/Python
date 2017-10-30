@@ -96,9 +96,9 @@ class raceTrack():
                 #velocity=   [0,0]
         return reward, newPos, velocity
 
-    def add_racer(self, learnType='TD0', eGreedy=0.1):
+    def add_racer(self, Lambda=0, eGreedy=0.1):
         # New racer
-        self.racers.append(racer(self.track_pickStart(), [0,0], list(self.track_dim), learnType=learnType, eGreedy=eGreedy))
+        self.racers.append(racer(self.track_pickStart(), [0,0], list(self.track_dim), Lambda=Lambda, eGreedy=eGreedy))
 
     def race_terminated(self, position):
         # Check if position is terminal
@@ -134,6 +134,8 @@ class raceTrack():
                 # the exact output you're looking for:
                 stdout.write("Running races: [%-40s] %d%%, completed in %i steps" % ('=' * int(iRc / nRaces * 40), 100 * iRc / nRaces, nSteps))
                 stdout.flush()
+            # Update racers' policies
+            [x.car_set_policy() for x in self.racers]
             # Pick new starting positions
             [x.car_set_start(self.track_pickStart(), [0,0]) for x in self.racers]
             stepsBrace[0,iRc]   =   nSteps
@@ -199,6 +201,6 @@ class raceTrack():
 # LAUNCHER
 RT      =   raceTrack(trackType=1)
 RT.add_racer(eGreedy=0.1)
-#RT.race_run(1, display=True)
+RT.race_run(1, display=True)
 #RT.race_run(100, display=False)
-Qlog    =   RT.race_log(50, 200, pgbOn=True)
+Qlog_0    =   RT.race_log(50, 200, pgbOn=True)

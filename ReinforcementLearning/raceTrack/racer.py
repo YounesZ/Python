@@ -14,11 +14,11 @@ from random import choice
 
 class racer():
 
-    def __init__(self, position, velocity, spaceDim, learnType='monteCarlo', learnRate=0.1, eGreedy=0.1, discount=0.8):
+    def __init__(self, position, velocity, spaceDim, Lambda=0, learnRate=0.1, eGreedy=0.1, discount=0.8):
         # ==============
         # Learning agent
         # Agent type
-        self.learnType      =   learnType
+        self.Lambda         =   Lambda
         self.learnRate      =   learnRate
         self.eGreedy        =   eGreedy
         self.discount       =   discount
@@ -46,6 +46,7 @@ class racer():
         self.position_chain =   [position]
         self.action_chain   =   []
         self.velocity_chain =   [self.velocities.index(velocity)]
+        self.eligibility    =   np.zeros( np.shape(self.action_value) )
         self.cumul_reward   =   0
         self.car_control()
 
@@ -95,6 +96,15 @@ class racer():
         self.position_chain.append(newPos)
         self.velocity_chain[-1]     =   self.velocities.index(newVelo)     # Set to 0,0 in case car hits a wall
         self.car_control()
+        # SARSA lambda
+        Qold    =   self.action_value[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]
+        Qnew    =   self.action_value[self.position_chain[-1][0], self.position_chain[-1][1], self.velocity_chain[-2], self.action_chain[-1]]
+        incr    =   reward + self.discount * Qnew - Qold
+        self.eligibility[self.position_chain[-1][0], self.position_chain[-1][1], self.velocity_chain[-2], self.action_chain[-1]]    +=  1
+        self.action_value   +=  self.learnRate * incr * self.eligibility
+        self.eligibility    *=  self.discount * self.Lambda
+
+        """
         # MONTE-CARLO LEARNING
         if self.learnType=='monteCarlo' and terminated:
             # Distribute reward to chain - First-visit
@@ -114,7 +124,7 @@ class racer():
             Qnew    =   self.action_value[self.position_chain[-1][0], self.position_chain[-1][1], self.velocity_chain[-2], self.action_chain[-1]]
             self.action_value[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]  =   Qold + self.learnRate * (reward + self.discount * Qnew - Qold)
             self.car_set_policy(self.position_chain[-2], self.velocity_chain[-3])
-
+        """
 
 
 
