@@ -31,7 +31,7 @@ method          =   [(x,y) for x in method for y in eGreedy]
 # COMPUTATIONAL PART
 # ==================
 # Loop on all unique combinations
-for iM1 in range(0,len(method)-1):
+for iM1 in range(0,len(method)):
     for iM2 in range(iM1,len(method)):
 
         # Init the agents
@@ -169,3 +169,19 @@ for iM1 in range(0,len(method)):
 
         # Store value
         algoC[iM1, iM2] =   sum( simR['History'] )
+        plt.close(simR['Figure'])
+
+# Show picture
+MCprint     =   ['MC'+str(x[1]) if x[0]=='monte_carlo' else 'TD'+str(x[1]) for x in method]
+rng         =   np.max(np.log(np.abs(algoC)))
+fig1        =   plt.figure()
+ax          =   fig1.add_subplot(111)
+cax         =   plt.imshow(np.log(np.abs(algoC)) * np.sign(algoC))
+ax.set_yticklabels(['']+MCprint)
+ax.set_xticklabels(['']+MCprint)
+ax.set_title('Comparison of learning algos for blackjack')
+plt.clim(-rng, rng)
+plt.xlabel('Opponent algo')
+plt.ylabel('Player algo')
+cbar = fig1.colorbar(cax, ticks=[-rng, 0, rng])
+cbar.ax.set_yticklabels(['player loses', 'equal', 'player wins'])

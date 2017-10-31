@@ -12,7 +12,10 @@
 
 import numpy as np
 import pickle
+import matplotlib
+#matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 from Utils.programming.ut_make_video import make_video
 from random import choice
 from time import sleep
@@ -32,8 +35,13 @@ class raceTrack():
         # Initialize racers
         self.racers     =   []
         # Initialize display
+        self.imageSeries=   []
         self.figId      =   None
         self.display()
+        self.display(draw=True)
+        plt.pause(0.5)
+        plt.close(self.figId)
+        self.figId = None
 
     def track_init(self, trackType):
         # First example
@@ -112,7 +120,6 @@ class raceTrack():
     def race_run(self, nRaces, display=True, videoTape=None, pgbar=True):
         # Loop on number of races
         stepsBrace      =   np.zeros([1, nRaces])
-        imgsBrace       =   []
 
         # Loop on number of races
         for iRc in range(nRaces):
@@ -130,7 +137,7 @@ class raceTrack():
                 # Update race status
                 race_on  =  [not self.race_terminated(x[1]) for x in rew_pos]
                 # Update display
-                if display or not videoTape is None: imgsBrace.append( self.display(draw=display) )
+                if display or not videoTape is None: self.display(draw=False)
             # Update progress bar
             if pgbar:
                 stdout.write('\r')
@@ -141,12 +148,11 @@ class raceTrack():
             [x.car_set_start(self.track_pickStart(), [0,0]) for x in self.racers]
             stepsBrace[0,iRc]   =   nSteps
         # Close display
-        if display:
+        if display or not videoTape is None:
+            self.display(draw=True, videoTape=videoTape)
             plt.close(self.figId)
-            self.figId  =   None
-        if videoTape is not None:
-            make_video(imgsBrace, videoTape)
-        return stepsBrace, imgsBrace
+            self.figId          =   None
+        return stepsBrace
 
     def race_log(self, steps, iterations, pgbOn=True):
         # Prepare containers
@@ -159,51 +165,72 @@ class raceTrack():
             Qlog['racerMirror'].append([deepcopy(x) for x in self.racers])
         return Qlog
 
-    def display(self, draw=False):
+    def display(self, draw=False, videoTape=None):
+
         # Number of racers
-        nRacers     =   len(self.racers)
-        # ===========
-        # TRACK MASKS
-        # Mask1: raceTrack
-        mask1   =   self.track_reward>-5
-        # Mask2: starting zone
-        mask2   =   np.zeros(self.track_dim)
-        for iX,iY in zip(self.track_start[0], self.track_start[1]):
-            mask2[iX,iY]    =   .8
-        # Mask3: Finish zone
-        mask3   =   np.zeros(self.track_dim)
-        for iX, iY in zip(self.track_finish[0], self.track_finish[1]):
-            mask3[iX, iY] = .4
-        # Prep track
-        IMtrack =   mask1+mask2+mask3
-        IMtrack =   np.dstack([IMtrack]*3)
-        # ===========
-        # RACERS DOTS
-        lsRGB   =   [[1,0,0], [1,.5,0], [1,1,0], [0.5, 1, 0], [0,1,0], [0,1,0.5], [0,1,1], [0,0.5,1], [0,0,1], [0.5,0,1], [1,0,1], [1,0,0.5]]
-        for iRac in range(nRacers):
-            y,x =   self.racers[iRac].position_chain[-1]
-            IMtrack[y,x,:]  =   lsRGB[iRac]
-        # ===========
-        # NO DISPLAY MODE
+        nRacers = len(self.racers)
+
+        def update_matrix(num, matrix, hndl):
+            hndl.set_data( matrix[num] )
+            return hndl,
+
         if not draw:
-            return IMtrack
+            # ===========
+            # TRACK MASKS
+            # Mask1: raceTrack
+            mask1   =   self.track_reward>-5
+            # Mask2: starting zone
+            mask2   =   np.zeros(self.track_dim)
+            for iX,iY in zip(self.track_start[0], self.track_start[1]):
+                mask2[iX,iY]    =   .8
+            # Mask3: Finish zone
+            mask3   =   np.zeros(self.track_dim)
+            for iX, iY in zip(self.track_finish[0], self.track_finish[1]):
+                mask3[iX, iY] = .4
+            # Prep track
+            IMtrack =   mask1+mask2+mask3
+            IMtrack =   np.dstack([IMtrack]*3)
+            # ===========
+            # RACERS DOTS
+            lsRGB   =   [[1,0,0], [1,.5,0], [1,1,0], [0.5, 1, 0], [0,1,0], [0,1,0.5], [0,1,1], [0,0.5,1], [0,0,1], [0.5,0,1], [1,0,1], [1,0,0.5]]
+            for iRac in range(nRacers):
+                y,x =   self.racers[iRac].position_chain[-1]
+                IMtrack[y,x,:]  =   lsRGB[iRac]
+            # ===========
+            # NO DISPLAY MODE
+            self.imageSeries.append(IMtrack)
+            return
+
         # ===========
         # CREATE FIGURE
-        if self.figId is None:
-            self.figId  =   plt.figure()
-            self.ax1    =   self.figId.add_subplot(100 + (1 + nRacers) * 10 + 1)
-            # DRAW TRACK
-            self.showId =   plt.imshow(IMtrack, interpolation='nearest', axes=self.ax1)
-        else:
-            self.showId.set_data(IMtrack)
+        self.figId  =   plt.figure()
+        self.ax1    =   self.figId.add_subplot(100 + (1 + nRacers) * 10 + 1)
+        # DRAW TRACK
+        showId      =   plt.imshow(self.imageSeries[0], interpolation='nearest', axes=self.ax1)
+
+        # Adjust the figure size
+        axPos       =   self.ax1.get_position()
+        self.figId.set_size_inches( self.figId.get_size_inches() * [axPos.width, axPos.height] )
+        self.ax1.set_position([0.2, 0.1, 0.7, 0.8])
+
         # Minor ticks
-        plt.show()
-        plt.draw()
         self.ax1.set_xticks(np.arange(-.5, self.track_dim[1], 1), minor=True);
         self.ax1.set_yticks(np.arange(-.5, self.track_dim[0], 1), minor=True);
         self.ax1.grid(which='minor', color='k', linestyle='-', linewidth=1)
-        plt.pause(0.2)
-        return IMtrack
+
+        if not videoTape is None:
+            # Initiate writer
+            Writer      =   animation.writers['ffmpeg']
+            writer      =   Writer(fps=5, metadata=dict(artist='Me'), bitrate=1800)
+            line_ani    =   animation.FuncAnimation(self.figId, update_matrix, len(self.imageSeries), fargs=(self.imageSeries, showId),blit=False)
+            line_ani.save(videoTape, writer=writer)
+        else:
+            while len(self.imageSeries)>0:
+                showId.set_data(self.imageSeries.pop(0))
+                plt.show()
+                plt.draw()
+                plt.pause(0.2)
+
 
 
 # LAUNCHER
@@ -222,16 +249,20 @@ RT.add_racer(eGreedy=pareGr, Lambda=parLamb)
 #with open(wrkRep+filename, 'wb') as f:
 #    pickle.dump(logVar, f)
 
+
 import pickle
-with open('/home/younesz/Documents/Simulations/raceTrack/Type1/TD0log_racer_10Kraces', 'rb') as f:
+with open('/home/younesz/Documents/Simulations/raceTrack/Type1/1RacerLog_TD010K_races', 'rb') as f:
     Qlog = pickle.load(f)
 RT.racers[0].learnType = 'noLearning'
+
+"""
 # After 1 race
-RT.racers[0].policy = Qlog['racerMirror'][-1][0].policy
+RT.racers[0].policy = Qlog['racerMirror'][1][0].policy
 RT.race_run(1, display=True, videoTape='/home/younesz/Documents/Simulations/raceTrack/Type1/Run_1race_iter1.mp4')
 # After 5K races
-RT.racers[0].policy = Qlog['racerMirror'][-1][0].policy
+RT.racers[0].policy = Qlog['racerMirror'][100][0].policy
 RT.race_run(1, display=True, videoTape='/home/younesz/Documents/Simulations/raceTrack/Type1/Run_5Kraces_iter1.mp4')
 # After 10K races
 RT.racers[0].policy = Qlog['racerMirror'][-1][0].policy
-RT.race_run(1, display=True, videoTape='/home/younesz/Documents/Simulations/raceTrack/Type1/Run_10Kraces_iter1.mp4')
+RT.race_run(1, display=False, videoTape='/home/younesz/Documents/Simulations/raceTrack/Type1/Run_10Kraces_iter1.mp4')
+"""
