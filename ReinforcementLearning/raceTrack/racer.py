@@ -100,9 +100,11 @@ class racer():
         Qold    =   self.action_value[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]
         Qnew    =   self.action_value[self.position_chain[-1][0], self.position_chain[-1][1], self.velocity_chain[-2], self.action_chain[-1]]
         incr    =   reward + self.discount * Qnew - Qold
-        self.eligibility[self.position_chain[-1][0], self.position_chain[-1][1], self.velocity_chain[-2], self.action_chain[-1]]    +=  1
+        self.eligibility[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]    +=  1
         self.action_value   +=  self.learnRate * incr * self.eligibility
         self.eligibility    *=  self.discount * self.Lambda
+        # Update racers' policies
+        self.car_set_policy(self.position_chain[-2], self.velocity_chain[-3])
 
         """
         # MONTE-CARLO LEARNING
