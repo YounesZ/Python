@@ -19,7 +19,7 @@ from os import path, makedirs
 filename        =   'blackjack_agentVSagent_log'
 wrkRep          =   '/home/younesz/Documents/Simulations/blackjack/agentVSagent/'
 dataPack        =   {'Agent1_policy': {}, 'Agent2_policy': {}}
-nGames          =   10000000
+nGames          =   1000000
 
 # Set the combinations of configurations
 method          =   ['monte_carlo', 'TD0']
@@ -103,6 +103,7 @@ for iM1 in range(0,len(method)-1):
                 st, ac, us = (state_chain1[-1], action_chain1[-1], usable_chain1[-1])
                 bjk_agent1.action_value[st[0] - 12, st[1] - 2, us, ac]      =   bjk_agent1.action_value[st[0] - 12, st[1] - 2, us, ac] + bjk_agent1.learnRate * (reward - bjk_agent1.action_value[st[0] - 12, st[1] - 2, us, ac])
                 bjk_agent1.policy_agent[st[0] - 12, st[1] - 2, us]          =   bjk_agent1.greedy_choice(bjk_agent1.action_value[st[0] - 12, st[1] - 2, us, :])
+
             # To agent2
             if method[iM2][0] == 'monte_carlo':
                 for st, ac, us in zip(state_chain2, action_chain2, usable_chain2):
@@ -117,9 +118,9 @@ for iM1 in range(0,len(method)-1):
                 bjk_agent2.policy_agent[st[0] - 12, st[1] - 2, us]          =   bjk_agent2.greedy_choice(bjk_agent2.action_value[st[0] - 12, st[1] - 2, us, :])
 
             # ========
-            if not ipl%100 or ipl==1:
+            GameHistory.append(reward)
+            if not ipl%10000 or ipl==1:
                 # Update plot1
-                GameHistory.append(reward)
                 minY1   =   min(minY1, sum(GameHistory))
                 maxY1   =   max(maxY1, sum(GameHistory))
                 line1.set_xdata(np.append(line1.get_xdata(), ipl))
