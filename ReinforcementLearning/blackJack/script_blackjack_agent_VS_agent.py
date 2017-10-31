@@ -26,6 +26,10 @@ method          =   ['monte_carlo', 'TD0']
 eGreedy         =   [0.15, 0.1, 0.05, 0.01]
 method          =   [(x,y) for x in method for y in eGreedy]
 
+
+# ==================
+# COMPUTATIONAL PART
+# ==================
 # Loop on all unique combinations
 for iM1 in range(0,len(method)-1):
     for iM2 in range(iM1,len(method)):
@@ -149,3 +153,18 @@ for iM1 in range(0,len(method)-1):
         plt.close(fig1)
 
 
+# ==================
+# DISPLAY PART
+# =================
+algoC   =   np.zeros([len(method), len(method)])
+# Loop on all unique combinations
+for iM1 in range(0,len(method)):
+    for iM2 in range(iM1,len(method)):
+
+        # Load simulation data
+        combiName       =   method[iM1][0]+'_'+str(method[iM1][1]) + '_VS_' + method[iM2][0]+'_'+str(method[iM2][1])
+        with open(wrkRep+combiName+'/game_history.p', 'rb') as f:
+            simR        =   pickle.load(f)
+
+        # Store value
+        algoC[iM1, iM2] =   sum( simR['History'] )

@@ -11,6 +11,7 @@
 """
 
 import numpy as np
+import pickle
 import matplotlib.pyplot as plt
 from random import choice
 from time import sleep
@@ -198,7 +199,16 @@ class raceTrack():
 
 # LAUNCHER
 RT      =   raceTrack(trackType=1)
-RT.add_racer(eGreedy=0.1)
+parLamb =   0.1
+pareGr  =   0.1
+RT.add_racer(eGreedy=pareGr, Lambda=parLamb)
 #RT.race_run(1, display=True)
 #RT.race_run(100, display=False)
 Qlog_0    =   RT.race_log(50, 200, pgbOn=True)
+
+#SAVE
+logVar      =   {'log':Qlog_0, 'figure':RT.figId}
+wrkRep      =   '/home/younesz/Documents/Simulations/raceTrack/Type1/'
+filename    =   '1RacerLog_TD'+str(parLamb).replace('.', '_')+'_eGreedy'+str(pareGr).replace('.', '_')+'_10Kraces.p'
+with open(wrkRep+filename, 'wb') as f:
+    pickle.dump(logVar, f)

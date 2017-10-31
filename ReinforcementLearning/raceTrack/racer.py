@@ -14,7 +14,7 @@ from random import choice
 
 class racer():
 
-    def __init__(self, position, velocity, spaceDim, Lambda=0, learnRate=0.1, eGreedy=0.1, discount=0.8):
+    def __init__(self, position, velocity, spaceDim, Lambda=0, learnRate=0.15, eGreedy=0.1, discount=0.8):
         # ==============
         # Learning agent
         # Agent type
