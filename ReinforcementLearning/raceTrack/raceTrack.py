@@ -1,8 +1,7 @@
 """ This code solves the raceTrack problem in Sutton and Barto 5.6
 
     TO DO:
-        -   Somehow the rewards are not computed properly when car tries to run through walls
-            same reward is calculated whether the wall is hit with high or low speed
+        -   Return field of view from self.compute_displacement() then in pass it to racer
         -   Set velocity to 0 after hitting a wall
         -   No more racers than the number of starting blocks
         -   2 racers cannot start on the same spot - to be fixed
@@ -145,7 +144,7 @@ class raceTrack():
                 stdout.write("Running races: [%-40s] %d%%, completed in %i steps" % ('=' * int(iRc / nRaces * 40), 100 * iRc / nRaces, nSteps))
                 stdout.flush()
             # Pick new starting positions
-            [x.car_set_start(self.track_pickStart(), [0,0]) for x in self.racers]
+            #[x.car_set_start(self.track_pickStart(), [0,0]) for x in self.racers]
             stepsBrace[0,iRc]   =   nSteps
         # Close display
         if display or not videoTape is None:
@@ -229,15 +228,15 @@ class raceTrack():
                 showId.set_data(self.imageSeries.pop(0))
                 plt.show()
                 plt.draw()
-                plt.pause(0.2)
+                plt.pause(0.1)
 
 
 
 # LAUNCHER
-RT      =   raceTrack(trackType=1)
-parLamb =   0.1
-pareGr  =   0.1
-RT.add_racer(eGreedy=pareGr, Lambda=parLamb)
+#RT      =   raceTrack(trackType=1)
+#parLamb =   0.1
+#pareGr  =   0.1
+#RT.add_racer(eGreedy=pareGr, Lambda=parLamb)
 #RT.race_run(1, display=True)
 #RT.race_run(100, display=False)
 
@@ -249,13 +248,13 @@ RT.add_racer(eGreedy=pareGr, Lambda=parLamb)
 #with open(wrkRep+filename, 'wb') as f:
 #    pickle.dump(logVar, f)
 
-
+"""
 import pickle
 with open('/home/younesz/Documents/Simulations/raceTrack/Type1/1RacerLog_TD010K_races', 'rb') as f:
     Qlog = pickle.load(f)
 RT.racers[0].learnType = 'noLearning'
 
-"""
+
 # After 1 race
 RT.racers[0].policy = Qlog['racerMirror'][1][0].policy
 RT.race_run(1, display=True, videoTape='/home/younesz/Documents/Simulations/raceTrack/Type1/Run_1race_iter1.mp4')
