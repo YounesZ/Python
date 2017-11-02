@@ -12,6 +12,7 @@
 import numpy as np
 import pickle
 import matplotlib
+import cProfile
 #matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -36,11 +37,11 @@ class raceTrack():
         # Initialize display
         self.imageSeries=   []
         self.figId      =   None
-        self.display()
-        self.display(draw=True)
-        plt.pause(0.5)
-        plt.close(self.figId)
-        self.figId = None
+        #self.display()
+        #self.display(draw=True)
+        #plt.pause(0.5)
+        #plt.close(self.figId)
+        #self.figId = None
 
     def track_init(self, trackType):
         # First example
@@ -73,7 +74,7 @@ class raceTrack():
             track_reward[startZone[0][ii], startZone[1][ii]]    =   -1  #This avoids that car switching between starting position at race onset
         # Make finish
         for ii in range(np.shape(finishZone)[-1]):
-            track_reward[finishZone[0][ii], finishZone[1][ii]]  =   5
+            track_reward[finishZone[0][ii], finishZone[1][ii]]  =   100    #5
         # EOF
         self.track_start    =   startZone
         self.track_finish   =   finishZone
@@ -102,7 +103,7 @@ class raceTrack():
             reward      +=  reward2
             if reward2>-5:
                 newPos  =   newPos2
-                #velocity=   [0,0]          # Uncomment this line to have the car velocity set to 0 after hitting a wall
+                velocity=   [0,0]          # Uncomment this line to have the car velocity set to 0 after hitting a wall
         return reward, newPos, velocity
 
     def compute_FoV(self, racerInst, position):
@@ -125,20 +126,15 @@ class raceTrack():
         FoVi    =   int(''.join(FoVi), 2)
         return FoVi
 
-    def reset_racer(self, hRacer='new', Lambda=0, eGreedy=0.1):
+    def reset_racer(self, hRacer='new', Lambda=0, eGreedy=0.1, navMode='global'):
         # Pre-compute position
-        position = self.track_pickStart()
+        position    =  self.track_pickStart()
         # New racer
         if hRacer=='new':
-            self.racers.append(racer(position, [0,0], list(self.track_dim), Lambda=Lambda, eGreedy=eGreedy))
-            # Get its field of view
-            initFoV     =   self.compute_FoV(self.racers[-1], position)
-            self.racers[-1].car_init_FoV(initFoV)
-        else:
-            hRacer.car_set_start(position, [0, 0])
-            # Get its field of view
-            initFoV     =   self.compute_FoV(hRacer, position)
-            hRacer.car_init_FoV(initFoV)
+            self.racers.append(racer(position, [0,0], list(self.track_dim), Lambda=Lambda, eGreedy=eGreedy, navMode=navMode))
+            hRacer  =   self.racers[-1]
+        initFoV     =   self.compute_FoV(hRacer, position)
+        hRacer.car_set_start(position, [0, 0], initFoV)
 
     def race_terminated(self, position):
         # Check if position is terminal
@@ -149,17 +145,16 @@ class raceTrack():
 
     def race_run(self, nRaces, display=True, videoTape=None, pgbar=True):
         # Loop on number of races
-        stepsBrace      =   np.zeros([1, nRaces])
+        stepsBrace      =   np.zeros([len(self.racers), nRaces])
+        rewBrace        =   np.zeros([len(self.racers), nRaces])
 
         # Loop on number of races
         for iRc in range(nRaces):
             race_on     =   [True]*len(self.racers)
 
             # Count the steps
-            nSteps      =   0
             while any(race_on):
                 # Compute displacement
-                nSteps  +=  1
                 rew_pos =   [self.compute_displacement(self.racers[x].position_chain[-1], self.racers[x].velocities[self.racers[x].velocity_chain[-1]]) if y else [] for x,y in zip(range(len(self.racers)), race_on)]
                 # Update field of view
                 fov     =   [self.compute_FoV(x, position[1]) for x,position in zip(self.racers, rew_pos)]
@@ -173,27 +168,71 @@ class raceTrack():
             if pgbar:
                 stdout.write('\r')
                 # the exact output you're looking for:
-                stdout.write("Running races: [%-40s] %d%%, completed in %i steps" % ('=' * int(iRc / nRaces * 40), 100 * iRc / nRaces, nSteps))
+                msgR    =   ['Racer '+str(x+1)+': '+str(y.cumul_steps)+' steps' for x,y in zip(range(len(self.racers)), self.racers)]
+                stdout.write("Running races: [%-40s] %d%%, %s" % ('=' * int(iRc / nRaces * 40), 100 * iRc / nRaces, ', '.join(msgR)))
                 stdout.flush()
             # Pick new starting positions
+            stepsBrace[:,iRc]   =   [x.cumul_steps for x in self.racers]
+            rewBrace[:,iRc]     =   [x.cumul_reward for x in self.racers]
             [self.reset_racer(hRacer=x) for x in self.racers]
-            stepsBrace[0,iRc]   =   nSteps
         # Close display
         if display or not videoTape is None:
             self.display(draw=True, videoTape=videoTape)
             plt.close(self.figId)
             self.figId          =   None
-        return stepsBrace
+        return stepsBrace, rewBrace
+
+    def race_train(self, nRuns, display=True, videoTape=None, pgbar=True):
+        # Loop on number of races
+        for iRc in range(nRuns):
+            race_on     =   [True]*len(self.racers)
+
+            # Count the steps
+            while any(race_on):
+                # Compute displacement
+                rew_pos =   [self.compute_displacement(self.racers[x].position_chain[-1], self.racers[x].velocities[self.racers[x].velocity_chain[-1]]) if y else [] for x,y in zip(range(len(self.racers)), race_on)]
+                # Update field of view
+                fov     =   [self.compute_FoV(x, position[1]) for x,position in zip(self.racers, rew_pos)]
+                # Update racers' learning
+                [self.racers[w].car_update(list(x[1]), list(x[2]), z, (x[0]!=-1)*x[0], self.race_terminated(x[1])) if y else [] for w,x,y,z in zip(range(len(self.racers)), rew_pos, race_on, fov)]
+                # Update race status
+                race_on  =  [not self.race_terminated(x[1]) for x in rew_pos]
+                # Update display
+                if display or not videoTape is None: self.display(draw=False)
+            # Update progress bar
+            if pgbar:
+                stdout.write('\r')
+                # the exact output you're looking for:
+                msgR    =   ['Racer '+str(x+1)+': '+str(y.cumul_steps)+' steps, reward '+str(y.cumul_reward) for x,y in zip(range(len(self.racers)), self.racers)]
+                stdout.write("Running races: [%-40s] %d%%, %s" % ('=' * int(iRc / nRuns * 40), 100 * iRc / nRuns, ', '.join(msgR)))
+                stdout.flush()
+            # Pick new starting positions
+            [self.reset_racer(hRacer=x) for x in self.racers]
+        # Close display
+        if display or not videoTape is None:
+            self.display(draw=True, videoTape=videoTape)
+            plt.close(self.figId)
+            self.figId          =   None
 
     def race_log(self, steps, iterations, pgbOn=True):
         # Prepare containers
         nRaces  =   [1] + [steps]*iterations
-        Qlog    =   {'nRaces':[0], 'nSteps':[], 'racerMirror':[]}
+        Qlog    =   {'nRaces':[0], 'nSteps':[], 'reward':[], 'currentPolicies':[]}
         # Loop on iterations
+        count   =   0
         for nIt in nRaces:
+            STP, REW    =   self.race_run(nIt, display=False, pgbar=pgbOn)
             Qlog['nRaces'].append( nIt + Qlog['nRaces'][-1] )
-            Qlog['nSteps'].append(np.mean(self.race_run(nIt, display=False, pgbar=pgbOn)))
-            Qlog['racerMirror'].append([deepcopy(x) for x in self.racers])
+            Qlog['nSteps'].append( np.mean(STP, axis=1) )
+            Qlog['reward'].append( np.mean(REW, axis=1) )
+            Qlog['currentPolicies'].append([deepcopy(x.policy) for x in self.racers])
+
+            # Print status
+            count += 1
+            stdout.write('\r')
+            # the exact output you're looking for:
+            stdout.write("Running iteration: [%-40s] %d%%, completed in %i steps on average" % ('=' * int(count / len(nRaces) * 40), 100 * count / len(nRaces), int(np.mean(STP, axis=1))))
+            stdout.flush()
         return Qlog
 
     def display(self, draw=False, videoTape=None):
@@ -267,13 +306,45 @@ class raceTrack():
 # ========
 # LAUNCHER
 RT      =   raceTrack(trackType=1)
-parLamb =   0.6
+parLamb =   0.5
 pareGr  =   0.1
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb)
-#RT.race_run(1, display=True)
-#RT.race_run(100, display=False)
 
-Qlog_0    =   RT.race_log(50, 200, pgbOn=True)
+for ii in range(100):
+    RT.racers[0].car_set_start([20,9], choice(RT.racers[0].velocities), RT.compute_FoV(RT.racers[0], [20,9]))
+    RT.race_train(1, display=False, pgbar=False)
+
+#RT.race_run(1, display=True)
+#RT.race_run(100, display=False, pgbar=False)
+
+"""
+# Iterate over lambda parameters for a single navigation mode
+plt.figure;
+hRac    =   RT.racers[0]
+lVal    =   [0, .2, .4, .6, .8, .9, 1]
+lCol    =   ['r', 'm', 'y', 'c', 'g', 'b', 'k']
+for iL, iC in zip(lVal, lCol):
+    RT.reset_racer(hRacer=hRac, eGreedy=pareGr, Lambda=iL)
+    Qlog_0    =   RT.race_log(10, 100, pgbOn=False)
+    plt.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], iC+'--', label='lambda: '+str(iL))
+
+# Iterate over navigation modes for a single lambda
+FF  =   plt.figure()
+ax1 =   FF.add_subplot(121); ax1.title.set_text('Cumulative reward');   ax1.set_xlabel('Nb of races')
+ax2 =   FF.add_subplot(122); ax2.title.set_text('Avg number of steps'); ax2.set_xlabel('Nb of races')
+navM    =   ['global', 'sum', 'maxAbs']
+lCol    =   ['r', 'g', 'b']
+for iL, iC in zip(navM, lCol):
+    RT.racers.pop()
+    RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode=iL)
+    Qlog_0    =   RT.race_log(10, 100, pgbOn=False)
+    ax1.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], iC, label='nav. mode: '+iL)
+    ax2.plot(Qlog_0['nRaces'][1:], Qlog_0['nSteps'], iC, label='nav. mode: ' + iL)
+ax1.legend()
+ax1.set_xlim([1,1000]); ax1.set_ylim([-10000,0])
+ax2.set_xlim([1,1000]); ax2.set_ylim([0,500])
+
+
 #SAVE
 logVar      =   {'log':Qlog_0, 'figure':RT.figId}
 wrkRep      =   '/home/younesz/Documents/Simulations/raceTrack/Type1/'
@@ -281,7 +352,7 @@ filename    =   '1Racer1VisionLog_TD'+str(parLamb).replace('.', '_')+'_eGreedy'+
 with open(wrkRep+filename, 'wb') as f:
     pickle.dump(logVar, f)
 
-"""
+
 import pickle
 with open('/home/younesz/Documents/Simulations/raceTrack/Type1/1RacerLog_TD010K_races', 'rb') as f:
     Qlog = pickle.load(f)
