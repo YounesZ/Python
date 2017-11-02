@@ -84,7 +84,7 @@ class racer():
         # Find the max
         valuesG =   self.global_value[state[0], state[1], velocity, :]
         valuesL =   self.local_value[FoV][velocity, :]
-        values  =   valuesG * valuesL
+        values  =   np.add( valuesG, valuesL )
         nEl     =   len(values)
         # Pick a max randomly
         x       =   np.where( values==max(values) )
