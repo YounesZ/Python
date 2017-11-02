@@ -46,16 +46,26 @@ class racer():
         # Empty learning variables
         self.position_chain =   [position]
         self.action_chain   =   []
+        self.FoV_chain      =   []
         self.velocity_chain =   [self.velocities.index(velocity)]
         self.global_trace   =   np.zeros( np.shape(self.global_value) )
-        self.local_trace    =   {}
         self.cumul_reward   =   0
+        # Reset local trace
+        self.local_trace    =   {}
+        for iTr in self.local_value.keys():
+            self.local_trace[iTr]   =   np.zeros([len(self.velocities), len(self.actions)])
         self.car_control()
+
+    def car_init_FoV(self, FoV):
+        self.FoV_chain.append(FoV)
+        # Initialize value within field of view
+        self.local_value[FoV]   =   np.zeros([len(self.velocities), len(self.actions)])
+        self.local_trace[FoV]   =   np.zeros([len(self.velocities), len(self.actions)])
 
     def car_control(self):
         # ==============
         # Pick action: stochastic
-        curVel = self.velocity_chain[-1]
+        curVel      =   self.velocity_chain[-1]
         if len(self.action_chain)==0 and self.eGreedy==0:
             # First move must be exploratory
             x       =   list( range( len(self.actions) ) )
@@ -84,7 +94,7 @@ class racer():
         # Find the max
         valuesG =   self.global_value[state[0], state[1], velocity, :]
         valuesL =   self.local_value[FoV][velocity, :]
-        values  =   valuesG * valuesL
+        values  =   valuesG #np.maximum( valuesG, valuesL )
         nEl     =   len(values)
         # Pick a max randomly
         x       =   np.where( values==max(values) )
@@ -98,6 +108,7 @@ class racer():
         # Time to learn
         self.cumul_reward += reward
         self.position_chain.append(newPos)
+        self.FoV_chain.append(newFoV)
         self.velocity_chain[-1]     =   self.velocities.index(newVelo)     # Set to 0,0 in case car hits a wall
         self.car_control()
         # SARSA lambda - global
@@ -108,19 +119,18 @@ class racer():
         self.global_value   +=  self.learnRate * incr * self.global_trace
         self.global_trace   *=  self.discount * self.Lambda
         # SARSA lambda - local
-        FoVi    =   int(newFoV, 2)
-        if not FoVi in self.local_value.keys():
-            self.local_value[FoVi]  =   np.zeros( len(self.velocities), len(self.actions) )
-            self.local_trace[FoVi]  =   np.zeros( len(self.velocities), len(self.actions) )
-        Qold    =   self.local_value[FoVi][self.velocity_chain[-3], self.action_chain[-2]]
-        Qnew    =   self.local_value[FoVi][self.velocity_chain[-2], self.action_chain[-1]]
+        if not self.FoV_chain[-1] in self.local_value.keys():
+            self.local_value[self.FoV_chain[-1]]  =   np.zeros([len(self.velocities), len(self.actions)])
+            self.local_trace[self.FoV_chain[-1]]  =   np.zeros([len(self.velocities), len(self.actions)])
+        Qold    =   self.local_value[self.FoV_chain[-2]][self.velocity_chain[-3], self.action_chain[-2]]
+        Qnew    =   self.local_value[self.FoV_chain[-1]][self.velocity_chain[-2], self.action_chain[-1]]
         incr    =   reward + self.discount * Qnew - Qold
-        self.local_trace[FoVi][self.velocity_chain[-3], self.action_chain[-2]] += 1
-        for iK in self.local_value['keys']:
+        self.local_trace[self.FoV_chain[-2]][self.velocity_chain[-3], self.action_chain[-2]] += 1
+        for iK in self.local_value.keys():
             self.local_value[iK]    +=  self.learnRate * incr * self.local_trace[iK]
             self.local_trace[iK]    *=  self.discount * self.Lambda
         # Update racers' policies
-        self.car_set_policy(self.position_chain[-2], newFoV, self.velocity_chain[-3])
+        self.car_set_policy(self.position_chain[-2], self.FoV_chain[-2], self.velocity_chain[-3])
 
         """
         # MONTE-CARLO LEARNING

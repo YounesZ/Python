@@ -82,7 +82,7 @@ class raceTrack():
 
     def track_pickStart(self):
         # Select at random
-        idPick              =   choice( list(range(len(self.track_start[0]))) )
+        idPick  =   choice( list(range(len(self.track_start[0]))) )
         return   [self.track_start[0][idPick], self.track_start[1][idPick]]
 
     def compute_displacement(self, position, velocity):
@@ -102,12 +102,43 @@ class raceTrack():
             reward      +=  reward2
             if reward2>-5:
                 newPos  =   newPos2
-                #velocity=   [0,0]
+                #velocity=   [0,0]          # Uncomment this line to have the car velocity set to 0 after hitting a wall
         return reward, newPos, velocity
 
-    def add_racer(self, Lambda=0, eGreedy=0.1):
+    def compute_FoV(self, racerInst, position):
+        # Box seed
+        padSize =   [int( (racerInst.viewY-1)/2 ), int( (racerInst.viewX-1)/2 )]
+        bxSeed  =   np.subtract(position, padSize)
+        bxBnd   =   np.add(position, padSize)
+        # Make a empty FoV
+        FoV     =   np.ones([racerInst.viewY, racerInst.viewX])*-5
+        # Get the box
+        box     =   self.track_reward[max(0,bxSeed[0]):min(self.track_dim[0],bxBnd[0]+1), max(0,bxSeed[1]):min(self.track_dim[1],bxBnd[1]+1)]
+        bxShape =   box.shape
+        # Put the box in FoV
+        stX     =   abs( min(0,bxSeed[1]) )
+        stY     =   abs( min(0,bxSeed[0]) )
+        FoV[stY:(stY+bxShape[0]), stX:(stX+bxShape[1])]   =   box
+        # Convert FoV to an integer
+        FoV     =   FoV.flatten()
+        FoVi    =   ['1' if x==-5 else '0' for x in FoV]
+        FoVi    =   int(''.join(FoVi), 2)
+        return FoVi
+
+    def reset_racer(self, hRacer='new', Lambda=0, eGreedy=0.1):
+        # Pre-compute position
+        position = self.track_pickStart()
         # New racer
-        self.racers.append(racer(self.track_pickStart(), [0,0], list(self.track_dim), Lambda=Lambda, eGreedy=eGreedy))
+        if hRacer=='new':
+            self.racers.append(racer(position, [0,0], list(self.track_dim), Lambda=Lambda, eGreedy=eGreedy))
+            # Get its field of view
+            initFoV     =   self.compute_FoV(self.racers[-1], position)
+            self.racers[-1].car_init_FoV(initFoV)
+        else:
+            hRacer.car_set_start(position, [0, 0])
+            # Get its field of view
+            initFoV     =   self.compute_FoV(hRacer, position)
+            hRacer.car_init_FoV(initFoV)
 
     def race_terminated(self, position):
         # Check if position is terminal
@@ -123,7 +154,6 @@ class raceTrack():
         # Loop on number of races
         for iRc in range(nRaces):
             race_on     =   [True]*len(self.racers)
-            if display: self.display()
 
             # Count the steps
             nSteps      =   0
@@ -131,8 +161,10 @@ class raceTrack():
                 # Compute displacement
                 nSteps  +=  1
                 rew_pos =   [self.compute_displacement(self.racers[x].position_chain[-1], self.racers[x].velocities[self.racers[x].velocity_chain[-1]]) if y else [] for x,y in zip(range(len(self.racers)), race_on)]
-                # Update racers
-                [self.racers[w].car_update(list(x[1]), list(x[2]), x[0], self.race_terminated(x[1])) if y else [] for w,x,y in zip(range(len(self.racers)), rew_pos, race_on)]
+                # Update field of view
+                fov     =   [self.compute_FoV(x, position[1]) for x,position in zip(self.racers, rew_pos)]
+                # Update racers' learning
+                [self.racers[w].car_update(list(x[1]), list(x[2]), z, x[0], self.race_terminated(x[1])) if y else [] for w,x,y,z in zip(range(len(self.racers)), rew_pos, race_on, fov)]
                 # Update race status
                 race_on  =  [not self.race_terminated(x[1]) for x in rew_pos]
                 # Update display
@@ -144,7 +176,7 @@ class raceTrack():
                 stdout.write("Running races: [%-40s] %d%%, completed in %i steps" % ('=' * int(iRc / nRaces * 40), 100 * iRc / nRaces, nSteps))
                 stdout.flush()
             # Pick new starting positions
-            #[x.car_set_start(self.track_pickStart(), [0,0]) for x in self.racers]
+            [self.reset_racer(hRacer=x) for x in self.racers]
             stepsBrace[0,iRc]   =   nSteps
         # Close display
         if display or not videoTape is None:
@@ -155,12 +187,12 @@ class raceTrack():
 
     def race_log(self, steps, iterations, pgbOn=True):
         # Prepare containers
-        nRaces  =   [1] + list( range(steps, iterations*steps+1, steps) )
-        Qlog    =   {'nRaces':[], 'nSteps':[], 'racerMirror':[]}
+        nRaces  =   [1] + [steps]*iterations
+        Qlog    =   {'nRaces':[0], 'nSteps':[], 'racerMirror':[]}
         # Loop on iterations
         for nIt in nRaces:
-            Qlog['nRaces'].append(nIt)
-            Qlog['nSteps'].append(np.mean(RT.race_run(nIt, display=False, pgbar=pgbOn)))
+            Qlog['nRaces'].append( nIt + Qlog['nRaces'][-1] )
+            Qlog['nSteps'].append(np.mean(self.race_run(nIt, display=False, pgbar=pgbOn)))
             Qlog['racerMirror'].append([deepcopy(x) for x in self.racers])
         return Qlog
 
@@ -232,21 +264,22 @@ class raceTrack():
 
 
 
+# ========
 # LAUNCHER
-#RT      =   raceTrack(trackType=1)
-#parLamb =   0.1
-#pareGr  =   0.1
-#RT.add_racer(eGreedy=pareGr, Lambda=parLamb)
+RT      =   raceTrack(trackType=1)
+parLamb =   0.6
+pareGr  =   0.1
+RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb)
 #RT.race_run(1, display=True)
 #RT.race_run(100, display=False)
 
-#Qlog_0    =   RT.race_log(50, 200, pgbOn=True)
+Qlog_0    =   RT.race_log(50, 200, pgbOn=True)
 #SAVE
-#logVar      =   {'log':Qlog_0, 'figure':RT.figId}
-#wrkRep      =   '/home/younesz/Documents/Simulations/raceTrack/Type1/'
-#filename    =   '1RacerLog_TD'+str(parLamb).replace('.', '_')+'_eGreedy'+str(pareGr).replace('.', '_')+'_10Kraces.p'
-#with open(wrkRep+filename, 'wb') as f:
-#    pickle.dump(logVar, f)
+logVar      =   {'log':Qlog_0, 'figure':RT.figId}
+wrkRep      =   '/home/younesz/Documents/Simulations/raceTrack/Type1/'
+filename    =   '1Racer1VisionLog_TD'+str(parLamb).replace('.', '_')+'_eGreedy'+str(pareGr).replace('.', '_')+'_10Kraces.p'
+with open(wrkRep+filename, 'wb') as f:
+    pickle.dump(logVar, f)
 
 """
 import pickle
