@@ -72,7 +72,7 @@ class raceTrack():
             track_reward[startZone[0][ii], startZone[1][ii]]    =   -1  #This avoids that car switching between starting position at race onset
         # Make finish
         for ii in range(np.shape(finishZone)[-1]):
-            track_reward[finishZone[0][ii], finishZone[1][ii]]  =   100    #5
+            track_reward[finishZone[0][ii], finishZone[1][ii]]  =   5   #100
         # EOF
         self.track_start    =   startZone
         self.track_finish   =   finishZone
@@ -272,12 +272,15 @@ class raceTrack():
 
 
 
-"""
+
 # ========
 # LAUNCHER
 RT      =   raceTrack(trackType=1)
 parLamb =   0.5
 pareGr  =   0.1
+
+
+"""
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb)
 for ii in range(100):
     RT.racers[0].car_set_start([20,9], choice(RT.racers[0].velocities), RT.compute_FoV(RT.racers[0], [20,9]))
@@ -306,25 +309,27 @@ for iL, iC in zip(lVal, lCol):
 # ==================
 # COMPARE NAVI MODES
 # ==================
- Iterate over navigation modes for a single lambda
+# Iterate over navigation modes for a single lambda
 FF  =   plt.figure()
 ax1 =   FF.add_subplot(131); ax1.title.set_text('Cumulative reward');   ax1.set_xlabel('Nb of races')
 ax2 =   FF.add_subplot(132); ax2.title.set_text('Avg number of steps'); ax2.set_xlabel('Nb of races')
 ax3 =   FF.add_subplot(133); ax3.title.set_text('Weight of local info'); ax3.set_xlabel('Nb of races')
 navM    =   ['global', 'sum', 'entropyWsum', 'maxAbs', 'local']
 lCol    =   ['r', 'g', 'b', 'k']
+Qlog_0  =   []
 for iL, iC in zip(navM, lCol):
     RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode=iL)
     print('Navigation mode: '+iL)
-    Qlog_0    =   RT.race_log(50, 1000, pgbOn=False)
-    ax1.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], iC, label='nav. mode: '+iL)
-    ax2.plot(Qlog_0['nRaces'][1:], Qlog_0['nSteps'], iC, label='nav. mode: ' + iL)
-    ax3.plot(Qlog_0['nRaces'][1:], Qlog_0['locWgt'], iC, label='nav. mode: ' + iL)
+    Qlog_0.append( RT.race_log(50, 100, pgbOn=False) )
+    ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], iC, label='nav. mode: '+iL)
+    ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], iC, label='nav. mode: ' + iL)
+    ax3.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['locWgt'], iC, label='nav. mode: ' + iL)
     plt.pause(0.5)
     RT.racers.pop()
 ax1.legend()
-ax1.set_xlim([1,1000]); ax1.set_ylim([-10000,0])
-ax2.set_xlim([1,1000]); ax2.set_ylim([0,500])
+ax1.set_xlim([1,50]); ax1.set_ylim([-30000,0])
+ax2.set_xlim([1,50]); ax2.set_ylim([0,1000])
+ax3.set_xlim([1,1000]); ax3.set_ylim([0,500])
 
 
 # ==================
@@ -333,33 +338,40 @@ ax2.set_xlim([1,1000]); ax2.set_ylim([0,500])
 FF  =   plt.figure()
 ax1 =   FF.add_subplot(121); ax1.title.set_text('Cumulative reward');   ax1.set_xlabel('Nb of races')
 ax2 =   FF.add_subplot(122); ax2.title.set_text('Avg number of steps'); ax2.set_xlabel('Nb of races')
+Qlog_0 =    []
 # ---- First do sequential
 # LOCAL training
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='local')
 print('Sequential learning)
-Qlog_0    =   RT.race_log(25, 1000, pgbOn=False)
-ax1.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], 'r--', label='localOnly')
-ax2.plot(Qlog_0['nRaces'][1:], Qlog_0['nSteps'], 'r--', label='localOnly')
+Qlog_0.append( RT.race_log(25, 1000, pgbOn=False) )
+ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'r--', label='localOnly')
+ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'r--', label='localOnly')
 # GLOBAL training
 RT.racers[0].navMode    =   'global'
-Qlog_0    =   RT.race_log(25, 1000, pgbOn=False)
-ax1.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], 'r', label='globalOnly')
-ax2.plot(Qlog_0['nRaces'][1:], Qlog_0['nSteps'], 'r', label='globalOnly')
+Qlog_0.append( RT.race_log(25, 1000, pgbOn=False) )
+ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'r', label='globalOnly')
+ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'r', label='globalOnly')
 # ---- Next do simultaneous
 print('Simultaneous learning: sum)
 RT.racers.pop()
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='sum')    
-Qlog_0    =   RT.race_log(50, 1000, pgbOn=False)
-ax1.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], 'b', label='l+g: sum')
-ax2.plot(Qlog_0['nRaces'][1:], Qlog_0['nSteps'], 'b', label='l+g: sum')    
+Qlog_0.append( RT.race_log(50, 1000, pgbOn=False) )
+ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'b', label='l+g: sum')
+ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'b', label='l+g: sum')    
 print('Simultaneous learning: maxAbs)
 RT.racers.pop()
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='maxAbs')    
-Qlog_0    =   RT.race_log(50, 1000, pgbOn=False)
-ax1.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], 'k', label='l+g: sum')
-ax2.plot(Qlog_0['nRaces'][1:], Qlog_0['nSteps'], 'k', label='l+g: sum')    
+Qlog_0.append( RT.race_log(50, 1000, pgbOn=False) )
+ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'k', label='l+g: sum')
+ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'k', label='l+g: sum')    
     
-        
+    
+    
+    
+# ==================
+# DUMP, essentially
+# ==================    
+            
 #SAVE
 logVar      =   {'log':Qlog_0, 'figure':RT.figId}
 wrkRep      =   '/home/younesz/Documents/Simulations/raceTrack/Type1/'

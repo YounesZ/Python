@@ -12,6 +12,7 @@
 import numpy as np
 from random import choice
 from scipy.stats import entropy
+from Utils.programming import ut_remove_value
 
 
 class racer():
@@ -116,8 +117,8 @@ class racer():
             values  =   valuesG + valuesL
         elif self.navMode == 'entropyWsum':
             # entropy-weighted sum of both
-            entrL   =   entropy(valuesL)
-            entrG   =   entropy(valuesG)
+            entrL   =   entropy( ut_remove_value.main(valuesL, '!=0') ) + 1
+            entrG   =   entropy( ut_remove_value.main(valuesG, '!=0') ) + 1
             values  =   valuesG/entrG + valuesL/entrL
         elif self.navMode == 'maxAbs':
             # Max of absolute value
@@ -136,7 +137,10 @@ class racer():
         if self.navMode == 'sum':
             self.cumul_locWeight.append( abs(valuesL[iMax]) / (abs(valuesG[iMax]) + abs(valuesL[iMax])) )
         elif self.navMode == 'entropyWsum':
-            self.cumul_locWeight.append( (abs(valuesL[iMax])/entrL) / (abs(valuesG[iMax])/entrG + abs(valuesL[iMax])/entrL) )
+            if (abs(valuesG[iMax])/entrG + abs(valuesL[iMax])/entrL)==0:
+                self.cumul_locWeight.append(0.5)
+            else:
+                self.cumul_locWeight.append( (abs(valuesL[iMax])/entrL) / (abs(valuesG[iMax])/entrG + abs(valuesL[iMax])/entrL) )
         elif self.navMode == 'maxAbs':
             self.cumul_locWeight.append( abs(valuesL[iMax])==max(valuesL[iMax],valuesG[iMax])  - abs(valuesG[iMax])==max(valuesL[iMax],valuesG[iMax]))
 
