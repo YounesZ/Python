@@ -312,7 +312,7 @@ RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb)
 
 for ii in range(100):
     RT.racers[0].car_set_start([20,9], choice(RT.racers[0].velocities), RT.compute_FoV(RT.racers[0], [20,9]))
-    RT.race_train(1, display=False, pgbar=False)
+    RT.race_train(1, display=False, pgbar=True)
 
 #RT.race_run(1, display=True)
 #RT.race_run(100, display=False, pgbar=False)
