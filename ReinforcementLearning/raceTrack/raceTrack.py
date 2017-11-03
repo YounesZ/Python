@@ -1,8 +1,6 @@
 """ This code solves the raceTrack problem in Sutton and Barto 5.6
 
     TO DO:
-        -   Return field of view from self.compute_displacement() then in pass it to racer
-        -   Set velocity to 0 after hitting a wall
         -   No more racers than the number of starting blocks
         -   2 racers cannot start on the same spot - to be fixed
         -   Seen a case where car hits the finish line but the episode does not end
@@ -131,10 +129,10 @@ class raceTrack():
         position    =  self.track_pickStart()
         # New racer
         if hRacer=='new':
-            self.racers.append(racer(position, [0,0], list(self.track_dim), Lambda=Lambda, eGreedy=eGreedy, navMode=navMode))
+            self.racers.append(racer(list(self.track_dim), Lambda=Lambda, eGreedy=eGreedy, navMode=navMode))
             hRacer  =   self.racers[-1]
         initFoV     =   self.compute_FoV(hRacer, position)
-        hRacer.car_set_start(position, [0, 0], initFoV)
+        hRacer.car_set_start(position, [0, 0], FoV=initFoV)
 
     def race_terminated(self, position):
         # Check if position is terminal
@@ -147,6 +145,7 @@ class raceTrack():
         # Loop on number of races
         stepsBrace      =   np.zeros([len(self.racers), nRaces])
         rewBrace        =   np.zeros([len(self.racers), nRaces])
+        locBrace        =   np.zeros([len(self.racers), nRaces])
 
         # Loop on number of races
         for iRc in range(nRaces):
@@ -174,57 +173,27 @@ class raceTrack():
             # Pick new starting positions
             stepsBrace[:,iRc]   =   [x.cumul_steps for x in self.racers]
             rewBrace[:,iRc]     =   [x.cumul_reward for x in self.racers]
+            locBrace[:,iRc]     =   [np.mean(x.cumul_locWeight) for x in self.racers]
             [self.reset_racer(hRacer=x) for x in self.racers]
         # Close display
         if display or not videoTape is None:
             self.display(draw=True, videoTape=videoTape)
             plt.close(self.figId)
             self.figId          =   None
-        return stepsBrace, rewBrace
-
-    def race_train(self, nRuns, display=True, videoTape=None, pgbar=True):
-        # Loop on number of races
-        for iRc in range(nRuns):
-            race_on     =   [True]*len(self.racers)
-
-            # Count the steps
-            while any(race_on):
-                # Compute displacement
-                rew_pos =   [self.compute_displacement(self.racers[x].position_chain[-1], self.racers[x].velocities[self.racers[x].velocity_chain[-1]]) if y else [] for x,y in zip(range(len(self.racers)), race_on)]
-                # Update field of view
-                fov     =   [self.compute_FoV(x, position[1]) for x,position in zip(self.racers, rew_pos)]
-                # Update racers' learning
-                [self.racers[w].car_update(list(x[1]), list(x[2]), z, (x[0]!=-1)*x[0], self.race_terminated(x[1])) if y else [] for w,x,y,z in zip(range(len(self.racers)), rew_pos, race_on, fov)]
-                # Update race status
-                race_on  =  [not self.race_terminated(x[1]) for x in rew_pos]
-                # Update display
-                if display or not videoTape is None: self.display(draw=False)
-            # Update progress bar
-            if pgbar:
-                stdout.write('\r')
-                # the exact output you're looking for:
-                msgR    =   ['Racer '+str(x+1)+': '+str(y.cumul_steps)+' steps, reward '+str(y.cumul_reward) for x,y in zip(range(len(self.racers)), self.racers)]
-                stdout.write("Running races: [%-40s] %d%%, %s" % ('=' * int(iRc / nRuns * 40), 100 * iRc / nRuns, ', '.join(msgR)))
-                stdout.flush()
-            # Pick new starting positions
-            [self.reset_racer(hRacer=x) for x in self.racers]
-        # Close display
-        if display or not videoTape is None:
-            self.display(draw=True, videoTape=videoTape)
-            plt.close(self.figId)
-            self.figId          =   None
+        return stepsBrace, rewBrace, locBrace
 
     def race_log(self, steps, iterations, pgbOn=True):
         # Prepare containers
         nRaces  =   [1] + [steps]*iterations
-        Qlog    =   {'nRaces':[0], 'nSteps':[], 'reward':[], 'currentPolicies':[]}
+        Qlog    =   {'nRaces':[0], 'nSteps':[], 'reward':[], 'locWgt':[], 'currentPolicies':[]}
         # Loop on iterations
         count   =   0
         for nIt in nRaces:
-            STP, REW    =   self.race_run(nIt, display=False, pgbar=pgbOn)
+            STP, REW, LOC    =   self.race_run(nIt, display=False, pgbar=pgbOn)
             Qlog['nRaces'].append( nIt + Qlog['nRaces'][-1] )
             Qlog['nSteps'].append( np.mean(STP, axis=1) )
             Qlog['reward'].append( np.mean(REW, axis=1) )
+            Qlog['locWgt'].append( np.mean(LOC, axis=1) )
             Qlog['currentPolicies'].append([deepcopy(x.policy) for x in self.racers])
 
             # Print status
@@ -303,21 +272,26 @@ class raceTrack():
 
 
 
+"""
 # ========
 # LAUNCHER
 RT      =   raceTrack(trackType=1)
 parLamb =   0.5
 pareGr  =   0.1
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb)
-
 for ii in range(100):
     RT.racers[0].car_set_start([20,9], choice(RT.racers[0].velocities), RT.compute_FoV(RT.racers[0], [20,9]))
     RT.race_train(1, display=False, pgbar=True)
+"""
 
 #RT.race_run(1, display=True)
 #RT.race_run(100, display=False, pgbar=False)
 
 """
+
+# ==================
+# COMPARE LAMBDAs
+# ==================
 # Iterate over lambda parameters for a single navigation mode
 plt.figure;
 hRac    =   RT.racers[0]
@@ -328,23 +302,64 @@ for iL, iC in zip(lVal, lCol):
     Qlog_0    =   RT.race_log(10, 100, pgbOn=False)
     plt.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], iC+'--', label='lambda: '+str(iL))
 
-# Iterate over navigation modes for a single lambda
+
+# ==================
+# COMPARE NAVI MODES
+# ==================
+ Iterate over navigation modes for a single lambda
 FF  =   plt.figure()
-ax1 =   FF.add_subplot(121); ax1.title.set_text('Cumulative reward');   ax1.set_xlabel('Nb of races')
-ax2 =   FF.add_subplot(122); ax2.title.set_text('Avg number of steps'); ax2.set_xlabel('Nb of races')
-navM    =   ['global', 'sum', 'maxAbs']
-lCol    =   ['r', 'g', 'b']
+ax1 =   FF.add_subplot(131); ax1.title.set_text('Cumulative reward');   ax1.set_xlabel('Nb of races')
+ax2 =   FF.add_subplot(132); ax2.title.set_text('Avg number of steps'); ax2.set_xlabel('Nb of races')
+ax3 =   FF.add_subplot(133); ax3.title.set_text('Weight of local info'); ax3.set_xlabel('Nb of races')
+navM    =   ['global', 'sum', 'entropyWsum', 'maxAbs', 'local']
+lCol    =   ['r', 'g', 'b', 'k']
 for iL, iC in zip(navM, lCol):
-    RT.racers.pop()
     RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode=iL)
-    Qlog_0    =   RT.race_log(10, 100, pgbOn=False)
+    print('Navigation mode: '+iL)
+    Qlog_0    =   RT.race_log(50, 1000, pgbOn=False)
     ax1.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], iC, label='nav. mode: '+iL)
     ax2.plot(Qlog_0['nRaces'][1:], Qlog_0['nSteps'], iC, label='nav. mode: ' + iL)
+    ax3.plot(Qlog_0['nRaces'][1:], Qlog_0['locWgt'], iC, label='nav. mode: ' + iL)
+    plt.pause(0.5)
+    RT.racers.pop()
 ax1.legend()
 ax1.set_xlim([1,1000]); ax1.set_ylim([-10000,0])
 ax2.set_xlim([1,1000]); ax2.set_ylim([0,500])
 
 
+# ==================
+# COMPARE SIMULTANEOUS vs SEQUENTIAL LEARNING
+# ==================
+FF  =   plt.figure()
+ax1 =   FF.add_subplot(121); ax1.title.set_text('Cumulative reward');   ax1.set_xlabel('Nb of races')
+ax2 =   FF.add_subplot(122); ax2.title.set_text('Avg number of steps'); ax2.set_xlabel('Nb of races')
+# ---- First do sequential
+# LOCAL training
+RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='local')
+print('Sequential learning)
+Qlog_0    =   RT.race_log(25, 1000, pgbOn=False)
+ax1.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], 'r--', label='localOnly')
+ax2.plot(Qlog_0['nRaces'][1:], Qlog_0['nSteps'], 'r--', label='localOnly')
+# GLOBAL training
+RT.racers[0].navMode    =   'global'
+Qlog_0    =   RT.race_log(25, 1000, pgbOn=False)
+ax1.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], 'r', label='globalOnly')
+ax2.plot(Qlog_0['nRaces'][1:], Qlog_0['nSteps'], 'r', label='globalOnly')
+# ---- Next do simultaneous
+print('Simultaneous learning: sum)
+RT.racers.pop()
+RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='sum')    
+Qlog_0    =   RT.race_log(50, 1000, pgbOn=False)
+ax1.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], 'b', label='l+g: sum')
+ax2.plot(Qlog_0['nRaces'][1:], Qlog_0['nSteps'], 'b', label='l+g: sum')    
+print('Simultaneous learning: maxAbs)
+RT.racers.pop()
+RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='maxAbs')    
+Qlog_0    =   RT.race_log(50, 1000, pgbOn=False)
+ax1.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], 'k', label='l+g: sum')
+ax2.plot(Qlog_0['nRaces'][1:], Qlog_0['nSteps'], 'k', label='l+g: sum')    
+    
+        
 #SAVE
 logVar      =   {'log':Qlog_0, 'figure':RT.figId}
 wrkRep      =   '/home/younesz/Documents/Simulations/raceTrack/Type1/'

@@ -1,20 +1,22 @@
 """ This class codes racers that can run on class: raceTrack.py
 
     TO DO:
-        -   restrict velocity to positive values
+        -   correct the logging function to include multiple realizations at low nb of races
 
     TO TEST:
-        -   velocity never goes down to 0
+        -   tracking contribution of local info
+        -   new combination of Q-values: entropy-weighted sum
 
 """
 
 import numpy as np
 from random import choice
+from scipy.stats import entropy
 
 
 class racer():
 
-    def __init__(self, position, velocity, spaceDim, Lambda=0, learnRate=0.15, eGreedy=0.1, discount=0.8, navMode='global'):
+    def __init__(self, spaceDim, Lambda=0, learnRate=0.15, eGreedy=0.1, discount=0.8, navMode='global'):
         # ==============
         # Learning agent
         # Agent type
@@ -38,8 +40,6 @@ class racer():
         self.global_value   =   np.zeros(spaceDim+[len(self.velocities), len(self.actions)])
         self.local_value    =   {}
         self.navMode        =   navMode
-        # Initialize starting position
-        self.car_set_start(position, velocity)
         # Print message
         print('Initialized 1 racer')
 
@@ -47,14 +47,16 @@ class racer():
         # Empty learning variables
         self.position_chain =   [position]
         self.action_chain   =   []
+        self.FoV_chain      =   []
         if FoV is not None:
             self.FoV_chain  =   [FoV]
-        else:
-            self.FoV_chain  =   []
+        if FoV not in self.local_value.keys():
+            self.local_value[FoV]   =   np.zeros([len(self.velocities), len(self.actions)])
         self.velocity_chain =   [self.velocities.index(velocity)]
         self.global_trace   =   np.zeros( np.shape(self.global_value) )
         self.cumul_reward   =   0
         self.cumul_steps    =   0
+        self.cumul_locWeight=   []
         # Reset local trace
         self.local_trace    =   {}
         for iTr in self.local_value.keys():
@@ -105,11 +107,18 @@ class racer():
         if self.navMode=='global':
             # Only global information
             values  =   valuesG
+            self.cumul_locWeight.append(0)
         elif self.navMode=='local':
             values  =   valuesL
+            self.cumul_locWeight.append(1)
         elif self.navMode == 'sum':
             # Sum of both
             values  =   valuesG + valuesL
+        elif self.navMode == 'entropyWsum':
+            # entropy-weighted sum of both
+            entrL   =   entropy(valuesL)
+            entrG   =   entropy(valuesG)
+            values  =   valuesG/entrG + valuesL/entrL
         elif self.navMode == 'maxAbs':
             # Max of absolute value
             mxV     =   np.maximum(np.abs(valuesG), np.abs(valuesL))
@@ -123,32 +132,45 @@ class racer():
         # Greedy value
         self.policy[state[0], state[1], velocity, :]      =   self.eGreedy / nEl
         self.policy[state[0], state[1], velocity, iMax]   =   1 - self.eGreedy * (1 - 1 / nEl)
+        # Update contributions of global vs local
+        if self.navMode == 'sum':
+            self.cumul_locWeight.append( abs(valuesL[iMax]) / (abs(valuesG[iMax]) + abs(valuesL[iMax])) )
+        elif self.navMode == 'entropyWsum':
+            self.cumul_locWeight.append( (abs(valuesL[iMax])/entrL) / (abs(valuesG[iMax])/entrG + abs(valuesL[iMax])/entrL) )
+        elif self.navMode == 'maxAbs':
+            self.cumul_locWeight.append( abs(valuesL[iMax])==max(valuesL[iMax],valuesG[iMax])  - abs(valuesG[iMax])==max(valuesL[iMax],valuesG[iMax]))
 
     def car_update(self, newPos, newVelo, newFoV, reward, terminated):
         # ==============
         self.cumul_steps    +=  1
+        self.cumul_reward   +=  reward
         self.position_chain.append(newPos)
+        # Append field of view
         self.FoV_chain.append(newFoV)
+        if not self.FoV_chain[-1] in self.local_value.keys():
+            self.local_value[self.FoV_chain[-1]] = np.zeros([len(self.velocities), len(self.actions)])
+            self.local_trace[self.FoV_chain[-1]] = np.zeros([len(self.velocities), len(self.actions)])
         #self.velocity_chain[-1]     =   self.velocities.index(newVelo)     # Set to 0,0 in case car hits a wall
         self.car_control()
-        # SARSA lambda - global
-        Qold    =   self.global_value[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]
-        Qnew    =   self.global_value[self.position_chain[-1][0], self.position_chain[-1][1], self.velocity_chain[-2], self.action_chain[-1]]
-        incr    =   reward + self.discount * Qnew - Qold
-        self.global_trace[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]    +=  1
-        self.global_value   +=  self.learnRate * incr * self.global_trace
-        self.global_trace   *=  self.discount * self.Lambda
-        # SARSA lambda - local
-        if not self.FoV_chain[-1] in self.local_value.keys():
-            self.local_value[self.FoV_chain[-1]]  =   np.zeros([len(self.velocities), len(self.actions)])
-            self.local_trace[self.FoV_chain[-1]]  =   np.zeros([len(self.velocities), len(self.actions)])
-        Qold    =   self.local_value[self.FoV_chain[-2]][self.velocity_chain[-3], self.action_chain[-2]]
-        Qnew    =   self.local_value[self.FoV_chain[-1]][self.velocity_chain[-2], self.action_chain[-1]]
-        incr    =   reward + self.discount * Qnew - Qold
-        self.local_trace[self.FoV_chain[-2]][self.velocity_chain[-3], self.action_chain[-2]] = 1
-        for iK in self.local_value.keys():
-            self.local_value[iK]    +=  self.learnRate * incr * self.local_trace[iK]
-            self.local_trace[iK]    *=  self.discount * self.Lambda
+        # Global Learning
+        if self.navMode != 'local':
+            # SARSA lambda - global
+            Qold    =   self.global_value[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]
+            Qnew    =   self.global_value[self.position_chain[-1][0], self.position_chain[-1][1], self.velocity_chain[-2], self.action_chain[-1]]
+            incr    =   reward + self.discount * Qnew - Qold
+            self.global_trace[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]    +=  1
+            self.global_value   +=  self.learnRate * incr * self.global_trace
+            self.global_trace   *=  self.discount * self.Lambda
+        # Local learning
+        if self.navMode != 'global':
+            # SARSA lambda - local
+            Qold    =   self.local_value[self.FoV_chain[-2]][self.velocity_chain[-3], self.action_chain[-2]]
+            Qnew    =   self.local_value[self.FoV_chain[-1]][self.velocity_chain[-2], self.action_chain[-1]]
+            incr    =   reward + self.discount * Qnew - Qold
+            self.local_trace[self.FoV_chain[-2]][self.velocity_chain[-3], self.action_chain[-2]] = 1
+            for iK in self.local_value.keys():
+                self.local_value[iK]    +=  self.learnRate * incr * self.local_trace[iK]
+                self.local_trace[iK]    *=  self.discount * self.Lambda
         # Update racers' policies
         self.car_set_policy(self.position_chain[-2], self.FoV_chain[-2], self.velocity_chain[-3])
 
