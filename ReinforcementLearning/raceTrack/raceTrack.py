@@ -362,8 +362,8 @@ Qlog_0 =    []
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='local')
 print('Sequential learning')
 Qlog_0.append( RT.race_log(25, 100, pgbOn=False) )
-#ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'r--', label='localOnly')
-#ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'r--', label='localOnly')
+#ax1.plot(Qlog_0[0]['nRaces'][1:], Qlog_0[0]['reward'], 'r--', label='localOnly')
+#ax2.plot(Qlog_0[0]['nRaces'][1:], Qlog_0[0]['nSteps'], 'r--', label='localOnly')
 # GLOBAL training
 RT.racers[0].navMode    =   'global'
 Qlog_0.append( RT.race_log(25, 100, pgbOn=False) )
@@ -384,9 +384,8 @@ ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'k', label='l+g: sum')
 ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'k', label='l+g: sum')    
     
 ax1.legend()
-ax1.set_xlim([1,50000]); ax1.set_ylim([-5000,0])
-ax2.set_xlim([1,50000]); ax2.set_ylim([0,300])
-ax3.set_xlim([1,50000]); ax3.set_ylim([.5, .8])
+ax1.set_xlim([1,5000]); ax1.set_ylim([-1000,0])
+ax2.set_xlim([1,5000]); ax2.set_ylim([0,300])
 
 #SAVE
 logVar      =   {'log':Qlog_0, 'figure':RT.figId}
