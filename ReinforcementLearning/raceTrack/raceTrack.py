@@ -320,17 +320,25 @@ Qlog_0  =   []
 for iL, iC in zip(navM, lCol):
     RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode=iL)
     print('Navigation mode: '+iL)
-    Qlog_0.append( RT.race_log(50, 100, pgbOn=False) )
+    Qlog_0.append( RT.race_log(50, 200, pgbOn=False) )
     ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], iC, label='nav. mode: '+iL)
     ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], iC, label='nav. mode: ' + iL)
     ax3.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['locWgt'], iC, label='nav. mode: ' + iL)
     plt.pause(0.5)
     RT.racers.pop()
 ax1.legend()
-ax1.set_xlim([1,50]); ax1.set_ylim([-30000,0])
-ax2.set_xlim([1,50]); ax2.set_ylim([0,1000])
-ax3.set_xlim([1,1000]); ax3.set_ylim([0,500])
+ax1.set_xlim([1,10000]); ax1.set_ylim([-4000,0])
+ax2.set_xlim([1,10000]); ax2.set_ylim([25,300])
+ax3.set_xlim([1,10000]); ax3.set_ylim([.5, .8])
 
+#SAVE
+logVar      =   {'log':Qlog_0, 'figure':RT.figId}
+wrkRep      =   '/home/younesz/Documents/Simulations/raceTrack/Type1/'
+filename    =   '1Racer_compareNavModes_lambda'+str(parLamb).replace('.', '_')+'_eGreedy'+str(pareGr).replace('.', '_')+'_10Kraces.p'
+with open(wrkRep+filename, 'wb') as f:
+    pickle.dump(logVar, f)
+    
+    
 
 # ==================
 # COMPARE SIMULTANEOUS vs SEQUENTIAL LEARNING
@@ -342,8 +350,8 @@ Qlog_0 =    []
 # ---- First do sequential
 # LOCAL training
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='local')
-print('Sequential learning)
-Qlog_0.append( RT.race_log(25, 1000, pgbOn=False) )
+print('Sequential learning')
+Qlog_0.append( RT.race_log(50, 1000, pgbOn=False) )
 ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'r--', label='localOnly')
 ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'r--', label='localOnly')
 # GLOBAL training
@@ -352,20 +360,30 @@ Qlog_0.append( RT.race_log(25, 1000, pgbOn=False) )
 ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'r', label='globalOnly')
 ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'r', label='globalOnly')
 # ---- Next do simultaneous
-print('Simultaneous learning: sum)
+print('Simultaneous learning: sum')
 RT.racers.pop()
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='sum')    
 Qlog_0.append( RT.race_log(50, 1000, pgbOn=False) )
 ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'b', label='l+g: sum')
 ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'b', label='l+g: sum')    
-print('Simultaneous learning: maxAbs)
+print('Simultaneous learning: maxAbs')
 RT.racers.pop()
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='maxAbs')    
 Qlog_0.append( RT.race_log(50, 1000, pgbOn=False) )
 ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'k', label='l+g: sum')
 ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'k', label='l+g: sum')    
     
-    
+ax1.legend()
+ax1.set_xlim([1,50000]); ax1.set_ylim([-5000,0])
+ax2.set_xlim([1,50000]); ax2.set_ylim([0,300])
+ax3.set_xlim([1,50000]); ax3.set_ylim([.5, .8])
+
+#SAVE
+logVar      =   {'log':Qlog_0, 'figure':RT.figId}
+wrkRep      =   '/home/younesz/Documents/Simulations/raceTrack/Type1/'
+filename    =   '1Racer_compareNavModes_sequentialVSsimultaneous_lambda'+str(parLamb).replace('.', '_')+'_eGreedy'+str(pareGr).replace('.', '_')+'_10Kraces.p'
+with open(wrkRep+filename, 'wb') as f:
+    pickle.dump(logVar, f)    
     
     
 # ==================

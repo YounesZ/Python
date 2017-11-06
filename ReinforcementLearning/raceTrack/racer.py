@@ -135,7 +135,10 @@ class racer():
         self.policy[state[0], state[1], velocity, iMax]   =   1 - self.eGreedy * (1 - 1 / nEl)
         # Update contributions of global vs local
         if self.navMode == 'sum':
-            self.cumul_locWeight.append( abs(valuesL[iMax]) / (abs(valuesG[iMax]) + abs(valuesL[iMax])) )
+            if (abs(valuesG[iMax]) + abs(valuesL[iMax])) == 0:
+                self.cumul_locWeight.append(0.5)
+            else:
+                self.cumul_locWeight.append( abs(valuesL[iMax]) / (abs(valuesG[iMax]) + abs(valuesL[iMax])) )
         elif self.navMode == 'entropyWsum':
             if (abs(valuesG[iMax])/entrG + abs(valuesL[iMax])/entrL)==0:
                 self.cumul_locWeight.append(0.5)
