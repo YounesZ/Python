@@ -12,6 +12,7 @@
 import numpy as np
 from random import choice
 from scipy.stats import entropy
+from itertools import chain
 from Utils.programming import ut_remove_value
 
 
@@ -26,12 +27,14 @@ class racer():
         self.eGreedy        =   eGreedy
         self.discount       =   discount
         # Actions
-        actY                =   [-1,0,1]*3
-        actX                =   [-1]*3+[0]*3+[1]*3
+        mxAct               =   1
+        actY                =   [-1,0,1]*(2*mxAct+1)
+        actX                =   list( np.concatenate([[x]*(2*mxAct+1) for x in range(-mxAct,mxAct+1)]) )
         self.actions        =   [[actY[idx], actX[idx]] for idx in range(len(actX))]
         # Velocities
-        velX                =   list(range(-5,6))*11
-        velY                =   [-5]*11+[-4]*11+[-3]*11+[-2]*11+[-1]*11+[0]*11+[1]*11+[2]*11+[3]*11+[4]*11+[5]*11
+        self.maxVelocity    =   1
+        velX                =   list(range(-self.maxVelocity,self.maxVelocity+1))*(2*self.maxVelocity+1)
+        velY                =   list( np.concatenate([[x]*(2*self.maxVelocity+1) for x in range(-self.maxVelocity,self.maxVelocity+1)]) )
         self.velocities     =   [[velY[idx], velX[idx]] for idx in range(len(velX))]
         # Field of view
         self.viewX          =   5
@@ -83,7 +86,7 @@ class racer():
         else:
             curPos  =   self.position_chain[-1]
             moveP   =   np.multiply(self.policy[curPos[0], curPos[1], curVel, :], np.random.random([1, len(self.actions)]))[0]
-            crit1   =   [abs(sum(np.add(x, self.velocities[curVel]))) > 0 for x in self.actions]
+            crit1   =   [sum(abs(np.add(x, self.velocities[curVel]))) > 0 for x in self.actions]
             #crit2   =   [(x[0] + self.velocities[curVel][0]) >= 0 for x in self.actions]
             #crit3   =   [(x[1] + self.velocities[curVel][1]) >= 0 for x in self.actions]
             #moveP   =   [x if y and z and w else -1 for x,y,z,w in zip(list(moveP),crit1,crit2,crit3)]
@@ -93,9 +96,9 @@ class racer():
         iAction     =   self.actions[idX]
         # Set car acceleration/deceleration
         velocity    =   np.add(self.velocities[curVel], iAction)
-        velocity    =   [max(min(velocity[0],5),-5), max(min(velocity[1],5),-5)]
+        velocity    =   [max(min(velocity[0],self.maxVelocity),-self.maxVelocity), max(min(velocity[1],self.maxVelocity),-self.maxVelocity)]
         self.action_chain.append(idX)
-        self.velocity_chain.append(self.velocities.index(velocity))
+        self.velocity_chain.append( self.velocities.index(velocity) )
 
     def car_set_policy(self, state, FoV, velocity):
         # ==============
@@ -124,11 +127,13 @@ class racer():
             # Max of absolute value
             mxV     =   np.maximum(np.abs(valuesG), np.abs(valuesL))
             snV     =   np.sign
-            values  =   [[x,y][np.abs([x,y]).argmax()] for x,y in zip(valuesG, valuesL)]
+            values  =   np.array( [[x,y][np.abs([x,y]).argmax()] for x,y in zip(valuesG, valuesL)] )
 
         nEl     =   len(values)
+        # Make sure not to select an action that puts velocity to 0
+        allowed =   [sum(abs(np.add(x, self.velocities[velocity]))) > 0 for x in self.actions]
         # Pick a max randomly
-        x       =   np.where( values==max(values) )
+        x       =   np.where( [values[x]==max(values[allowed]) and allowed[x] for x in range(len(allowed))] )
         iMax    =   choice(x[0])
         # Greedy value
         self.policy[state[0], state[1], velocity, :]      =   self.eGreedy / nEl
@@ -157,7 +162,7 @@ class racer():
         if not self.FoV_chain[-1] in self.local_value.keys():
             self.local_value[self.FoV_chain[-1]] = np.zeros([len(self.velocities), len(self.actions)])
             self.local_trace[self.FoV_chain[-1]] = np.zeros([len(self.velocities), len(self.actions)])
-        #self.velocity_chain[-1]     =   self.velocities.index(newVelo)     # Set to 0,0 in case car hits a wall
+        self.velocity_chain[-1]     =   self.velocities.index(newVelo)     # Set to 0,0 in case car hits a wall
         self.car_control()
         # Global Learning
         if self.navMode != 'local':
@@ -165,7 +170,7 @@ class racer():
             Qold    =   self.global_value[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]
             Qnew    =   self.global_value[self.position_chain[-1][0], self.position_chain[-1][1], self.velocity_chain[-2], self.action_chain[-1]]
             incr    =   reward + self.discount * Qnew - Qold
-            self.global_trace[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]    +=  1
+            self.global_trace[self.position_chain[-2][0], self.position_chain[-2][1], self.velocity_chain[-3], self.action_chain[-2]]   =  1
             self.global_value   +=  self.learnRate * incr * self.global_trace
             self.global_trace   *=  self.discount * self.Lambda
         # Local learning
