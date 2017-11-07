@@ -83,7 +83,7 @@ class racer():
         else:
             curPos  =   self.position_chain[-1]
             moveP   =   np.multiply(self.policy[curPos[0], curPos[1], curVel, :], np.random.random([1, len(self.actions)]))[0]
-            crit1   =   [abs(sum(np.add(x, self.velocities[curVel]))) > 0 for x in self.actions]
+            crit1   =   [sum(abs(np.add(x, self.velocities[curVel]))) > 0 for x in self.actions]
             #crit2   =   [(x[0] + self.velocities[curVel][0]) >= 0 for x in self.actions]
             #crit3   =   [(x[1] + self.velocities[curVel][1]) >= 0 for x in self.actions]
             #moveP   =   [x if y and z and w else -1 for x,y,z,w in zip(list(moveP),crit1,crit2,crit3)]
@@ -124,11 +124,12 @@ class racer():
             # Max of absolute value
             mxV     =   np.maximum(np.abs(valuesG), np.abs(valuesL))
             snV     =   np.sign
-            values  =   [[x,y][np.abs([x,y]).argmax()] for x,y in zip(valuesG, valuesL)]
+            values  =   np.array( [[x,y][np.abs([x,y]).argmax()] for x,y in zip(valuesG, valuesL)] )
 
         nEl     =   len(values)
         # Pick a max randomly
-        x       =   np.where( values==max(values) )
+        allowed =   [sum(abs(np.add(x, self.velocities[velocity]))) > 0 for x in self.actions]
+        x       =   np.where( [values[x]==max(values[allowed]) and allowed[x] for x in range(len(allowed))] )
         iMax    =   choice(x[0])
         # Greedy value
         self.policy[state[0], state[1], velocity, :]      =   self.eGreedy / nEl

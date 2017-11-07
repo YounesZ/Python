@@ -315,21 +315,23 @@ ax1 =   FF.add_subplot(131); ax1.title.set_text('Cumulative reward');   ax1.set_
 ax2 =   FF.add_subplot(132); ax2.title.set_text('Avg number of steps'); ax2.set_xlabel('Nb of races')
 ax3 =   FF.add_subplot(133); ax3.title.set_text('Weight of local info'); ax3.set_xlabel('Nb of races')
 navM    =   ['global', 'sum', 'entropyWsum', 'maxAbs', 'local']
-lCol    =   ['r', 'g', 'b', 'k']
+lCol    =   ['r', 'g', 'c', 'b', 'k']
 Qlog_0  =   []
+count   =   0
 for iL, iC in zip(navM, lCol):
     RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode=iL)
     print('Navigation mode: '+iL)
     Qlog_0.append( RT.race_log(50, 200, pgbOn=False) )
-    ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], iC, label='nav. mode: '+iL)
-    ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], iC, label='nav. mode: ' + iL)
-    ax3.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['locWgt'], iC, label='nav. mode: ' + iL)
+    ax1.plot(Qlog_0[count]['nRaces'][1:], Qlog_0[count]['reward'], iC, label='nav. mode: '+iL)
+    ax2.plot(Qlog_0[count]['nRaces'][1:], Qlog_0[count]['nSteps'], iC, label='nav. mode: ' + iL)
+    ax3.plot(Qlog_0[count]['nRaces'][1:], Qlog_0[count]['locWgt'], iC, label='nav. mode: ' + iL)
     plt.pause(0.5)
     RT.racers.pop()
-ax1.legend()
-ax1.set_xlim([1,10000]); ax1.set_ylim([-4000,0])
-ax2.set_xlim([1,10000]); ax2.set_ylim([25,300])
-ax3.set_xlim([1,10000]); ax3.set_ylim([.5, .8])
+    count += 1
+ax3.legend()
+ax1.set_xlim([1,10000]); ax1.set_ylim([-1000,5])
+ax2.set_xlim([1,10000]); ax2.set_ylim([10,150])
+ax3.set_xlim([1,10000]); ax3.set_ylim([0, 1])
 
 #SAVE
 logVar      =   {'log':Qlog_0, 'figure':RT.figId}
