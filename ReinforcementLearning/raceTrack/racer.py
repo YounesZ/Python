@@ -18,7 +18,7 @@ from Utils.programming import ut_remove_value
 
 class racer():
 
-    def __init__(self, spaceDim, Lambda=0, learnRate=0.15, eGreedy=0.1, discount=0.8, navMode='global'):
+    def __init__(self, spaceDim, Lambda=0, learnRate=0.15, eGreedy=0.1, discount=0.8, planningMode='prioritySweep', planningNodes=0, navMode='global'):
         # ==============
         # Learning agent
         # Agent type
@@ -26,9 +26,11 @@ class racer():
         self.learnRate      =   learnRate
         self.eGreedy        =   eGreedy
         self.discount       =   discount
+        self.planningMode   =   planningMode
+        self.planningNodes  =   planningNodes
         # Actions
         mxAct               =   1
-        actY                =   [-1,0,1]*(2*mxAct+1)
+        actY                =   list( range(-mxAct,mxAct+1) ) * (2*mxAct+1)
         actX                =   list( np.concatenate([[x]*(2*mxAct+1) for x in range(-mxAct,mxAct+1)]) )
         self.actions        =   [[actY[idx], actX[idx]] for idx in range(len(actX))]
         # Velocities
@@ -50,6 +52,8 @@ class racer():
     def car_set_start(self, position, velocity, FoV=None):
         # Empty learning variables
         self.position_chain =   [position]
+        self.planningQueue  =   []
+        self.planningModel  =   []
         self.action_chain   =   []
         self.FoV_chain      =   []
         if FoV is not None:
@@ -183,6 +187,8 @@ class racer():
             for iK in self.local_value.keys():
                 self.local_value[iK]    +=  self.learnRate * incr * self.local_trace[iK]
                 self.local_trace[iK]    *=  self.discount * self.Lambda
+        # Planning
+
         # Update racers' policies
         self.car_set_policy(self.position_chain[-2], self.FoV_chain[-2], self.velocity_chain[-3])
 
