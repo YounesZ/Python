@@ -114,7 +114,7 @@ class raceTrack():
             if reward2>-5:
                 newPos  =   newPos2
                 velocity=   [0,0]           # Uncomment this line to have the car velocity set to 0 after hitting a wall
-        return reward, newPos, [0,0]        # velocity
+        return reward, newPos, velocity        # velocity
 
     def compute_FoV(self, racerInst, position):
         # Box seed
@@ -146,12 +146,12 @@ class raceTrack():
 
     # GAMEPLAY FUNCTIONS
     # =================
-    def reset_racer(self, hRacer='new', Lambda=0, eGreedy=0.1, navMode='global'):
+    def reset_racer(self, hRacer='new', Lambda=0, eGreedy=0.1, navMode='global', planningMode='prioritySweep', planningNodes=0):
         # Pre-compute position
         position    =  self.track_pickStart()
         # New racer
         if hRacer=='new':
-            self.racers.append(racer(list(self.track_dim), Lambda=Lambda, eGreedy=eGreedy, navMode=navMode))
+            self.racers.append(racer(list(self.track_dim), Lambda=Lambda, eGreedy=eGreedy, navMode=navMode, planningMode=planningMode, planningNodes=planningNodes))
             hRacer  =   self.racers[-1]
         initFoV     =   self.compute_FoV(hRacer, position)
         hRacer.car_set_start(position, [0, 0], FoV=initFoV)
@@ -380,10 +380,13 @@ parLamb =   0.9
 pareGr  =   0.1
 
 
-RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='global')
-RT.race_run(10, display=False);
+RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='global', planningMode='prioritySweep', planningNodes=10)
+RT.race_run(2, display=False)
+
 
 """
+RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='global', planningMode='noPlnanning', planningNodes=0)
+RT.race_run(10, display=False)
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb)
 for ii in range(100):
     RT.racers[0].car_set_start([20,9], choice(RT.racers[0].velocities), RT.compute_FoV(RT.racers[0], [20,9]))
