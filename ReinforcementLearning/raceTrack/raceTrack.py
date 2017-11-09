@@ -375,14 +375,26 @@ class raceTrack():
 
 # ========
 # LAUNCHER
-RT      =   raceTrack(trackType=1)
 parLamb =   0.9
 pareGr  =   0.1
 
 
-RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='global', planningMode='prioritySweep', planningNodes=10)
-RT.race_run(2, display=True)
+"""
+RT2     =   raceTrack(trackType=1)
+RT2.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='global', planningMode='prioritySweep', planningNodes=10)
 
+RT      =   raceTrack(trackType=1)
+RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='global', planningMode='noPlanning', planningNodes=10)
+
+Qlog_0  =   []
+Qlog_0.append( RT.race_log(20, 100, pgbOn=False) )
+Qlog_0.append( RT2.race_log(20, 100, pgbOn=False) )
+
+
+
+RT2.race_run(100, display=False)
+RT.race_run(100, display=False)
+"""
 
 """
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='global', planningMode='noPlnanning', planningNodes=0)

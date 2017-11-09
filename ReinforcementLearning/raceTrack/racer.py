@@ -11,7 +11,7 @@
 
 import numpy as np
 from random import choice
-#from scipy.stats import entropy
+from scipy.stats import entropy
 from itertools import chain
 from Utils.programming import ut_remove_value
 
@@ -85,7 +85,6 @@ class racer():
         # ==============
         # Pick action: stochastic
         curVel      =   self.velocity_chain[-1]
-        curVel      =   4       #  DELETE THIS LINE FOR QUITTING SPEED-AND-STOP MODE
         if len(self.action_chain)==0 and self.eGreedy==0:
             # First move must be exploratory
             x       =   list( range( len(self.actions) ) )
@@ -170,7 +169,8 @@ class racer():
         if not self.FoV_chain[-1] in self.local_value.keys():
             self.local_value[self.FoV_chain[-1]] = np.zeros([len(self.velocities), len(self.actions)])
             self.local_trace[self.FoV_chain[-1]] = np.zeros([len(self.velocities), len(self.actions)])
-        self.velocity_chain[-1]     =   self.velocities.index(newVelo)     # Set to 0,0 in case car hits a wall
+        #self.velocity_chain[-1]     =   self.velocities.index(newVelo)     # Set to 0,0 in case car hits a wall
+        self.velocity_chain[-1]      = self.velocities.index([0,0])
         self.car_control()
         # Global Learning
         S,A     =   self.position_chain[-2]+[self.velocity_chain[-3]], self.action_chain[-2]
