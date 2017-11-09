@@ -11,7 +11,7 @@
 
 import numpy as np
 from random import choice
-from scipy.stats import entropy
+#from scipy.stats import entropy
 from itertools import chain
 from Utils.programming import ut_remove_value
 
@@ -214,9 +214,8 @@ class racer():
                 R,Sp    =   self.planningModel[S[0]][S[1]][S[2]][A]
                 self.global_value[S[0],S[1],S[2],A]     +=  self.learnRate * (R + self.discount * max(self.global_value[Sp[0], Sp[1], Sp[2], :]) - self.global_value[S[0],S[1],S[2],A])
                 prevCandidates  =   self.planningiModel[S[0]][S[1]][S[2]]
-                Sm, Am, Rm      =   [0]*3, [], []
                 for TPL in prevCandidates.keys():
-                    Sm[0], Sm[1], Sm[2], Am, Rm  =   TPL[0], TPL[1], TPL[2], TPL[3], prevCandidates[TPL]
+                    Sm, Am, Rm  =   [TPL[0], TPL[1], TPL[2]], TPL[3], prevCandidates[TPL]
                     Priority    =   abs(Rm + self.discount * max(self.global_value[S[0], S[1], S[2], :]) - self.global_value[Sm[0], Sm[1], Sm[2], Am])
                     if Priority >=  self.planningThresh:
                         ix      =   list(np.where(Priority > np.array(self.planningPriority))[0])
@@ -263,7 +262,7 @@ class racer():
 
 
 
-self.position_chain
-[[32, 7], [31, 8], [30, 9], [31, 9], [32, 8], [32, 7], [32, 8], [31, 7], [30, 8], [31, 8], [30, 8], [29, 9], [29, 9], [29, 9]]
-self.velocity_chain
-[4,         2,       2,         7,      6,      3,      5,          0,      2,      7,          1,      2,      4,      4,      6]
+# self.position_chain
+# [[32, 7], [31, 8], [30, 9], [31, 9], [32, 8], [32, 7], [32, 8], [31, 7], [30, 8], [31, 8], [30, 8], [29, 9], [29, 9], [29, 9]]
+# self.velocity_chain
+# [4,         2,       2,         7,      6,      3,      5,          0,      2,      7,          1,      2,      4,      4,      6]

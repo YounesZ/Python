@@ -381,7 +381,7 @@ pareGr  =   0.1
 
 
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='global', planningMode='prioritySweep', planningNodes=10)
-RT.race_run(2, display=False)
+RT.race_run(2, display=True)
 
 
 """
