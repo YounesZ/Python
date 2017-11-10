@@ -4,16 +4,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from random import choice
-
+plt.ion()
 
 class maze():
 
     # INIT FUNCTIONS
     # ==============
-    def __init__(self, type='template1', params=(0,0,1)):
+    def __init__(self, type='template1', params=(0,0,1), display=False):
         # Make the maze
         self.maze_make(type, params)
         # Display variables
+        self.displayOn      =   display
         self.figId          =   None
         self.imagePanels    =   []
         self.arrowsP        =   [[[] for x in range(self.maze_dims[1])] for y in range(self.maze_dims[0])]
@@ -69,16 +70,19 @@ class maze():
         wentOut =   newy<0 or newy>=self.maze_dims[0] or newx<0 or newx>=self.maze_dims[1] or self.maze_allowed[newy,newx]==0
         if wentOut:
             reward  =   self.move_reward[1]
+            newPos  =   position
         elif newPos in self.maze_finish:
             reward  =   self.move_reward[2]
             mazeOver=   True
         else:
             reward  =   self.move_reward[0]
+        if self.displayOn:
+            self.display()
         return reward, newPos, mazeOver
 
     # DISPLAY FUNCTIONS
     # =================
-    def display(self, draw=False, videoTape=None):
+    def display(self, videoTape=None):
 
         def update_matrix(num, dum, hndl):
             hndl.set_data(self.view_race(num))
@@ -120,7 +124,8 @@ class maze():
             self.view_value(-1)
             plt.show()
             plt.draw()
-            #plt.pause(0.1)
+            plt.pause(0.1)
+
 
     def view_race(self, cnt):
         # ===========
@@ -187,8 +192,5 @@ class maze():
                 self.arrowsV[iy][ix] = [self.ax3.arrow(-resV[1] / 2 + ix, -resV[0] / 2 + iy, resV[1] / 2, resV[0] / 2,
                                                        head_width=0.5 * ampV, head_length=max( ampV/ 2, 0.1), fc='k', ec='k')]
 
-
-
-MZ  =   maze(type='template1', params=(0,0,1))
 
 
