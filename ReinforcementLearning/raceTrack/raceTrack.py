@@ -1,4 +1,4 @@
-""" This code solves the raceTrack problem in Sutton and Barto 5.6
+""" This code solves the raceTrack problem in Sutton and Barto 5.
 
     TO DO:
         -   No more racers than the number of starting blocks
@@ -27,13 +27,17 @@ plt.ion()
 
 class raceTrack():
 
+    # INIT FUNCTIONS
+    # =================
     def __init__(self, trackType=1, display=True):
         # Generate track shape
         self.track_init(trackType)
         # Initialize racers
         self.racers     =   []
         # Initialize display
-        self.imageSeries=   []
+        self.imagePanels=   []
+        self.arrowsP    =   [[ [] for x in range(self.track_dim[1]) ] for y in range(self.track_dim[0])]
+        self.arrowsV    =   [[ [] for x in range(self.track_dim[1]) ] for y in range(self.track_dim[0])]
         self.figId      =   None
         #self.display()
         #self.display(draw=True)
@@ -53,6 +57,8 @@ class raceTrack():
             startZone           =   [[32]*6, list(range(4, 10))]
             # Finish zone
             finishZone          =   [list(range(1,7)), [17]*6]
+            # Display zone
+            dspZone             =   [20,14]
         # Second example
         elif trackType==2:
             # Dimensions
@@ -65,8 +71,10 @@ class raceTrack():
             # Finish zone
             finishZone          =   [list(range(1, 10)), [32] * 9]
         # Make track
-        track_reward    =   [np.array([-5]*(x[0]+1)+[-1]*(trWidth-sum(x))+[-5]*(x[-1]+1)) for x in forbidden]
-        track_reward    =   np.append( np.append( np.array([-5]*(trWidth+2), ndmin=2), track_reward, axis=0 ), np.array([-5]*(trWidth+2), ndmin=2), axis=0)
+        onPist_rew      =   -1
+        offPist_rew     =   -5
+        track_reward    =   [np.array([offPist_rew]*(x[0]+1)+[onPist_rew]*(trWidth-sum(x))+[offPist_rew]*(x[-1]+1)) for x in forbidden]
+        track_reward    =   np.append( np.append( np.array([offPist_rew]*(trWidth+2), ndmin=2), track_reward, axis=0 ), np.array([offPist_rew]*(trWidth+2), ndmin=2), axis=0)
         # Make start
         for ii in range(np.shape(startZone)[-1]):
             track_reward[startZone[0][ii], startZone[1][ii]]    =   -1  #This avoids that car switching between starting position at race onset
@@ -78,12 +86,16 @@ class raceTrack():
         self.track_finish   =   finishZone
         self.track_dim      =   (trHeight+2, trWidth+2)
         self.track_reward   =   track_reward
+        self.track_dispZ    =   {'anchor':dspZone, 'handleP':[], 'handleV':[]}
 
     def track_pickStart(self):
         # Select at random
         idPick  =   choice( list(range(len(self.track_start[0]))) )
         return   [self.track_start[0][idPick], self.track_start[1][idPick]]
 
+
+    # STATE FUNCTIONS
+    # =================
     def compute_displacement(self, position, velocity):
         # This function issues the new state and reward after displacement
         newPos      =   np.add(position, velocity)
@@ -101,8 +113,8 @@ class raceTrack():
             reward      +=  reward2
             if reward2>-5:
                 newPos  =   newPos2
-                velocity=   [0,0]          # Uncomment this line to have the car velocity set to 0 after hitting a wall
-        return reward, newPos, velocity
+                velocity=   [0,0]           # Uncomment this line to have the car velocity set to 0 after hitting a wall
+        return reward, newPos, velocity        # velocity
 
     def compute_FoV(self, racerInst, position):
         # Box seed
@@ -124,22 +136,25 @@ class raceTrack():
         FoVi    =   int(''.join(FoVi), 2)
         return FoVi
 
-    def reset_racer(self, hRacer='new', Lambda=0, eGreedy=0.1, navMode='global'):
+    def race_terminated(self, position):
+        # Check if position is terminal
+        terminated = False
+        for iy, ix in zip(self.track_finish[0], self.track_finish[1]):
+            terminated = terminated or [iy, ix] == list(position)
+        return terminated
+
+
+    # GAMEPLAY FUNCTIONS
+    # =================
+    def reset_racer(self, hRacer='new', Lambda=0, eGreedy=0.1, navMode='global', planningMode='prioritySweep', planningNodes=0):
         # Pre-compute position
         position    =  self.track_pickStart()
         # New racer
         if hRacer=='new':
-            self.racers.append(racer(list(self.track_dim), Lambda=Lambda, eGreedy=eGreedy, navMode=navMode))
+            self.racers.append(racer(list(self.track_dim), Lambda=Lambda, eGreedy=eGreedy, navMode=navMode, planningMode=planningMode, planningNodes=planningNodes))
             hRacer  =   self.racers[-1]
         initFoV     =   self.compute_FoV(hRacer, position)
         hRacer.car_set_start(position, [0, 0], FoV=initFoV)
-
-    def race_terminated(self, position):
-        # Check if position is terminal
-        terminated      =   False
-        for iy,ix in zip(self.track_finish[0], self.track_finish[1]):
-            terminated  =   terminated or [iy,ix]==list(position)
-        return terminated
 
     def race_run(self, nRaces, display=True, videoTape=None, pgbar=True):
         # Loop on number of races
@@ -150,9 +165,12 @@ class raceTrack():
         # Loop on number of races
         for iRc in range(nRaces):
             race_on     =   [True]*len(self.racers)
+            [self.reset_racer(hRacer=x) for x in self.racers]
 
             # Count the steps
             while any(race_on):
+                if display:
+                    self.display(draw=True)
                 # Compute displacement
                 rew_pos =   [self.compute_displacement(self.racers[x].position_chain[-1], self.racers[x].velocities[self.racers[x].velocity_chain[-1]]) if y else [] for x,y in zip(range(len(self.racers)), race_on)]
                 # Update field of view
@@ -161,8 +179,6 @@ class raceTrack():
                 [self.racers[w].car_update(list(x[1]), list(x[2]), z, x[0], self.race_terminated(x[1])) if y else [] for w,x,y,z in zip(range(len(self.racers)), rew_pos, race_on, fov)]
                 # Update race status
                 race_on  =  [not self.race_terminated(x[1]) for x in rew_pos]
-                # Update display
-                if display or not videoTape is None: self.display(draw=False)
             # Update progress bar
             if pgbar:
                 stdout.write('\r')
@@ -174,12 +190,13 @@ class raceTrack():
             stepsBrace[:,iRc]   =   [x.cumul_steps for x in self.racers]
             rewBrace[:,iRc]     =   [x.cumul_reward for x in self.racers]
             locBrace[:,iRc]     =   [np.mean(x.cumul_locWeight) for x in self.racers]
-            [self.reset_racer(hRacer=x) for x in self.racers]
+
         # Close display
         if display or not videoTape is None:
             self.display(draw=True, videoTape=videoTape)
             plt.close(self.figId)
             self.figId          =   None
+            self.imagePanels    =   []
         return stepsBrace, rewBrace, locBrace
 
     def race_log(self, steps, iterations, pgbOn=True):
@@ -204,83 +221,184 @@ class raceTrack():
             stdout.flush()
         return Qlog
 
+
+    # DISPLAY FUNCTIONS
+    # =================
     def display(self, draw=False, videoTape=None):
 
-        # Number of racers
-        nRacers = len(self.racers)
-
-        def update_matrix(num, matrix, hndl):
-            hndl.set_data( matrix[num] )
+        def update_matrix(num, dum, hndl):
+            hndl.set_data(self.view_race(num))
             return hndl,
 
-        if not draw:
-            # ===========
-            # TRACK MASKS
-            # Mask1: raceTrack
-            mask1   =   self.track_reward>-5
-            # Mask2: starting zone
-            mask2   =   np.zeros(self.track_dim)
-            for iX,iY in zip(self.track_start[0], self.track_start[1]):
-                mask2[iX,iY]    =   .8
-            # Mask3: Finish zone
-            mask3   =   np.zeros(self.track_dim)
-            for iX, iY in zip(self.track_finish[0], self.track_finish[1]):
-                mask3[iX, iY] = .4
-            # Prep track
-            IMtrack =   mask1+mask2+mask3
-            IMtrack =   np.dstack([IMtrack]*3)
-            # ===========
-            # RACERS DOTS
-            lsRGB   =   [[1,0,0], [1,.5,0], [1,1,0], [0.5, 1, 0], [0,1,0], [0,1,0.5], [0,1,1], [0,0.5,1], [0,0,1], [0.5,0,1], [1,0,1], [1,0,0.5]]
-            for iRac in range(nRacers):
-                y,x =   self.racers[iRac].position_chain[-1]
-                IMtrack[y,x,:]  =   lsRGB[iRac]
-            # ===========
-            # NO DISPLAY MODE
-            self.imageSeries.append(IMtrack)
-            return
+        def update_ticks():
+            # Minor ticks - Ax1
+            for xA in [self.ax1, self.ax2, self.ax3]:
+                xA.set_xticks(np.arange(-.5, self.track_dim[1], 1), minor=True)
+                xA.set_yticks(np.arange(-.5, self.track_dim[0], 1), minor=True)
+                xA.grid(which='minor', color='k', linestyle='-', linewidth=1)
 
-        # ===========
-        # CREATE FIGURE
-        self.figId  =   plt.figure()
-        self.ax1    =   self.figId.add_subplot(100 + (1 + nRacers) * 10 + 1)
-        # DRAW TRACK
-        showId      =   plt.imshow(self.imageSeries[0], interpolation='nearest', axes=self.ax1)
-
-        # Adjust the figure size
-        axPos       =   self.ax1.get_position()
-        self.figId.set_size_inches( self.figId.get_size_inches() * [axPos.width, axPos.height] )
-        self.ax1.set_position([0.2, 0.1, 0.7, 0.8])
-
-        # Minor ticks
-        self.ax1.set_xticks(np.arange(-.5, self.track_dim[1], 1), minor=True);
-        self.ax1.set_yticks(np.arange(-.5, self.track_dim[0], 1), minor=True);
-        self.ax1.grid(which='minor', color='k', linestyle='-', linewidth=1)
+        # Init display
+        nRacers =   len(self.racers)
+        count   =   0
+        if self.figId is None:
+            # CREATE FIGURE
+            self.figId  =   plt.figure()
+            self.ax1    =   self.figId.add_subplot(100 + (2 + nRacers) * 10 + 1)
+            self.ax2    =   self.figId.add_subplot(100 + (2 + nRacers) * 10 + 2)
+            self.ax3    =   self.figId.add_subplot(100 + (2 + nRacers) * 10 + 3)
+            # DRAW TRACK
+            m1  = np.zeros(np.shape(self.track_reward))
+            m1[self.track_reward > -5] = 1
+            self.imagePanels.append( self.ax1.imshow( np.dstack( [m1]*3 ), interpolation='nearest') )
+            self.imagePanels.append( self.ax2.imshow( np.dstack( [m1]*3 ), interpolation='nearest') )
+            self.imagePanels.append( self.ax3.imshow( np.dstack( [m1]*3 ), interpolation='nearest') )
+        update_ticks()
 
         if not videoTape is None:
             # Initiate writer
             Writer      =   animation.writers['ffmpeg']
             writer      =   Writer(fps=5, metadata=dict(artist='Me'), bitrate=1800)
-            line_ani    =   animation.FuncAnimation(self.figId, update_matrix, len(self.imageSeries), fargs=(self.imageSeries, showId),blit=False)
+            line_ani    =   animation.FuncAnimation(self.figId, update_matrix, max([len(x.position_chain) for x in self.racers]), fargs=([], self.imagePanels[0]),blit=False)
             line_ani.save(videoTape, writer=writer)
         else:
-            while len(self.imageSeries)>0:
-                showId.set_data(self.imageSeries.pop(0))
-                plt.show()
-                plt.draw()
-                plt.pause(0.1)
+            self.imagePanels[0].set_data(self.view_race(-1))
+            self.view_policy(-1)
+            self.view_value(-1)
+            plt.show()
+            plt.draw()
+            #plt.pause(0.1)
 
+    def view_race(self, cnt):
+        # ===========
+        # TRACK MASKS
+        # Mask1: raceTrack
+        mask1 = self.track_reward > -5
+        # Mask2: starting zone
+        mask2 = np.zeros(self.track_dim)
+        for iX, iY in zip(self.track_start[0], self.track_start[1]):
+            mask2[iX, iY] = .8
+        # Mask3: Finish zone
+        mask3 = np.zeros(self.track_dim)
+        for iX, iY in zip(self.track_finish[0], self.track_finish[1]):
+            mask3[iX, iY] = .4
+        # Prep track
+        IMtrack = mask1 + mask2 + mask3
+        IMtrack = np.dstack([IMtrack] * 3)
+        # ===========
+        # RACERS DOTS
+        nRacers = len(self.racers)
+        lsRGB   = [[1, 0, 0], [1, .5, 0], [1, 1, 0], [0.5, 1, 0], [0, 1, 0], [0, 1, 0.5], [0, 1, 1], [0, 0.5, 1],
+                 [0, 0, 1], [0.5, 0, 1], [1, 0, 1], [1, 0, 0.5]]
+        for iRac in range(nRacers):
+            y, x = self.racers[iRac].position_chain[cnt]
+            IMtrack[y, x, :] = lsRGB[iRac]
+        return IMtrack
 
+    def view_policy(self, cnt):
+        # --- Draw the action arrows
+        # Slice the policy
+        iVel    =   self.racers[0].velocity_chain[cnt-1]
+        #[iy, ix]=   self.racers[0].position_chain[cnt]
+        for iy in range(self.track_dim[0]):
+            for ix in range(self.track_dim[1]):
+                pSlice  =   self.racers[0].policy[iy,ix,iVel,:]
+                # Compute resultant vectors along each dimension
+                resV    =   np.argmax(pSlice)
+                ampV    =   0
+                if sum(pSlice)>0:
+                    ampV=   pSlice[resV]/sum(pSlice)
+                # Draw arrows
+                try:
+                    self.arrowsP[iy][ix][0].remove()
+                except:
+                    pass
+                iAct    =   self.racers[0].actions[resV]
+                self.arrowsP[iy][ix] =   [self.ax2.arrow(-iAct[1]/2+ix, -iAct[0]/2+iy, iAct[1]/2, iAct[0]/2, head_width=0.5*ampV, head_length=max(max(abs(np.array(iAct)))/2, 0.001)*ampV, fc='k', ec='k')]
+        # --- Draw the velocity arrow
+        # Clear arrow
+        try:
+            self.track_dispZ['handleP'].remove()
+        except:
+            xyForm  =   list(reversed(self.track_dispZ['anchor']))
+            self.track_dispZ['textP']   =   self.ax2.annotate('Curr. veloc.', xy=xyForm, xytext=np.subtract(xyForm, [0, 3]), horizontalalignment='center', verticalalignment='top', color='r')
+        # Current velocity
+        velo    =   self.racers[0].velocities[iVel]
+        [iy,ix] =   self.track_dispZ['anchor']
+        try:
+            self.track_dispZ['handleP']  =   self.ax2.arrow(-velo[1] / 2 + ix, -velo[0] / 2 + iy, velo[1] / 2, velo[0] / 2, head_width=0.5,
+                                            head_length=max(max(abs(np.array(velo))) / 2, 0.001), fc='r', ec='r')
+        except:
+            pass
 
+    def view_value(self, cnt):
+        # --- Draw the action arrows
+        # Slice the policy
+        iVel    =   self.racers[0].velocity_chain[cnt - 1]
+        #[iy, ix] = self.racers[0].position_chain[cnt]
+        for iy in range(self.track_dim[0]):
+            for ix in range(self.track_dim[1]):
+                pSlice  =   self.racers[0].global_value[iy, ix, iVel, :]
+                # Compute resultant vectors along each dimension
+                indV    =   [ np.multiply(x,y) for x,y in zip(pSlice, self.racers[0].actions)]
+                resV    =   np.sum( np.array(indV), axis=0 )
+                scl     =   np.sum( abs(np.array(indV)), axis=0)
+                scl     =   [1 if x==0 else x for x in scl]
+                resV    =   np.divide( resV, scl )
+                ampV    =   np.sqrt( np.sum(resV**2) )
+                # Draw arrows
+                try:
+                    self.arrowsV[iy][ix][0].remove()
+                except:
+                    pass
+                self.arrowsV[iy][ix] = [self.ax3.arrow(-resV[1] / 2 + ix, -resV[0] / 2 + iy, resV[1] / 2, resV[0] / 2,
+                                                       head_width=0.5 * ampV, head_length=max( ampV/ 2, 0.1), fc='k', ec='k')]
+        # --- Draw the velocity arrow
+        # Clear arrow
+        try:
+            self.track_dispZ['handleV'].remove()
+        except:
+            xyForm = list(reversed(self.track_dispZ['anchor']))
+            self.track_dispZ['textV'] = self.ax3.annotate('Curr. veloc.', xy=xyForm,
+                                                         xytext=np.subtract(xyForm, [0, 3]),
+                                                         horizontalalignment='center', verticalalignment='top',
+                                                         color='r')
+        # Current velocity
+        velo = self.racers[0].velocities[iVel]
+        [iy, ix] = self.track_dispZ['anchor']
+        try:
+            self.track_dispZ['handle'] = self.ax3.arrow(-velo[1] / 2 + ix, -velo[0] / 2 + iy, velo[1] / 2,
+                                                        velo[0] / 2, head_width=0.5,
+                                                        head_length=max(max(abs(np.array(velo))) / 2, 0.001),
+                                                        fc='r', ec='r')
+        except:
+            pass
 
 # ========
 # LAUNCHER
-RT      =   raceTrack(trackType=1)
-parLamb =   0.5
+parLamb =   0.9
 pareGr  =   0.1
 
 
 """
+RT2     =   raceTrack(trackType=1)
+RT2.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='global', planningMode='prioritySweep', planningNodes=10)
+
+RT      =   raceTrack(trackType=1)
+RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='global', planningMode='noPlanning', planningNodes=10)
+
+Qlog_0  =   []
+Qlog_0.append( RT.race_log(20, 100, pgbOn=False) )
+Qlog_0.append( RT2.race_log(20, 100, pgbOn=False) )
+
+
+
+RT2.race_run(100, display=False)
+RT.race_run(100, display=False)
+"""
+
+"""
+RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='global', planningMode='noPlnanning', planningNodes=0)
+RT.race_run(10, display=False)
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb)
 for ii in range(100):
     RT.racers[0].car_set_start([20,9], choice(RT.racers[0].velocities), RT.compute_FoV(RT.racers[0], [20,9]))
@@ -296,14 +414,22 @@ for ii in range(100):
 # COMPARE LAMBDAs
 # ==================
 # Iterate over lambda parameters for a single navigation mode
-plt.figure;
-hRac    =   RT.racers[0]
+FF      =   plt.figure();
 lVal    =   [0, .2, .4, .6, .8, .9, 1]
 lCol    =   ['r', 'm', 'y', 'c', 'g', 'b', 'k']
+Qlog_0  =   []
+ax1     =   FF.add_subplot(121); ax1.title.set_text('Cumulative reward');   ax1.set_xlabel('Nb of races')
+ax2     =   FF.add_subplot(122); ax2.title.set_text('Avg number of steps'); ax2.set_xlabel('Nb of races')
 for iL, iC in zip(lVal, lCol):
-    RT.reset_racer(hRacer=hRac, eGreedy=pareGr, Lambda=iL)
-    Qlog_0    =   RT.race_log(10, 100, pgbOn=False)
-    plt.plot(Qlog_0['nRaces'][1:], Qlog_0['reward'], iC+'--', label='lambda: '+str(iL))
+    RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=iL)
+    Qlog_0.append( RT.race_log(50, 40, pgbOn=False) )
+    ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], iC, label='lambda: '+str(iL))
+    ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], iC, label='lambda: '+str(iL))
+    plt.pause(0.5)
+    RT.racers.pop()
+ax1.legend()
+ax1.set_xlim([1,2000]); ax1.set_ylim([-500,5])
+ax2.set_xlim([1,2000]); ax2.set_ylim([25,500])
 
 
 # ==================
@@ -353,32 +479,31 @@ Qlog_0 =    []
 # LOCAL training
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='local')
 print('Sequential learning')
-Qlog_0.append( RT.race_log(50, 1000, pgbOn=False) )
-ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'r--', label='localOnly')
-ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'r--', label='localOnly')
+Qlog_0.append( RT.race_log(25, 100, pgbOn=False) )
+#ax1.plot(Qlog_0[0]['nRaces'][1:], Qlog_0[0]['reward'], 'r--', label='localOnly')
+#ax2.plot(Qlog_0[0]['nRaces'][1:], Qlog_0[0]['nSteps'], 'r--', label='localOnly')
 # GLOBAL training
 RT.racers[0].navMode    =   'global'
-Qlog_0.append( RT.race_log(25, 1000, pgbOn=False) )
-ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'r', label='globalOnly')
-ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'r', label='globalOnly')
+Qlog_0.append( RT.race_log(25, 100, pgbOn=False) )
+ax1.plot( np.add(Qlog_0[-1]['nRaces'][1:],2500), Qlog_0[-1]['reward'], 'r', label='globalOnly')
+ax2.plot( np.add(Qlog_0[-1]['nRaces'][1:],2500), Qlog_0[-1]['nSteps'], 'r', label='globalOnly')
 # ---- Next do simultaneous
 print('Simultaneous learning: sum')
 RT.racers.pop()
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='sum')    
-Qlog_0.append( RT.race_log(50, 1000, pgbOn=False) )
+Qlog_0.append( RT.race_log(25, 200, pgbOn=False) )
 ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'b', label='l+g: sum')
 ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'b', label='l+g: sum')    
 print('Simultaneous learning: maxAbs')
 RT.racers.pop()
 RT.reset_racer(hRacer='new', eGreedy=pareGr, Lambda=parLamb, navMode='maxAbs')    
-Qlog_0.append( RT.race_log(50, 1000, pgbOn=False) )
+Qlog_0.append( RT.race_log(25, 200, pgbOn=False) )
 ax1.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['reward'], 'k', label='l+g: sum')
 ax2.plot(Qlog_0[-1]['nRaces'][1:], Qlog_0[-1]['nSteps'], 'k', label='l+g: sum')    
     
 ax1.legend()
-ax1.set_xlim([1,50000]); ax1.set_ylim([-5000,0])
-ax2.set_xlim([1,50000]); ax2.set_ylim([0,300])
-ax3.set_xlim([1,50000]); ax3.set_ylim([.5, .8])
+ax1.set_xlim([1,5000]); ax1.set_ylim([-1000,0])
+ax2.set_xlim([1,5000]); ax2.set_ylim([0,300])
 
 #SAVE
 logVar      =   {'log':Qlog_0, 'figure':RT.figId}
