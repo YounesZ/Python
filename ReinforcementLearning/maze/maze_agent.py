@@ -7,7 +7,7 @@ from copy import deepcopy
 
 class maze_agent():
 
-    def __init__(self, mazeInst, Lambda=0, learnRate=0.15, eGreedy=0.1, discount=0.8, planningMode='prioritized', planningNodes=0, planningThresh=0.05, navMode='global'):
+    def __init__(self, mazeRunner, Lambda=0, learnRate=0.15, eGreedy=0.1, discount=0.8, planningMode='prioritized', planningNodes=0, planningThresh=0.05, navMode='global'):
         # ==============
         # Maze agent
         # Agent type
@@ -18,65 +18,51 @@ class maze_agent():
         self.planningMode   =   planningMode
         self.planningNodes  =   planningNodes
         self.navMode        =   navMode
-        self.environment    =   mazeInst
+        self.environment    =   mazeRunner
         self.planningThresh =   planningThresh  # Minimum absolute increment for entering queue
-        # Actions
-        angles              =   range(0,4)
-        self.actions        =   [[-round(sin(x*pi/2)), round(cos(x*pi/2))] for x in angles]
-        # Field of view
-        self.viewX          =   5
-        self.viewY          =   5
         # Space dimensions for learning
-        self.policy         =   np.zeros(mazeInst.maze_dims + [len(self.actions)])
-        self.global_value   =   np.zeros(mazeInst.maze_dims + [len(self.actions)])
-        self.planningModel  =   [ [[[] for w in range(len(self.actions))] for y in range(mazeInst.maze_dims[1])] for z in range(mazeInst.maze_dims[0])]
-        self.planningiModel =   [[{} for x in range(mazeInst.maze_dims[1])] for y in range(mazeInst.maze_dims[0])]
+        self.policy         =   np.zeros(mazeRunner.stateSpace)
+        self.global_value   =   np.zeros(mazeRunner.stateSpace)
         self.local_value    =   {}
+        self.planningModel  =   [[]] * mazeRunner.stateSpace[-1]
+        self.planningiModel =   []
+        for iDim in mazeRunner.stateSpace[:-1]:
+            self.planningModel  =   [self.planningModel] * iDim
+            self.planningiModel =   [self.planningiModel] * iDim
 
-    def agent_restart(self, moveSequence=[]):
-        # --- Here the agent just picks a starting position in the maze and make first move
-        # Flush variables
-        self.position_chain     =   []
-        self.action_chain       =   []
-        # Pick a starting position
-        self.agent_move( choice(self.environment.maze_start), moveSequence )
-
-    def agent_move(self, position, moveSequence):
+    def agent_move(self, moveSequence):
         # --- Here the agent receives a move signal and picks a move according to policy
+        curS        =   self.mazeRunner.runnner_queryState()
         if len(moveSequence) > 0:
             # Replay a sequence of moves
             move    =   moveSequence.pop(0)
         else:
             # Select move according to policy
-            moveP   =   self.global_value[position[0], position[1], :]
+            moveP   =   eval( 'self.global_value[' + str(curS)[1:-1] + ']' )
+            moveP   =   np.multiply(moveP, np.random.random([1, len(moveP)]))
             # Most probable move
-            idProb  =   np.where( moveP==max(moveP) )
+            idProb  =   np.where( moveP==max(moveP[self.mazeRunner.actionsAllow]) )
             move    =   self.actions[ choice(idProb[0]) ]
-        # Store variables
-        self.position_chain.append(position)
-        self.action_chain.append(move)
-        # Query next position
-        rew, nex, F =   self.environment.compute_displacement(position, move)
+        # Query next state
+        nexS, rew, F=   self.mazeRunner.runner_change_velocity(self, move)
         # Learning phase
-        self.agent_learn(position, move, nex, rew)
+        self.agent_learn(curS, move, nexS, rew)
         # Planning phase
-        self.agent_plan(position, move, nex, rew)
+        self.agent_plan(curS, move, nexS, rew)
         # Update policy
-        self.agent_updatePolicy(position)
+        self.agent_updatePolicy(curS)
         if not F:
-            self.agent_move(nex, moveSequence)
-        else:
-            self.position_chain.append(nex)
+            self.agent_move(moveSequence)
 
     def agent_learn(self, prevState, prevAction, nextState, reward, incrementOnly=False):
         # Learn from experience
-        Qprev       =   self.global_value[prevState[0], prevState[1], self.actions.index(prevAction)]
-        Qnext       =   max( self.global_value[nextState[0], nextState[1], :] )
+        Qprev       =   eval('self.global_value[' + str(prevState+prevAction)[1:-1] + ']')
+        Qnext       =   eval( 'max( self.global_value[' + str(nextState)[1:-1] + '])' )
         increment   =   self.learnRate * (reward + self.discount*Qnext - Qprev)
         if incrementOnly:
             return increment
         else:
-            self.global_value[prevState[0], prevState[1], self.actions.index(prevAction)]   +=  increment
+            self.global_value[prevState][prevAction]    +=  increment
 
     def agent_plan(self, prevState, prevAction, nexState, reward):
         # Select planning type
@@ -85,9 +71,9 @@ class maze_agent():
             planningQueue   =   [(prevState, prevAction)]
             planningPrior   =   [reward]
             # Update the model "which state do I end up in from prevState : nexState"
-            self.planningModel[prevState[0]][prevState[1]][self.actions.index(prevAction)]  =   (reward, nexState)
+            self.planningModel[prevState][prevAction]  =   (reward, nexState)
             # Update the inverse model "which states drive me to nexState : prevState"
-            self.planningiModel[nexState[0]][nexState[1]][tuple(prevState+prevAction)]      =   reward
+            self.planningiModel[nexState][tuple(prevState+prevAction)]      =   reward
             # Start backsearching tree
             S               =   prevState
             count           =   0
@@ -95,17 +81,17 @@ class maze_agent():
             while len(planningQueue) > 0 and count < self.planningNodes:
                 # Empty the queue
                 if len(planningPrior) > 0:
-                    _ = planningPrior.pop(-1)
-                    S, A = planningQueue.pop(-1)
-                    R, Sp = self.planningModel[S[0]][S[1]][self.actions.index(A)]
+                    _       =   planningPrior.pop(-1)
+                    S, A    =   planningQueue.pop(-1)
+                    R, Sp   =   self.planningModel[S[0]][S[1]][A]
                     self.agent_learn(S, A, Sp, R)
                     # Update queue count
-                    count += 1
+                    count   +=  1
                 # States predicted to lead to S "This updates the queue"
                 beforeS     =   self.planningiModel[S[0]][S[1]].keys()
                 for bef in beforeS:
                     Sm, Am  =   list(bef[:2]), list(bef[2:])
-                    Rm, _   =   self.planningModel[Sm[0]][Sm[1]][self.actions.index(Am)]
+                    Rm, _   =   self.planningModel[Sm[0]][Sm[1]][Am]
                     Priority=   abs(self.agent_learn(Sm, Am, S, Rm, incrementOnly=True))
                     if Priority > self.planningThresh and (Sm, Am) not in planningQueue:
                         # insertion position
@@ -130,12 +116,12 @@ class maze_agent():
 setrecursionlimit(10000)
 from ReinforcementLearning.maze.maze import *
 
-"""
-MZ = maze(display=False)
+MZ = maze('raceTrack1')
 # Link agent and maze
-MA = maze_agent(MZ, planningNodes=10, planningThresh=0.1)
+MA = maze_agent(MZ, planningNodes=0, planningThresh=0.1)
 MZ.agents.append(MA)
 MA.agent_restart()
+"""
 """
 
 """
@@ -168,6 +154,7 @@ for ip, id in zip(plTs, range(len(plTs))):
 """
 
 
+"""
 # EFFECT OF PLANNING NODES ON POLICY VALUES
 # =========================================
 # First make a path using non-planning agent
@@ -196,3 +183,4 @@ plt.gca().set_xlim([1, 8])
 plt.gca().set_xlabel('Number of runs')
 plt.gca().set_ylabel('Number of steps')
 plt.title('Effect of planning on learning speed')
+"""

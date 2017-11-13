@@ -32,8 +32,8 @@ class raceTrack():
     def __init__(self, trackType=1, display=True):
         # Generate track shape
         self.track_init(trackType)
-        # Initialize racers
-        self.racers     =   []
+        # Initialize cars
+        self.cars       =   []
         # Initialize display
         self.imagePanels=   []
         self.arrowsP    =   [[ [] for x in range(self.track_dim[1]) ] for y in range(self.track_dim[0])]

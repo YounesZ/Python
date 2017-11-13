@@ -88,3 +88,61 @@ for add in np.arange(15):
 im_ani = animation.ArtistAnimation(fig2, ims, interval=50, repeat_delay=3000,
                                    blit=True)
 im_ani.save('im.mp4', writer=writer)
+
+
+
+
+
+
+self.ax2    =   self.figId.add_subplot(132);    self.ax2.title.set_text('Policy')
+            self.ax3    =   self.figId.add_subplot(133);    self.ax3.title.set_text('Values')
+
+self.imagePanels.append( self.ax2.imshow( np.dstack( [m1]*3 ), interpolation='nearest') )
+            self.imagePanels.append( self.ax3.imshow( np.dstack( [m1]*3 ), interpolation='nearest') )
+
+self.view_policy(-1)
+self.view_value(-1)
+
+
+def view_policy(self, cnt):
+    # --- Draw the action arrows
+    # Slice the policy
+    for iy in range(self.maze_dims[0]):
+        for ix in range(self.maze_dims[1]):
+            pSlice = self.agents[0].policy[iy, ix, :]
+            # Compute resultant vectors along each dimension
+            resV = np.argmax(pSlice)
+            ampV = 0
+            if sum(pSlice) > 0:
+                ampV = pSlice[resV] / sum(pSlice)
+            # Draw arrows
+            try:
+                self.arrowsP[iy][ix][0].remove()
+            except:
+                pass
+            iAct = self.agents[0].actions[resV]
+            self.arrowsP[iy][ix] = [
+                self.ax2.arrow(-iAct[1] / 2 + ix, -iAct[0] / 2 + iy, iAct[1] / 2, iAct[0] / 2, head_width=0.5 * ampV,
+                               head_length=max(max(abs(np.array(iAct))) / 2, 0.001) * ampV, fc='k', ec='k')]
+
+
+def view_value(self, cnt):
+    # --- Draw the action arrows
+    for iy in range(self.maze_dims[0]):
+        for ix in range(self.maze_dims[1]):
+            pSlice = self.agents[0].global_value[iy, ix, :]
+            # Compute resultant vectors along each dimension
+            indV = [np.multiply(x, y) for x, y in zip(pSlice, self.agents[0].actions)]
+            resV = np.sum(np.array(indV), axis=0)
+            scl = np.sum(abs(np.array(indV)), axis=0)
+            scl = [1 if x == 0 else x for x in scl]
+            resV = np.divide(resV, scl)
+            ampV = np.sqrt(np.sum(resV ** 2))
+            # Draw arrows
+            try:
+                self.arrowsV[iy][ix][0].remove()
+            except:
+                pass
+            self.arrowsV[iy][ix] = [self.ax3.arrow(-resV[1] / 2 + ix, -resV[0] / 2 + iy, resV[1] / 2, resV[0] / 2,
+                                                   head_width=0.5 * ampV, head_length=max(ampV / 2, 0.1), fc='k',
+                                                   ec='k')]
