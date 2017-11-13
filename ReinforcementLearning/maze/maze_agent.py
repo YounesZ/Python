@@ -82,19 +82,26 @@ class maze_agent():
         # Select planning type
         if self.planningMode=='prioritized':
             # Initialize
-            planningQueue   =   []
-            planningPrior   =   []
+            planningQueue   =   [(prevState, prevAction)]
+            planningPrior   =   [reward]
             # Update the model "which state do I end up in from prevState : nexState"
             self.planningModel[prevState[0]][prevState[1]][self.actions.index(prevAction)]  =   (reward, nexState)
             # Update the inverse model "which states drive me to nexState : prevState"
             self.planningiModel[nexState[0]][nexState[1]][tuple(prevState+prevAction)]      =   reward
             # Start backsearching tree
             S               =   prevState
-            init            =   True
+            count           =   0
             # Insert previous state in priority queue "if worth it"
-            while len(planningQueue) > 0 or init:
+            while len(planningQueue) > 0 and count < self.planningNodes:
+                # Empty the queue
+                if len(planningPrior) > 0:
+                    _ = planningPrior.pop(-1)
+                    S, A = planningQueue.pop(-1)
+                    R, Sp = self.planningModel[S[0]][S[1]][self.actions.index(A)]
+                    self.agent_learn(S, A, Sp, R)
+                    # Update queue count
+                    count += 1
                 # States predicted to lead to S "This updates the queue"
-                init        =   False
                 beforeS     =   self.planningiModel[S[0]][S[1]].keys()
                 for bef in beforeS:
                     Sm, Am  =   list(bef[:2]), list(bef[2:])
@@ -105,14 +112,6 @@ class maze_agent():
                         ixS = bisect_left(planningPrior, Priority)
                         planningPrior.insert(ixS, Priority)
                         planningQueue.insert(ixS, (Sm, Am))
-                planningQueue = planningQueue[:self.planningNodes]
-                planningPrior = planningPrior[:self.planningNodes]
-                # Empty the queue
-                if len(planningPrior)>0:
-                    _       =   planningPrior.pop(-1)
-                    S, A    =   planningQueue.pop(-1)
-                    R, Sp   =   self.planningModel[S[0]][S[1]][self.actions.index(A)]
-                    self.agent_learn(S, A, Sp, R)
 
     def agent_updatePolicy(self, position):
         # Update the policy "find the most valuable move"
@@ -155,16 +154,19 @@ FF      =   plt.figure()
 axs     =   []
 plTs    =   [0.1/(10**x) for x in range(5)]
 imSh    =   [[] for x in range(5)]
+imS     =   []
 for ip, id in zip(plTs, range(len(plTs))):
-    axs.append(FF.add_subplot(150 + len(imSh)))
+    axs.append(FF.add_subplot(150 + id + 1))
 for ip, id in zip(plTs, range(len(plTs))):
     MZ  =   maze(display=False)
     MA  =   maze_agent(MZ, planningNodes=10, planningThresh=ip)
     MZ.agents.append(MA)
     MA.agent_restart( moveSequence= deepcopy(mvSeq) )
+    MA.agent_restart(moveSequence=deepcopy(mvSeq))
     imSh[id]    =   np.max(MA.global_value, axis=2)
     # Display
-    axs[id].imshow(imSh[id])
+    imS.append( axs[id].imshow(imSh[id]) )
+
 
 
 
