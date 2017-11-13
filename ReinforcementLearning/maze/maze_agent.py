@@ -138,7 +138,7 @@ MZ.agents.append(MA)
 MA.agent_restart()
 """
 
-
+"""
 # EFFECT OF PLANNING THRESHOLD ON POLICY VALUES
 # =============================================
 # First make a path using non-planning agent
@@ -147,7 +147,6 @@ MA      = maze_agent(MZ, planningMode='noPlanning')
 MZ.agents.append(MA)
 MA.agent_restart()
 mvSeq   =   MA.action_chain
-
 
 # Make planning agents replay the path
 FF      =   plt.figure()
@@ -166,8 +165,34 @@ for ip, id in zip(plTs, range(len(plTs))):
     imSh[id]    =   np.max(MA.global_value, axis=2)
     # Display
     imS.append( axs[id].imshow(imSh[id]) )
+"""
 
 
+# EFFECT OF PLANNING NODES ON POLICY VALUES
+# =========================================
+# First make a path using non-planning agent
+MZ      =   maze(display=False)
+nNodes  =   range(11)
+nRuns   =   9
+nSteps  =   np.zeros( [len(nNodes), nRuns] )
+nIter   =   25
+for it in range(nIter):
+    MA      =   []
+    for iN in nNodes:
+        MA.append( maze_agent(MZ, planningNodes=iN, planningThresh=0.001) )
+    for iN in nNodes:
+        for iRn in range(nRuns):
+            MA[iN].agent_restart()
+            nSteps[iN, iRn]     +=   (len(MA[iN].position_chain)-1)/nIter
 
-
-
+# Display
+FF      =   plt.figure()
+axs     =   []
+for iN in nNodes:
+    axs.append( plt.plot( range(nRuns), nSteps[iN,:], label=str(iN)+' nodes') )
+plt.legend()
+plt.gca().set_ylim([10,800])
+plt.gca().set_xlim([1, 8])
+plt.gca().set_xlabel('Number of runs')
+plt.gca().set_ylabel('Number of steps')
+plt.title('Effect of planning on learning speed')

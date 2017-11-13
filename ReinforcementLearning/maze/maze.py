@@ -26,7 +26,7 @@ class maze():
         # Common variables
         onMaze_rew  =   params[0]       # Penalty for transitions
         offMaze_rew =   params[1]       # Penalty for trying to quit maze
-        finish_rew  =   params[2]       # Reward foe finishing the maze
+        finish_rew  =   params[2]       # Reward for finishing the maze
 
         # Template 1:   Sutton and Barto, p.191
         if type=='template1':
@@ -101,9 +101,9 @@ class maze():
         if self.figId is None:
             # CREATE FIGURE
             self.figId  =   plt.figure()
-            self.ax1    =   self.figId.add_subplot(100 + (2 + nAgents) * 10 + 1)
-            self.ax2    =   self.figId.add_subplot(100 + (2 + nAgents) * 10 + 2)
-            self.ax3    =   self.figId.add_subplot(100 + (2 + nAgents) * 10 + 3)
+            self.ax1    =   self.figId.add_subplot(131);    self.ax1.title.set_text('Run')
+            self.ax2    =   self.figId.add_subplot(132);    self.ax2.title.set_text('Policy')
+            self.ax3    =   self.figId.add_subplot(133);    self.ax3.title.set_text('Values')
             # DRAW TRACK
             m1  =   np.zeros(np.shape(self.maze_reward))
             m1  =   ( ( self.maze_reward == 0 )  + 1 )/ 2 - 1 + abs(self.maze_allowed)
@@ -125,7 +125,6 @@ class maze():
             plt.show()
             plt.draw()
             plt.pause(0.1)
-
 
     def view_race(self, cnt):
         # ===========
@@ -191,6 +190,5 @@ class maze():
                     pass
                 self.arrowsV[iy][ix] = [self.ax3.arrow(-resV[1] / 2 + ix, -resV[0] / 2 + iy, resV[1] / 2, resV[0] / 2,
                                                        head_width=0.5 * ampV, head_length=max( ampV/ 2, 0.1), fc='k', ec='k')]
-
 
 
