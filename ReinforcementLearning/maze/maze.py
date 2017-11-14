@@ -5,10 +5,10 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from math import pi, sin, cos
 from copy import deepcopy
-from random import choice
+from random import choice, shuffle
 plt.ion()
 
-class runner():
+class Runner():
 
     # INIT FUNCTIONS
     # ==============
@@ -19,23 +19,31 @@ class runner():
         self.actionsAllow   =   [True]*int(2/angleSection) + [False]
         self.environment    =   mazeInst
         # Velocities
+        self.maxVelocity    =   maxVelocity
         velX                =   list(range(-self.maxVelocity, self.maxVelocity + 1)) * (2 * self.maxVelocity + 1)
         velY                =   list(np.concatenate([[x] * (2 * self.maxVelocity + 1) for x in range(-self.maxVelocity, self.maxVelocity + 1)]))
         self.velocities     =   [[velY[idx], velX[idx]] for idx in range(len(velX))]
-        self.maxVelocity    =   maxVelocity
         # Field of view
         self.viewY          =   fieldOFview[0]
         self.viewX          =   fieldOFview[1]
         # Space dimensions for learning
         self.state_space    =   mazeInst.maze_dims + [len(self.velocities)]
-        self.action_space   =   len(self.actions)
+        self.action_space   =   [len(self.actions)]
 
-    def runner_new_run(self, position, velocity=[0,0], FoV=None):
+    def reset(self, position=None, velocity=0, FoV=None):
+        # Init
+        if position is None:
+            position    =   self.environment.maze_query_start()
         # Empty learning variables
         self.state_chain    =   [(position, velocity)]
         self.action_chain   =   []
         self.cumul_reward   =   0
         self.cumul_steps    =   0
+
+    def runner_query_state(self):
+        # Format state for output
+        curState    =   self.state_chain[-1]
+        return curState[0]+[curState[1]]
 
     def runner_change_velocity(self, acceleration):
         # Pick action: stochastic
@@ -49,15 +57,16 @@ class runner():
         # Get new position and velocities
         reward, newPos, gameOver    =   self.environment.compute_displacement(position, velocity)
         # Keep new variables
+        newVel =    self.velocities.index([0,0])   # THIS LINE HAS TO BE DELETED
         self.action_chain.append(acceleration)
         self.state_chain.append((newPos, newVel))
         # Convert state-space to indices
-        stateSpace  =   [position+[curVel], newPos+[newVel]]
+        stateSpace  =   newPos+[newVel]
         # Update allowed actions
         self.actionsAllow   =   [sum(abs(np.add(x, velocity))) > 0 for x in self.actions]
         return stateSpace, reward, gameOver
 
-class maze():
+class Maze():
 
     # INIT FUNCTIONS
     # ==============
@@ -71,8 +80,6 @@ class maze():
         self.figId          =   None
         self.arrowsP        =   [[[] for x in range(self.maze_dims[1])] for y in range(self.maze_dims[0])]
         self.arrowsV        =   [[[] for x in range(self.maze_dims[1])] for y in range(self.maze_dims[0])]
-        # Agents variables
-        self.agents         =   []
 
     def maze_make(self, type, params):
         # Common variables
@@ -117,6 +124,19 @@ class maze():
         self.maze_finish    =   finish
         self.maze_reward    =   reward
         self.move_reward    =   params
+
+    def maze_add_runner(self, nRunners=1, angleSection=0.25, maxVelocity=5, fieldOFview=(5, 5)):
+        # Agents variables
+        self.agents     =   []
+        # Add runners
+        self.Runners    =   [Runner(self, angleSection, maxVelocity, fieldOFview) for x in range(nRunners)]
+        [x.reset() for x in self.Runners]
+
+    def maze_query_start(self):
+        # Chose starting positions
+        positions   =   deepcopy(self.maze_start)
+        shuffle(positions)
+        return positions.pop(0)
 
     # STATE FUNCTIONS
     # ===============
@@ -197,11 +217,11 @@ class maze():
         IMtrack =   np.dstack([IMtrack] * 3)
         # ===========
         # RACERS DOTS
-        nAgents =   len(self.agents)
+        nRunners=   len(self.Runners)
         lsRGB   =   [[1, 0, 0], [1, .5, 0], [1, 1, 0], [0.5, 1, 0], [0, 1, 0], [0, 1, 0.5], [0, 1, 1], [0, 0.5, 1],
                     [0, 0, 1], [0.5, 0, 1], [1, 0, 1], [1, 0, 0.5]]
-        for iRac in range(nAgents):
-            y, x=   self.agents[iRac].position_chain[cnt]
+        for iRac in range(nRunners):
+            y, x=   self.Runners[iRac].state_chain[cnt][0]
             IMtrack[y, x, :] = lsRGB[iRac]
         return IMtrack
 
