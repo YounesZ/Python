@@ -192,17 +192,17 @@ for ip, id in zip(plTs, range(len(plTs))):
 # EFFECT OF PLANNING NODES ON POLICY VALUES
 # =========================================
 # First make a path using non-planning agent
-nNodes  =   range(11)
-nRuns   =   20
+nNodes  =   range(0,13,4)
+nRuns   =   50
 nSteps  =   np.zeros( [len(nNodes), nRuns] )
-nIter   =   25
+nIter   =   10
 for it in range(nIter):
     MA  =   []
-    MZ  = Maze(display=False)
+    MZ  = Maze(type='raceTrack1', display=False)
     for iN in nNodes:
         MZ.maze_add_runner(1, angleSection=0.5, maxVelocity=1)
         [MA.append( Maze_agent(x, planningNodes=iN, planningThresh=0.0001) ) for x in MZ.Runners]
-    for iN in nNodes:
+    for iN in range(len(nNodes)):
         for iRn in range(nRuns):
             MA[iN].agent_move()
             nSteps[iN, iRn]     +=   (len(MA[iN].environment.state_chain)-1)/nIter
@@ -211,11 +211,11 @@ for it in range(nIter):
 # Display
 FF      =   plt.figure()
 axs     =   []
-for iN in nNodes:
+for iN in range(len(nNodes)):
     axs.append( plt.plot( range(nRuns), nSteps[iN,:], label=str(iN)+' nodes') )
 plt.legend()
-plt.gca().set_ylim([10,800])
-plt.gca().set_xlim([1, 8])
+plt.gca().set_ylim([np.min(nSteps),np.max(nSteps)])
+plt.gca().set_xlim([0, nRuns-1])
 plt.gca().set_xlabel('Number of runs')
 plt.gca().set_ylabel('Number of steps')
 plt.title('Effect of planning on learning speed')
