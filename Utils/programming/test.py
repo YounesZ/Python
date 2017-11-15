@@ -146,3 +146,21 @@ def view_value(self, cnt):
             self.arrowsV[iy][ix] = [self.ax3.arrow(-resV[1] / 2 + ix, -resV[0] / 2 + iy, resV[1] / 2, resV[0] / 2,
                                                    head_width=0.5 * ampV, head_length=max(ampV / 2, 0.1), fc='k',
                                                    ec='k')]
+
+
+state_space     =   [32,17,9]
+SSc             =   0
+SS              =   [30, 5, 4]
+for ii in range(len(state_space)):
+    SSc         +=  (SS[ii]) * np.prod( state_space[ii+1:] )
+print( SSc )
+
+
+SScc            =   []
+count           =   0
+while count<len(state_space):
+    idX         =   np.floor( SSc / np.prod(state_space[count+1:]) )
+    SSc         -=  idX * np.prod(state_space[count+1:])
+    SScc.append( idX )
+    count+=1
+

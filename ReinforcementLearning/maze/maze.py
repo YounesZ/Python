@@ -27,13 +27,16 @@ class Runner():
         self.viewY          =   fieldOFview[0]
         self.viewX          =   fieldOFview[1]
         # Space dimensions for learning
-        self.state_space    =   mazeInst.maze_dims + [len(self.velocities)]
-        self.action_space   =   [len(self.actions)]
+        self.private_SS     =   mazeInst.maze_dims + [len(self.velocities)]
+        self.public_SS      =   np.prod( self.private_SS )
+        self.public_AS      =   len(self.actions)
 
-    def reset(self, position=None, velocity=0, FoV=None):
+    def reset(self, position=None, velocity=None, FoV=None):
         # Init
         if position is None:
             position    =   self.environment.maze_query_start()
+        if velocity is None:
+            velocity    =   self.velocities.index([0,0])
         # Empty learning variables
         self.state_chain    =   [(position, velocity)]
         self.action_chain   =   []
@@ -42,8 +45,9 @@ class Runner():
 
     def runner_query_state(self):
         # Format state for output
-        curState    =   self.state_chain[-1]
-        return curState[0]+[curState[1]]
+        curState    =   []
+        [curState.append(x) if isinstance(x, list) else curState.append([x]) for x in self.state_chain[-1]]
+        return self.runner_convert_state_space( np.concatenate(curState), 'forward')
 
     def runner_change_velocity(self, acceleration):
         # Pick action: stochastic
@@ -57,14 +61,31 @@ class Runner():
         # Get new position and velocities
         reward, newPos, gameOver    =   self.environment.compute_displacement(position, velocity)
         # Keep new variables
-        newVel =    self.velocities.index([0,0])   # THIS LINE HAS TO BE DELETED
+        #newVel =    self.velocities.index([0,0])   # THIS LINE HAS TO BE DELETED
         self.action_chain.append(acceleration)
         self.state_chain.append((newPos, newVel))
         # Convert state-space to indices
-        stateSpace  =   newPos+[newVel]
+        stateSpace  =   self.runner_convert_state_space(newPos+[newVel], 'forward')
         # Update allowed actions
         self.actionsAllow   =   [sum(abs(np.add(x, velocity))) > 0 for x in self.actions]
         return stateSpace, reward, gameOver
+
+    def runner_convert_state_space(self, SS, method):
+        if method=='forward':
+            SSc =   0
+            for ii in range(len(self.private_SS)):
+                SSc     +=  (SS[ii]) * np.prod(self.private_SS[ii + 1:])
+            SSc     =   int(SSc)
+        elif method=='backward':
+            SSc     =   []
+            count   =   0
+            while count < len(self.private_SS):
+                idX     =   np.floor(SS / np.prod(self.private_SS[count + 1:]))
+                SS      -=  idX * np.prod(self.private_SS[count + 1:])
+                SSc.append( int(idX) )
+                count   +=  1
+        return SSc
+
 
 class Maze():
 
@@ -80,6 +101,7 @@ class Maze():
         self.figId          =   None
         self.arrowsP        =   [[[] for x in range(self.maze_dims[1])] for y in range(self.maze_dims[0])]
         self.arrowsV        =   [[[] for x in range(self.maze_dims[1])] for y in range(self.maze_dims[0])]
+        self.Runners        =   []
 
     def maze_make(self, type, params):
         # Common variables
@@ -126,8 +148,6 @@ class Maze():
         self.move_reward    =   params
 
     def maze_add_runner(self, nRunners=1, angleSection=0.25, maxVelocity=5, fieldOFview=(5, 5)):
-        # Agents variables
-        self.agents     =   []
         # Add runners
         self.Runners    =   [Runner(self, angleSection, maxVelocity, fieldOFview) for x in range(nRunners)]
         [x.reset() for x in self.Runners]
@@ -141,21 +161,40 @@ class Maze():
     # STATE FUNCTIONS
     # ===============
     def compute_displacement(self, position, move):
+
         # This function issues the new state and reward after displacement
-        newy    =   position[0] + move[0]
-        newx    =   position[1] + move[1]
-        newPos  =   [max(0, min(newy, self.maze_dims[0]-1)), max(0, min(newx, self.maze_dims[1]-1))]
+        def went_out(position, move):
+            newy    =   position[0] + move[0]
+            newx    =   position[1] + move[1]
+            newPos  =   [newy, newx]
+            wentOut =   newy < 0 or newy >= self.maze_dims[0] or newx < 0 or newx >= self.maze_dims[1] or self.maze_allowed[newy, newx] == 0
+            mazeOver=   False
+
+            if newPos in self.maze_finish:
+                reward  =   self.move_reward[2]
+                mazeOver=   True
+            elif wentOut:
+                reward  =   self.move_reward[1]
+            else:
+                reward  =   self.move_reward[0]
+            return wentOut, newPos, reward, mazeOver
+
+        # Update position - prepare for retro-move
+        wentOut, newPos, reward, mazeOver   =   went_out(position, move)
         # Compute reward
-        mazeOver=   False
-        wentOut =   newy<0 or newy>=self.maze_dims[0] or newx<0 or newx>=self.maze_dims[1] or self.maze_allowed[newy,newx]==0
-        if wentOut:
-            reward  =   self.move_reward[1]
-            newPos  =   position
-        elif newPos in self.maze_finish:
-            reward  =   self.move_reward[2]
-            mazeOver=   True
-        else:
-            reward  =   self.move_reward[0]
+        decrement       =   [0, 0]
+        while wentOut:
+            # New decrement
+            decrement   =   np.add(decrement, [move[0] / sum(np.abs(move)), move[1] / sum(np.abs(move))])
+            # Walk back
+            newPos2     =   np.subtract(newPos, [int(decrement[0]), int(decrement[1])])
+            # New reward
+            wentOut, _, reward2, mazeOver   =   went_out(newPos2, [0,0])
+            reward      +=  reward2
+            if not wentOut:
+                newPos  =   list( newPos2 )
+                #velocity=   [0, 0]  # Uncomment this line to have the car velocity set to 0 after hitting a wall
+
         if self.displayOn:
             self.display()
         return reward, newPos, mazeOver
@@ -175,7 +214,6 @@ class Maze():
             self.ax1.grid(which='minor', color='k', linestyle='-', linewidth=1)
 
         # Init display
-        nAgents =   len(self.agents)
         if self.figId is None:
             # CREATE FIGURE
             self.figId  =   plt.figure()
@@ -227,3 +265,21 @@ class Maze():
 
 
 
+
+"""
+MZ  = Maze('raceTrack1', (-1,-5,5))
+MZ.display()
+MZ.maze_add_runner(1)
+MZ.display()
+MZ.Runners[0].runner_change_velocity(1); MZ.display()
+MZ.Runners[0].runner_change_velocity(3); MZ.display()
+MZ.Runners[0].runner_change_velocity(2); MZ.display()
+MZ.Runners[0].runner_change_velocity(2); MZ.display()
+MZ.Runners[0].runner_change_velocity(2); MZ.display()
+MZ.Runners[0].runner_change_velocity(2); MZ.display()
+MZ.Runners[0].runner_change_velocity(7); MZ.display()
+MZ.Runners[0].runner_change_velocity(7); MZ.display()
+MZ.Runners[0].runner_change_velocity(7); MZ.display()
+MZ.Runners[0].runner_change_velocity(7); MZ.display()
+MZ.Runners[0].runner_change_velocity(7); MZ.display()
+"""
