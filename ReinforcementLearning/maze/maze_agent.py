@@ -5,7 +5,7 @@ from bisect import bisect_left
 from sys import setrecursionlimit
 from copy import deepcopy
 from ReinforcementLearning.maze.maze import *
-setrecursionlimit(10000)
+setrecursionlimit(20000)
 
 
 class Maze_agent():
@@ -23,9 +23,10 @@ class Maze_agent():
         self.navMode        =   navMode
         self.environment    =   mazeRunner
         self.planningThresh =   planningThresh  # Minimum absolute increment for entering queue
+        self.exploratoryMove=   []
         # Space dimensions for learning
         self.policy         =   np.zeros( [self.environment.public_SS, self.environment.public_AS] )
-        self.global_value   =   np.zeros( [self.environment.public_SS, self.environment.public_AS] )
+        self.global_value   =   np.zeros( [self.environment.public_SS, self.environment.public_AS] )-5
         self.local_value    =   {}
         self.planningModel  =   [ [[] for x in range(self.environment.public_AS)] for y in range(self.environment.public_SS)]
         self.planningiModel =   [ {} for x in range(self.environment.public_SS) ]
@@ -35,27 +36,35 @@ class Maze_agent():
 
     def agent_move(self, moveSequence=[]):
         # --- Here the agent receives a move signal and picks a move according to policy
-        curS        =   self.environment.runner_query_state()
-        if len(moveSequence) > 0:
-            # Replay a sequence of moves
-            move    =   moveSequence.pop(0)
-        else:
-            # Select move according to policy
-            moveP   =   self.policy[curS,:]
-            moveP   =   np.multiply(moveP, np.random.random([1, len(moveP)]))
-            # Most probable move
-            idProb  =   np.where( [x and y for x,y in zip( (moveP==max(moveP[0][self.environment.actionsAllow]))[0], self.environment.actionsAllow)] )
-            move    =   choice(idProb[0])
-        # Query next state
-        nexS, rew, F=   self.environment.runner_change_velocity(move)
-        # Learning phase
-        self.agent_learn(curS, move, nexS, rew)
-        # Planning phase
-        self.agent_plan(curS, move, nexS, rew)
-        # Update policy
-        self.agent_updatePolicy(curS)
-        if not F:
-            self.agent_move(moveSequence)
+        F   =   False
+        init=   True
+        while not F:
+            # Current state
+            curS    =   self.environment.runner_query_state()
+            # Pick action
+            if len(moveSequence) > 0:
+                # Replay a sequence of moves
+                move    =   moveSequence.pop(0)
+            else:
+                # Select move according to policy
+                moveP   =   self.policy[curS,:]
+                moveP   =   np.multiply(moveP, np.random.random([1, len(moveP)]))
+                if init:
+                    moveP   =   np.random.random([1, len(self.policy[curS,:])])
+                # Most probable move
+                idProb  =   np.where( [x and y for x,y in zip( (moveP==max(moveP[0][self.environment.actionsAllow]))[0], self.environment.actionsAllow)] )
+                move    =   choice(idProb[0])
+                if move != np.argmax(self.policy[curS,:]):
+                    self.exploratoryMove.append(1)
+            # Query next state
+            nexS, rew, F=   self.environment.runner_change_velocity(move)
+            # Learning phase
+            self.agent_learn(curS, move, nexS, rew)
+            # Planning phase
+            self.agent_plan(curS, move, nexS, rew)
+            # Update policy
+            self.agent_updatePolicy(curS)
+            init    =   False
 
     def agent_learn(self, prevState, prevAction, nextState, reward, incrementOnly=False):
         # Learn from experience
@@ -115,7 +124,7 @@ class Maze_agent():
 
     # DISPLAY PART
     # ============
-    def display(self, videoTape=None, index=None):
+    def display(self, index=None, videoTape=None):
 
         self.arrowsP = [[[] for x in range(self.environment.environment.maze_dims[1])] for y in range(self.environment.environment.maze_dims[0])]
         self.arrowsV = [[[] for x in range(self.environment.environment.maze_dims[1])] for y in range(self.environment.environment.maze_dims[0])]
@@ -152,13 +161,13 @@ class Maze_agent():
         else:
             self.imagePanels[0].set_data( self.environment.environment.view_race(-1) );
             self.imagePanels[1].set_data( self.environment.environment.view_race(-1) );
-            self.view_policy(-1, index)
-            self.view_value(-1, index)
+            self.view_policy(index)
+            self.view_value(index)
             plt.show()
             plt.draw()
             plt.pause(0.1)
 
-    def view_policy(self, cnt, index):
+    def view_policy(self, index):
         # --- Draw the action arrows
         # Slice the policy
         POL     =   np.reshape( self.policy, self.environment.private_SS+[self.environment.public_AS] )
@@ -185,9 +194,9 @@ class Maze_agent():
                                    head_width=0.5 * ampV,
                                    head_length=max(max(abs(np.array(iAct))) / 2, 0.001) * ampV, fc='k', ec='k')]
 
-    def view_value(self, cnt, index):
+    def view_value(self, index):
         # --- Draw the action arrows
-        VAL = np.reshape(self.policy, self.environment.private_SS + [self.environment.public_AS])
+        VAL = np.reshape(self.global_value, self.environment.private_SS + [self.environment.public_AS])
         if not index is None:
             VAL = VAL[:, :, index, :]
 
@@ -215,17 +224,24 @@ class Maze_agent():
 # LAUNCHER - TEST
 # ===============
 # Set the environment
-
+"""
 MZ  =   Maze('maze1')
 MZ.maze_add_runner(1, angleSection=0.5, maxVelocity=1)
 
 # Set the agent
-MA  =   [Maze_agent(x) for x in MZ.Runners]
+MZ.display()
+MA  =   [Maze_agent(x, planningMode='prioritized', planningThresh=0.00001, planningNodes=20) for x in MZ.Runners]
+
 
 # Start race
+[x.reset() for x in MZ.Runners]
 [x.agent_move() for x in MA]
-MA[0].display(None, 0)
-"""
+MA[0].display(4,None)
+
+# re-Start race
+[x.reset() for x in MZ.Runners]
+[x.agent_move() for x in MA]
+MA[0].display(None, 4)
 """
 
 """
@@ -265,22 +281,23 @@ for id in range(len(plTs)):
 
 
 
-"""
+
 # EFFECT OF PLANNING NODES ON POLICY VALUES
 # =========================================
 # First make a path using non-planning agent
 nNodes  =   range(0,25,8)
-nRuns   =   100
+nRuns   =   5000
 nSteps  =   np.zeros( [len(nNodes), nRuns] )
-nIter   =   50
+nIter   =   25
 # Make environment
 MZ      =   Maze(type='raceTrack1', display=False, params=(-1,-5,5))
-MZ.maze_add_runner( 1, angleSection=0.5, maxVelocity=1 )
+MZ.maze_add_runner( 1, angleSection=0.25, maxVelocity=5 )
 # Make agents
-MA      =   [Maze_agent(MZ.Runners[0], planningNodes=x, planningThresh=0.0001, planningMode='prioritized') for x in nNodes]
 for it in range(nIter):
+    MA      =   [Maze_agent(MZ.Runners[0], eGreedy=0.1, planningNodes=x, planningThresh=0.0001, planningMode='prioritized') for x in nNodes]
+    print('Iteration: '+str(it))
     for iRn in range(nRuns):
-        for iN in [0,2]: #range(len(nNodes)):
+        for iN in range(len(nNodes)):
             MA[iN].agent_move()
             nSteps[iN, iRn] += (len(MA[iN].environment.state_chain) - 1) / nIter
             MA[iN].environment.reset()
@@ -288,12 +305,13 @@ for it in range(nIter):
 # Display
 FF      =   plt.figure()
 axs     =   []
-for iN in [0,2]: #range(len(nNodes)):
-    axs.append( plt.plot( range(nRuns), nSteps[iN,:], label=str(iN)+' nodes') )
+for iN in range(len(nNodes)):
+    axs.append( plt.plot( range(nRuns), nSteps[iN,:], label=str(nNodes[iN])+' nodes') )
 plt.legend()
 plt.gca().set_ylim([np.min(nSteps),np.max(nSteps)])
 plt.gca().set_xlim([0, nRuns-1])
 plt.gca().set_xlabel('Number of runs')
 plt.gca().set_ylabel('Number of steps')
 plt.title('Effect of planning on learning speed')
+"""
 """

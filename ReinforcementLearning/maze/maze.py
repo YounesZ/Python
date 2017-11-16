@@ -61,13 +61,13 @@ class Runner():
         # Get new position and velocities
         reward, newPos, gameOver    =   self.environment.compute_displacement(position, velocity)
         # Keep new variables
-        #newVel =    self.velocities.index([0,0])   # THIS LINE HAS TO BE DELETED
+        #newVel, velocity    =    self.velocities.index([0,0]), [0,0]   # THIS LINE HAS TO BE COMMENTED OUT FOR QUITTING THE STOP-AND-GO MODE
         self.action_chain.append(acceleration)
         self.state_chain.append((newPos, newVel))
-        # Convert state-space to indices
-        stateSpace  =   self.runner_convert_state_space(newPos+[newVel], 'forward')
         # Update allowed actions
         self.actionsAllow   =   [sum(abs(np.add(x, velocity))) > 0 for x in self.actions]
+        # Convert state-space to indices
+        stateSpace  =   self.runner_convert_state_space(newPos+[newVel], 'forward')
         return stateSpace, reward, gameOver
 
     def runner_convert_state_space(self, SS, method):
@@ -163,41 +163,51 @@ class Maze():
     def compute_displacement(self, position, move):
 
         # This function issues the new state and reward after displacement
-        def went_out(position, move):
-            newy    =   position[0] + move[0]
-            newx    =   position[1] + move[1]
-            newPos  =   [newy, newx]
-            wentOut =   newy < 0 or newy >= self.maze_dims[0] or newx < 0 or newx >= self.maze_dims[1] or self.maze_allowed[newy, newx] == 0
-            mazeOver=   False
+        def on_obstacle(position, move):
+            newy        =   position[0] + move[0]
+            newx        =   position[1] + move[1]
+            newPos      =   [newy, newx]
+            onObstacle  =   newy < 0 or newy >= self.maze_dims[0] or newx < 0 or newx >= self.maze_dims[1] or self.maze_allowed[newy, newx] == 0
+            mazeOver    =   False
 
             if newPos in self.maze_finish:
                 reward  =   self.move_reward[2]
                 mazeOver=   True
-            elif wentOut:
+            elif onObstacle:
                 reward  =   self.move_reward[1]
             else:
                 reward  =   self.move_reward[0]
-            return wentOut, newPos, reward, mazeOver
+            return onObstacle, list(newPos), reward, mazeOver
 
-        # Update position - prepare for retro-move
-        wentOut, newPos, reward, mazeOver   =   went_out(position, move)
-        # Compute reward
-        decrement       =   [0, 0]
-        while wentOut:
+        # Compute temporary last position
+        wentOut, newPos, reward, mazeOver   =   on_obstacle(position, move)
+
+        # Make sure trajectory did not cross a wall
+        decrement   =   [0,0]
+        curPos      =   newPos
+        newPos2     =   newPos
+        resetCursor =   wentOut
+        while newPos2!=position:
             # New decrement
             decrement   =   np.add(decrement, [move[0] / sum(np.abs(move)), move[1] / sum(np.abs(move))])
             # Walk back
-            newPos2     =   np.subtract(newPos, [int(decrement[0]), int(decrement[1])])
+            newPos2     =   list( np.subtract(newPos, [int(decrement[0]), int(decrement[1])]) )
             # New reward
-            wentOut, _, reward2, mazeOver   =   went_out(newPos2, [0,0])
-            reward      +=  reward2
-            if not wentOut:
-                newPos  =   list( newPos2 )
-                #velocity=   [0, 0]  # Uncomment this line to have the car velocity set to 0 after hitting a wall
+            wentOut, _, reward2, mzO    =   on_obstacle(newPos2, [0, 0])
+            if wentOut: # Reset the current position
+                newPos2         =   newPos2
+                reward          +=  reward2
+                resetCursor     =   True
+                # velocity=   [0, 0]  # Uncomment this line to have the car velocity set to 0 after hitting a wal
+            elif resetCursor:
+                resetCursor     =   False
+                curPos          =   newPos2
+                reward          +=   reward2
+                mazeOver        =   mzO
 
         if self.displayOn:
             self.display()
-        return reward, newPos, mazeOver
+        return reward, curPos, mazeOver
 
     # DISPLAY FUNCTIONS
     # =================
@@ -283,3 +293,8 @@ MZ.Runners[0].runner_change_velocity(7); MZ.display()
 MZ.Runners[0].runner_change_velocity(7); MZ.display()
 MZ.Runners[0].runner_change_velocity(7); MZ.display()
 """
+
+
+
+
+
