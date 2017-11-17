@@ -198,7 +198,7 @@ class Maze():
                 newPos2         =   newPos2
                 reward          +=  reward2
                 resetCursor     =   True
-                # velocity=   [0, 0]  # Uncomment this line to have the car velocity set to 0 after hitting a wal
+                velocity        =   [0, 0]  # Uncomment this line to have the car velocity set to 0 after hitting a wal
             elif resetCursor:
                 resetCursor     =   False
                 curPos          =   newPos2

@@ -124,7 +124,7 @@ class Maze_agent():
 
     # DISPLAY PART
     # ============
-    def display(self, index=None, videoTape=None):
+    def display(self, index=None):
 
         self.arrowsP = [[[] for x in range(self.environment.environment.maze_dims[1])] for y in range(self.environment.environment.maze_dims[0])]
         self.arrowsV = [[[] for x in range(self.environment.environment.maze_dims[1])] for y in range(self.environment.environment.maze_dims[0])]
@@ -152,20 +152,13 @@ class Maze_agent():
             self.imagePanels.append( self.ax2.imshow( self.environment.environment.view_race(-1) ) )
         update_ticks()
 
-        if not videoTape is None:
-            # Initiate writer
-            Writer      =   animation.writers['ffmpeg']
-            writer      =   Writer(fps=5, metadata=dict(artist='Me'), bitrate=1800)
-            line_ani    =   animation.FuncAnimation(self.figId, update_matrix, max([len(x.position_chain) for x in self.racers]), fargs=([], self.imagePanels[0]),blit=False)
-            line_ani.save(videoTape, writer=writer)
-        else:
-            self.imagePanels[0].set_data( self.environment.environment.view_race(-1) );
-            self.imagePanels[1].set_data( self.environment.environment.view_race(-1) );
-            self.view_policy(index)
-            self.view_value(index)
-            plt.show()
-            plt.draw()
-            plt.pause(0.1)
+        self.imagePanels[0].set_data( self.environment.environment.view_race(-1) );
+        self.imagePanels[1].set_data( self.environment.environment.view_race(-1) );
+        self.view_policy(index)
+        self.view_value(index)
+        plt.show()
+        plt.draw()
+        plt.pause(0.1)
 
     def view_policy(self, index):
         # --- Draw the action arrows
