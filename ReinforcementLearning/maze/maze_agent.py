@@ -10,19 +10,16 @@ setrecursionlimit(20000)
 
 class Maze_agent():
 
-    def __init__(self, mazeRunner, Lambda=0, learnRate=0.15, eGreedy=0.1, discount=0.8, planningMode='prioritized', planningNodes=0, planningThresh=0.05, navMode='global'):
+    def __init__(self, mazeRunner, learning={'Lambda':0, 'learnRate':0.15, 'eGreedy':0.1, 'discount':0.8},
+                    planning={'type':'prioritized', 'nNodes':0, 'thresh':0.05}, batch=1):
         # ==============
         # Maze agent
         # Agent type
-        self.Lambda         =   Lambda
-        self.learnRate      =   learnRate
-        self.eGreedy        =   eGreedy
-        self.discount       =   discount
-        self.planningMode   =   planningMode
-        self.planningNodes  =   planningNodes
-        self.navMode        =   navMode
+        self.learning       =   learning        #{'Lambda', 'learnRate', 'eGreedy', 'discount'}
+        self.planning       =   planning        #{'type', 'nodes', 'thresh'}
+        self.batch          =   {'size':max(1, batch)}   #{'size', 'tempo', 'mirror', 'cumul'}
+        # Environment
         self.environment    =   mazeRunner
-        self.planningThresh =   planningThresh  # Minimum absolute increment for entering queue
         self.exploratoryMove=   []
         # Space dimensions for learning
         self.policy         =   np.zeros( [self.environment.public_SS, self.environment.public_AS] )
@@ -30,6 +27,8 @@ class Maze_agent():
         self.local_value    =   {}
         self.planningModel  =   [ [[] for x in range(self.environment.public_AS)] for y in range(self.environment.public_SS)]
         self.planningiModel =   [ {} for x in range(self.environment.public_SS) ]
+        # Batch learning
+        self.batch['cumul'] =   0
         # Display variables
         self.figId          =   None
         self.ax             =   None
@@ -38,6 +37,13 @@ class Maze_agent():
         # --- Here the agent receives a move signal and picks a move according to policy
         F   =   False
         init=   True
+        # Init the batch values
+        self.batch['cumul']     +=  1
+        self.batch['tempoV']    =   deepcopy(self.global_value)
+        self.batch['tempoP']    =   deepcopy(self.policy)
+        if self.batch['cumul']  ==  1:
+            self.batch['mirror']=   np.zeros(self.global_value.shape)
+            #print('mirror initialized')
         while not F:
             # Current state
             curS    =   self.environment.runner_query_state()
@@ -47,14 +53,14 @@ class Maze_agent():
                 move    =   moveSequence.pop(0)
             else:
                 # Select move according to policy
-                moveP   =   self.policy[curS,:]
+                moveP   =   self.batch['tempoP'][curS,:]
                 moveP   =   np.multiply(moveP, np.random.random([1, len(moveP)]))
                 if init:
                     moveP   =   np.random.random([1, len(self.policy[curS,:])])
                 # Most probable move
                 idProb  =   np.where( [x and y for x,y in zip( (moveP==max(moveP[0][self.environment.actionsAllow]))[0], self.environment.actionsAllow)] )
                 move    =   choice(idProb[0])
-                if move != np.argmax(self.policy[curS,:]):
+                if move != np.argmax(self.batch['tempoP'][curS,:]):
                     self.exploratoryMove.append(1)
             # Query next state
             nexS, rew, F=   self.environment.runner_change_velocity(move)
@@ -63,22 +69,34 @@ class Maze_agent():
             # Planning phase
             self.agent_plan(curS, move, nexS, rew)
             # Update policy
-            self.agent_updatePolicy(curS)
+            self.agent_updatePolicy(curS, 'tempo')
             init    =   False
+        # Update the mirror - systematic
+        self.batch['mirror']    +=  self.batch['tempoV'] / self.batch['size']
+        #print('Updated the mirror')
+        if self.batch['cumul']  ==  self.batch['size']:
+            # Update Q(s,a) - at the end of batches
+            self.global_value   =   deepcopy(self.batch['mirror'])
+            # Update the policy - this one counts
+            [self.agent_updatePolicy(x, 'global') for x in range(self.global_value.shape[0])]
+            # Reset the batch
+            self.batch['cumul'] =   0
+            #print('Updated Q(s,a)')
 
     def agent_learn(self, prevState, prevAction, nextState, reward, incrementOnly=False):
         # Learn from experience
-        Qprev   =   self.global_value[prevState, prevAction]
-        Qnext   =   max( self.global_value[nextState,:] )
-        increment   =   self.learnRate * (reward + self.discount*Qnext - Qprev)
+        Qprev   =   self.batch['tempoV'][prevState, prevAction]  #global_value[prevState, prevAction]
+        Qnext   =   max( self.batch['tempoV'][nextState,:] )     #global_value[nextState,:] )
+        increment   =   self.learning['learnRate'] * (reward + self.learning['discount']*Qnext - Qprev)
         if incrementOnly:
             return increment
         else:
-            self.global_value[prevState, prevAction]    +=  increment
+            self.batch['tempoV'][prevState, prevAction]  +=  increment
+            #self.global_value[prevState, prevAction]    +=  increment
 
     def agent_plan(self, prevState, prevAction, nexState, reward):
         # Select planning type
-        if self.planningMode=='prioritized':
+        if self.planning['type']=='prioritized':
             # Initialize
             planningQueue   =   [(prevState, prevAction)]
             planningPrior   =   [reward]
@@ -90,7 +108,7 @@ class Maze_agent():
             S               =   prevState
             nodes           =   []
             # Insert previous state in priority queue "if worth it"
-            while len(planningQueue) > 0 and len(nodes) < self.planningNodes and planningPrior[-1]>self.planningThresh:
+            while len(planningQueue) > 0 and len(nodes) < self.planning['nNodes'] and planningPrior[-1]>self.planning['thresh']:
                 # Empty the queue
                 if len(planningPrior) > 0:
                     _       =   planningPrior.pop(-1)
@@ -104,22 +122,28 @@ class Maze_agent():
                 for Sm, Am in beforeS:
                     Rm, _   =   self.planningModel[Sm][Am]
                     Priority=   abs(self.agent_learn(Sm, Am, S, Rm, incrementOnly=True))
-                    if Priority > self.planningThresh and (Sm, Am) not in planningQueue:
+                    if Priority > self.planning['thresh'] and (Sm, Am) not in planningQueue:
                         # insertion position
                         ixS = bisect_left(planningPrior, Priority)
                         planningPrior.insert(ixS, Priority)
                         planningQueue.insert(ixS, (Sm, Am))
 
-    def agent_updatePolicy(self, position):
+    def agent_updatePolicy(self, position, type='global'):
         # Update the policy "find the most valuable move"
-        moveP   =   self.global_value[position]
+        if type=='tempo':
+            moveP   =   self.batch['tempoV'][position]   #self.global_value[position]
+        elif type=='global':
+            moveP   =   self.policy[position]  # self.global_value[position]
         # Find the action with highest value
         idProb  =   np.where(moveP == max(moveP))
         move    =   choice(idProb[0])
         # Update proba
-        policy          =   np.ones(self.environment.public_AS) * self.eGreedy / len(moveP)
-        policy[move]    =   1 - self.eGreedy * (1 - 1 / len(moveP))
-        self.policy[position]   =   policy
+        policy          =   np.ones(self.environment.public_AS) * self.learning['eGreedy'] / len(moveP)
+        policy[move]    =   1 - self.learning['eGreedy'] * (1 - 1 / len(moveP))
+        if type == 'tempo':
+            self.batch['tempoP'][position]  =   policy
+        elif type == 'global':
+            self.policy[position]           =   policy
 
 
     # DISPLAY PART
@@ -217,6 +241,7 @@ class Maze_agent():
 # LAUNCHER - TEST
 # ===============
 # Set the environment
+
 """
 MZ  =   Maze('maze1')
 MZ.maze_add_runner(1, angleSection=0.5, maxVelocity=1)
@@ -274,25 +299,26 @@ for id in range(len(plTs)):
 
 
 
-
+"""
 # EFFECT OF PLANNING NODES ON POLICY VALUES
 # =========================================
 # First make a path using non-planning agent
 nNodes  =   range(0,25,8)
-nRuns   =   5000
+nRuns   =   500
 nSteps  =   np.zeros( [len(nNodes), nRuns] )
-nIter   =   25
+nIter   =   15
 # Make environment
 MZ      =   Maze(type='raceTrack1', display=False, params=(-1,-5,5))
 MZ.maze_add_runner( 1, angleSection=0.25, maxVelocity=5 )
 # Make agents
 for it in range(nIter):
-    MA      =   [Maze_agent(MZ.Runners[0], eGreedy=0.1, planningNodes=x, planningThresh=0.0001, planningMode='prioritized') for x in nNodes]
+    MA      =   [Maze_agent(MZ.Runners[0], planning={'type':'prioritized', 'nNodes':x, 'thresh':0.0001}) for x in nNodes]
     print('Iteration: '+str(it))
     for iRn in range(nRuns):
         for iN in range(len(nNodes)):
             MA[iN].agent_move()
             nSteps[iN, iRn] += (len(MA[iN].environment.state_chain) - 1) / nIter
+            print('\tRace completed in '+str(len(MA[iN].environment.state_chain) - 1)+' steps')
             MA[iN].environment.reset()
 
 # Display
@@ -307,4 +333,42 @@ plt.gca().set_xlabel('Number of runs')
 plt.gca().set_ylabel('Number of steps')
 plt.title('Effect of planning on learning speed')
 """
+
+
+
+
 """
+# EFFECT OF BATCH SIZE ON POLICY VALUES
+# =====================================
+# First make a path using non-planning agent
+bSize   =   np.floor( np.power(10, np.array(range(0,5,1))/2) )
+nRuns   =   1000
+nSteps  =   np.zeros( [len(bSize), nRuns] )
+nIter   =   20
+# Make environment
+MZ      =   Maze(type='raceTrack1', display=False, params=(-1,-5,5))
+MZ.maze_add_runner( 1, angleSection=0.25, maxVelocity=5 )
+# Make agents
+for it in range(nIter):
+    MA      =   [Maze_agent(MZ.Runners[0], planning={'type':'prioritized', 'nNodes':15, 'thresh':0.0001},batch=x) for x in bSize]
+    print('Iteration: '+str(it))
+    for iRn in range(nRuns):
+        for iN in range(len(bSize)):
+            MA[iN].agent_move()
+            nSteps[iN, iRn] += (len(MA[iN].environment.state_chain) - 1) / nIter
+            print('\tRace completed in '+str(len(MA[iN].environment.state_chain) - 1)+' steps')
+            MA[iN].environment.reset()
+
+# Display
+FF      =   plt.figure()
+axs     =   []
+for iN in range(len(bSize)):
+    axs.append( plt.plot( range(nRuns), nSteps[iN,:], label='Batch size '+str(bSize[iN])) )
+plt.legend()
+plt.gca().set_ylim([np.min(nSteps),np.max(nSteps)])
+plt.gca().set_xlim([0, nRuns-1])
+plt.gca().set_xlabel('Number of runs')
+plt.gca().set_ylabel('Number of steps')
+plt.title('Effect of planning on learning speed')
+"""
+
