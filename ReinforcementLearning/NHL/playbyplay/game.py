@@ -152,8 +152,8 @@ for ig in gameId:
 
 """
 
-[x.pull_line_shifts() for x in gC]
-#[x.filter_line_shifts() for x in gC]
+[x.pull_line_shifts() for x in gc]
+[x.filter_line_shifts() for x in gc]
 """
 
 

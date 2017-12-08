@@ -40,7 +40,7 @@ def to_pandas(repoRaw):
         sumdt   =   [list(x.values()) for x in sumRdt]
         sumDF   =   pd.DataFrame( np.array(sumdt), columns=sumKeys )
         # Sort by teamAbbrev, playerName, gameId
-        sumDF   =   sumDF.sort_values(by=['gameId'], ascending=True)
+        sumDF   =   sumDF.sort_values(by=['gameId', 'teamAbbrev', 'playerName'], ascending=True)
         sumDF   =   sumDF.set_index(np.arange(len(sumDF)))
 
         # --- Process hits - get header
@@ -56,11 +56,27 @@ def to_pandas(repoRaw):
         hitdt   =   [list(x.values()) for x in hitRdt]
         hitDF   =   pd.DataFrame(np.array(hitdt), columns=hitKeys)
         # Sort by teamAbbrev, playerName, gameId
-        hitDF   =   hitDF.sort_values(by=['gameId'], ascending=True)
+        hitDF   =   hitDF.sort_values(by=['gameId', 'teamAbbrev', 'playerName'], ascending=True)
         hitDF   =   hitDF.set_index(np.arange(len(hitDF)))
 
+        # --- Process penalty kills - get header
+        kilF    =   path.join(repoRaw, isea, 'penalty_kills.csv')
+        # Read the file
+        kilR    =   open(kilF, 'r')
+        kilR    =   eval(kilR.readline().replace('null', 'None'))
+        # Process the file
+        kEntries =  kilR['total']
+        kilRdt  =   kilR['data']
+        kilKeys =   kilRdt[0].keys()
+        # Turn into a pandas dataframe
+        kildt   =   [list(x.values()) for x in kilRdt]
+        kilDF   =   pd.DataFrame(np.array(kildt), columns=kilKeys)
+        # Sort by teamAbbrev, playerName, gameId
+        kilDF   =   kilDF.sort_values(by=['gameId', 'teamAbbrev', 'playerName'], ascending=True)
+        kilDF   =   kilDF.set_index(np.arange(len(kilDF)))
+
         # --- Join the two tables into a pandas series
-        DF      =   pd.concat( (sumDF, hitDF), axis=1)
+        DF      =   pd.concat( (sumDF, hitDF, kilDF), axis=1)
         # Drop duplicates
         DF      =   DF.loc[:, ~DF.columns.duplicated()]
         # Pickle the result
@@ -101,8 +117,7 @@ def to_player(repoRaw, repoPbP, repoPSt):
         stdout.write("Player %i/%i - %s: [%-40s] %d%%, completed" % (count, len(plNames), pl, '='*int(count/len(plNames)*40), 100*count/len(plNames)) )
         stdout.flush()
 
-
-
+"""
 # LAUNCHER
 # ========
 repoRaw     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/raw'
@@ -112,10 +127,9 @@ to_pandas(repoRaw)
 to_player(repoRaw, repoPbP, repoPSt)
 
 
-
-
 ss  =   '20082009'
 AA  =   pd.read_csv('/home/younesz/Documents/Databases/Hockey/PlayByPlay/Season_'+ss+'/playbyplay_'+ss+'.csv')
 AAa =   AA.drop_duplicates(subset='gcode')
 print('All games: ',len(AAa['gcode']), '; Regular season games: ', sum(AAa['gcode']<30000))
+"""
 
