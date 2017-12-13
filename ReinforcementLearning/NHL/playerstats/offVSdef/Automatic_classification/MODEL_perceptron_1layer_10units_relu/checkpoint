@@ -1,0 +1,2 @@
+model_checkpoint_path: "/home/younesz/Documents/Code/Python/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu/model.ckpt"
+all_model_checkpoint_paths: "/home/younesz/Documents/Code/Python/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu/model.ckpt"

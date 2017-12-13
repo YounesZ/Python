@@ -117,6 +117,7 @@ def to_player(repoRaw, repoPbP, repoPSt):
         stdout.write("Player %i/%i - %s: [%-40s] %d%%, completed" % (count, len(plNames), pl, '='*int(count/len(plNames)*40), 100*count/len(plNames)) )
         stdout.flush()
 
+
 """
 # LAUNCHER
 # ========
@@ -125,7 +126,6 @@ repoPbP     =   '/home/younesz/Documents/Databases/Hockey/PlayByPlay'
 repoPSt     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/player'
 to_pandas(repoRaw)
 to_player(repoRaw, repoPbP, repoPSt)
-
 
 ss  =   '20082009'
 AA  =   pd.read_csv('/home/younesz/Documents/Databases/Hockey/PlayByPlay/Season_'+ss+'/playbyplay_'+ss+'.csv')

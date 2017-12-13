@@ -1,4 +1,3 @@
-import csv
 import pickle
 import pandas as pd
 import numpy as np
@@ -7,8 +6,121 @@ import matplotlib.pyplot as plt
 from os import path
 from sys import stdout
 from copy import deepcopy
+from sklearn import preprocessing
+from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
 from Utils.scraping.convert_raw import get_player_names
 from Utils.programming.ut_find_folders import *
+from Utils.maths.ut_cumsum_thresh import *
+
+
+class ANN_classifier():
+
+    def __init__(self, nNodes):
+        # Launch the builder
+        nInputs     =   nNodes.pop(0)
+        nOutputs    =   nNodes.pop(-1)
+        nHidden     =   len(nNodes)
+        self.ann_build_network(nInputs, nOutputs, nNodes)
+
+    def ann_build_network(self, nInputs, noutputs, nNodes):
+        # Architecture - 1 layer
+        self.annX   =   tf.placeholder(tf.float32, [None, nInputs], name='Input_to_the_network-player_features')
+        self.annY_  =   tf.placeholder(tf.float32, [None, 2], name='Ground_truth')
+        annW1       =   tf.Variable(tf.truncated_normal([nInputs, nNodes[0]], stddev=0.1))
+        annB1       =   tf.Variable(tf.ones([1, nNodes[0]]) / 10)
+        Y1          =   tf.nn.relu(tf.matmul(self.annX, annW1) + annB1)
+        annW2       =   tf.Variable(tf.truncated_normal([nNodes[0], noutputs], stddev=0.1))
+        annB2       =   tf.Variable(tf.ones([1, noutputs]) / 10)
+        self.annY   =   tf.matmul(Y1, annW2) + annB2
+        # Init variables
+        init        =   tf.global_variables_initializer()
+        # Optimization
+        self.loss       =   tf.reduce_mean(tf.squared_difference(self.annY_, self.annY))
+        self.train_step =   tf.train.GradientDescentOptimizer(0.1).minimize(self.loss)
+        # Compute accuracy
+        is_correct      =   tf.equal(tf.argmax(self.annY, axis=1), tf.argmax(self.annY_, axis=1))
+        self.accuracy   =   tf.reduce_mean(tf.cast(is_correct, tf.float32))
+
+    def ann_train_network(self, nIter, annI, annT, svname=None):
+        self.trLoss, self.tsLoss, self.trAcc, self.tsAcc, nIter = [], [], [], [], 50
+        # Initialize the model saver
+        saver   =   tf.train.Saver()
+        for iIt in range(nIter):
+            # --- TRAIN ANN
+            # Init instance
+            init        =   tf.global_variables_initializer()
+            self.sess   =   tf.Session()
+            self.sess.run(init)
+            # Split train/test data
+            train_X, test_X, train_Y, test_Y = train_test_split(annI, annT, test_size=0.25)
+            # Loop on data splits
+            fcnLoss =   []
+            # Make exponential batch size increase
+            batchSize, minSize, maxSize, nSteps =   [], 5, 20, 0
+            while np.sum(batchSize) + maxSize < train_X.shape[0]:
+                nSteps      +=  1
+                batchSize   =   np.floor( ((np.exp(range(nSteps)) - 1) / (np.exp(nSteps) - 1)) ** .05 * (maxSize - minSize)) + minSize
+            batchSize   =   np.append(batchSize, train_X.shape[0] - np.sum(batchSize)).astype(int)
+            trL, tsL, trA, tsA  =   [], [], [], []
+            for ib in batchSize:
+                # Slice input and target
+                trInput, train_X    =   train_X[:ib, :], train_X[ib:, :]
+                trTarget, train_Y   =   train_Y[:ib, :], train_Y[ib:, :]
+                # Pass them through
+                dictDT  =   {self.annX: trInput, self.annY_: trTarget}
+                self.sess.run(self.train_step, feed_dict=dictDT)
+                trL.append(self.sess.run(self.loss, feed_dict=dictDT))
+                trA.append(self.sess.run(self.accuracy, feed_dict=dictDT))
+                # Assess accuracy
+                dictTS  =   {self.annX: test_X, self.annY_: test_Y}
+                tsL.append(self.sess.run(self.loss, feed_dict=dictTS))
+                tsA.append(self.sess.run(self.accuracy, feed_dict=dictTS))
+            # plt.figure(); plt.plot(fcnLoss)
+            self.trLoss.append(trL)
+            self.tsLoss.append(tsL)
+            self.trAcc.append(trA)
+            self.tsAcc.append(tsA)
+            self.batchSize  =   batchSize
+        # Save session
+        if not svname is None:
+            save_path       =   saver.save(self.sess, svname)
+            self.mirror     =   svname
+
+    def ann_display_accuracy(self):
+        # Make figure
+        Fig     =   plt.figure()
+        # Axes1: loss
+        Ax1     =   Fig.add_subplot(121)
+        Ax1.fill_between(np.cumsum(self.batchSize), np.mean(self.trLoss, axis=0) - np.std(self.trLoss, axis=0), np.mean(self.trLoss, axis=0) + np.std(self.trLoss, axis=0), facecolors='b', interpolate=True, alpha=0.4)
+        Ax1.fill_between(np.cumsum(self.batchSize), np.mean(self.tsLoss, axis=0) - np.std(self.tsLoss, axis=0), np.mean(self.tsLoss, axis=0) + np.std(self.tsLoss, axis=0), facecolors='r', interpolate=True, alpha=0.4)
+        Ax1.plot(np.cumsum(self.batchSize), np.mean(self.trLoss, axis=0), 'b')
+        Ax1.plot(np.cumsum(self.batchSize), np.mean(self.tsLoss, axis=0), 'r')
+        Ax1.set_xlabel('Number of training examples')
+        Ax1.set_ylabel('Quadratic error')
+        Ax1.set_xlim([min(self.batchSize), np.sum(self.batchSize)])
+        Ax1.set_ylim([0.04, 0.16])
+        # Axes2: accuracy
+        Ax2     =   Fig.add_subplot(122)
+        Ax2.fill_between(np.cumsum(self.batchSize), np.mean(self.trAcc, axis=0) - np.std(self.trAcc, axis=0), np.mean(self.trAcc, axis=0) + np.std(self.trAcc, axis=0), facecolors='b', interpolate=True, alpha=0.4)
+        Ax2.fill_between(np.cumsum(self.batchSize), np.mean(self.tsAcc, axis=0) - np.std(self.tsAcc, axis=0), np.mean(self.tsAcc, axis=0) + np.std(self.tsAcc, axis=0), facecolors='r', interpolate=True, alpha=0.4)
+        Ax2.plot(np.cumsum(self.batchSize), np.mean(self.trAcc, axis=0), 'b')
+        Ax2.plot(np.cumsum(self.batchSize), np.mean(self.tsAcc, axis=0), 'r')
+        Ax2.set_xlabel('Number of training examples')
+        Ax2.set_ylabel('Classification accuracy')
+        Ax2.set_xlim([min(self.batchSize), np.sum(self.batchSize)])
+        Ax2.set_ylim([0.4, 1])
+
+    def ann_reload_network(self, image):
+        # Init saver
+        saver       =   tf.train.Saver()
+        # Initialize the variables
+        self.sess   =   tf.Session()
+        init        =   tf.global_variables_initializer()
+        self.sess.run(init)
+        # Restore model weights from previously saved model
+        saver.restore(self.sess, image)
+
 
 def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', nGames=82):
     # Initiate empty container
@@ -178,43 +290,100 @@ def do_manual_classification(repoPSt, repoPbP, upto, nGames):
     return PLclass, PQuart_off.index
 
 
-def do_ANN_classification(repoPSt, repoPbP):
+def do_prep_data(season):
+    X_train     =   pd.DataFrame()
+    Y_train     =   pd.DataFrame()
+    # Loop on seasons and collect data
+    for isea in season:
+        # Get end time stamp
+        sea_name=   isea.replace('Season_', '')
+        sea_strt=   sea_name[:4] + '-09-01'
+        sea_end =   sea_name[-4:] + '-07-01'
+        # Pull stats
+        sea_stats, sea_pos, sea_numeric, sea_normal = pull_stats(repoPSt, repoPbP, sea_strt, sea_end)
+        dtCols  =   list(set(sea_numeric).union(sea_normal))
+        # Pull Selke and Ross nominees for that season
+        with open(path.join(repoPSt.replace('player', 'raw'), sea_name, 'trophy_nominees.p'), 'rb') as f:
+            trophies = pickle.load(f)
+        # Process Selke
+        df_s    =   trophies['selke']
+        # Process Ross
+        df_r    =   trophies['ross']
+        # Make the voting dataframes
+        tempy1  =   np.concatenate((np.reshape(df_r['WEIGHT'].values, [len(df_r), 1]), np.zeros([len(df_r), 1])), axis=1)
+        tempy2  =   np.concatenate((np.zeros([len(df_s), 1]), np.reshape(df_s['WEIGHT'].values, [len(df_s), 1])), axis=1)
+        tempY   =   pd.concat([pd.DataFrame(tempy1/np.max(tempy1), index=df_r.index), pd.DataFrame(tempy2/np.max(tempy2), index=df_s.index)])
+        tempY   =   tempY.groupby(tempY.index).agg({0:sum, 1:sum})
+        tempX   =   sea_stats.loc[tempY.index, dtCols]
+        # Append to dataset
+        X_train =   pd.concat((X_train, tempX), axis=0)
+        Y_train =   pd.concat([Y_train, tempY], axis=0)
+    return X_train, Y_train
+
+
+def do_process_data(X, Y, nComp=None):
+    # Data
+    annInput    =   deepcopy(X.values)
+    annTarget   =   deepcopy(Y.values)
+    indices     =   X.index
+    # Remove NAN - by the way this should be fixed upfront
+    x, y        =   np.where(X.isnull())
+    x           =   np.unique(x)
+    annInput    =   np.delete(annInput, (x), axis=0)
+    annTarget   =   np.delete(annTarget, (x), axis=0)
+    indices     =   np.delete(indices, (x), axis=0)
+    # Center the data
+    annInput    =   preprocessing.scale(annInput)
+    annInput    =   annInput - np.mean(annInput, axis=0)
+    # Perform PCA - just look for nb of components
+    pca         =   PCA(svd_solver='full', whiten=True)
+    pca.fit(annInput)
+    if nComp is None:
+        nComp   =   ut_cumsum_thresh(pca.explained_variance_, 0.95)
+    # Perform PCA - transform the data
+    pca         =   PCA(n_components=nComp, svd_solver='full', whiten=True)
+    pca.fit(annInput)
+    annInput    =   pca.transform(annInput)
+    return annInput, annTarget, indices
+
+
+def do_ANN_training(repoPSt, repoPbP):
+    # --- PREP DATASET
     # List non-lockout seasons
     allS_p  =   ut_find_folders(repoPbP, True)
-    # Prep dataset
-    """dtCols  =   ['ppPoints', 'plusMinus', 'otGoals', 'points', 'shootingPctg', 'goals', 'faceoffWinPctg', 'penaltyMinutes',\
-                'shPoints', 'shots', 'gamesPlayed', 'ppGoals', 'timeOnIcePerGame', 'gameWinningGoals', 'assists',\
-                'shGoals', 'shiftsPerGame', 'faceoffsWon', 'hits', 'missedShots', 'hitsPerGame', 'shotsPerGame', 'blockedShots',\
-                'giveaways', 'blockedShotsPerGame', 'goalsPerGame', 'missedShotsPerGame', 'faceoffsLost', 'takeaways',\
-                'faceoffs', 'shShots', 'shFaceoffsLost', 'shHits', 'shGiveaways', 'shTimeOnIce', 'shAssists', 'shFaceoffsWon',\
-                'shBlockedShots', 'shTakeaways', 'shMissedShots']"""
-    X       =   pd.DataFrame()
-    Y       =   np.zeros([0,2])
-    # Loop on seasons and collect data
-    for isea in allS_p:
-        # Get end time stamp
-        sea_name    =   isea.replace('Season_', '')
-        sea_strt    =   sea_name[:4] + '-09-01'
-        sea_end     =   sea_name[-4:] + '-07-01'
-        # Pull stats
-        sea_stats, sea_pos, sea_numeric, sea_normal     =   pull_stats(repoPSt, repoPbP, sea_strt, sea_end)
-        dtCols      =   list( set(sea_numeric).union(sea_normal) )
-        # Pull Selke and Ross nominees for that season
-        with open( path.join(repoPSt.replace('player', 'raw'), sea_name, 'trophy_nominees.p'), 'rb') as f:
-            trophies=   pickle.load(f)
-        # Process Selke
-        df_s        =   trophies['selke']
-        dt_selke    =   sea_stats.loc[df_s.index.values, dtCols]
-        # Process Ross
-        df_r        =   trophies['ross']
-        dt_ross     =   sea_stats.loc[df_r.index.values, dtCols]
-        # Append to dataset
-        X           =   pd.concat( (X, dt_ross, dt_selke), axis=0)
-        tempy1      =   np.concatenate( ( np.reshape(df_r['WEIGHT'].values, [len(df_r),1]), np.zeros([len(df_r),1])), axis=1 )
-        tempy2      =   np.concatenate( (np.zeros([len(df_s), 1]), np.reshape(df_s['WEIGHT'].values, [len(df_s), 1])), axis=1)
-        Y           =   np.vstack( [Y, tempy1] )
-        Y           =   np.vstack([Y, tempy2])
-    return X, Y
+    #X,Y     =   do_prep_data(allS_p)
+    with open('/home/younesz/Documents/Code/Python/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p', 'rb') as f:
+        DT  =   pickle.load(f)
+        X   =   DT['X']
+        Y   =   DT['Y']
+    # --- PRE-PROCESS DATA
+    annI, annT, _  =   do_process_data(X, Y)
+    # --- BUILD THE NETWORK
+    nNodes  =   [annI.shape[1], 40, annT.shape[1]]
+    CLS     =   ANN_classifier(nNodes)
+    # --- TRAIN THE NETWORK
+    nIter   =   50
+    """
+    netname =   'MODEL_perceptron_1layer_10units_relu/model.ckpt'
+    svname  =   path.join('/home/younesz/Documents/Code/Python/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification', netname)
+    """
+    CLS.ann_train_network(nIter, annI, annT)
+    # --- DISPLAY NETWORK ACCURACY
+    #CLS.ann_display_accuracy()
+    return CLS
+
+
+def do_ANN_classification(upto, nGames, CLS):
+    # --- RETRIEVE DATA
+    DT, _, numC, nrmC   =   pull_stats(repoPSt, repoPbP, upto=upto, nGames=nGames)     #   sea_pos,
+    dtCols      =   list(set(numC).union(nrmC))
+    # --- PRE-PROCESS DATA
+    annI, annT, _  =   do_process_data( DT[dtCols], pd.DataFrame(np.zeros([len(DT), 1])) )
+    # --- RELOAD THE NETWORK IMAGE
+    # CLS.ann_reload_network(mirror)
+    # --- CLASSIFY DATA
+    DTfeed      =   {CLS.annX:annI}
+    return DT, CLS.sess.run(CLS.annY, feed_dict=DTfeed)
 
 
 # LAUNCHER:
@@ -223,34 +392,30 @@ repoPbP     =   '/home/younesz/Documents/Databases/Hockey/PlayByPlay'
 repoPSt     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/player'
 repoRaw     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/raw'
 
-# Make classification - ANN
-X, Y    =   do_ANN_classification(repoPSt, repoPbP)
+# Train automatic classifier - ANN
+CLS         =   do_ANN_training(repoPSt, repoPbP)
 
-# --- BUILD ANN
-# Input
-inpSize     =   np.shape(X)[1]
-annLay      =   [10,5]
-# Architecture
-annX        =   tf.placeholder(tf.float32, [None, inpSize, 1], name='Input to the network - player features')
-annY_       =   tf.placeholder(tf.float32, [None, 2], name='Ground truth')
-annW1       =   tf.Variable( tf.truncated_normal([inpSize, annLay[0]], stddev=0.1) )
-annB1       =   tf.Variable( tf.ones([1, annLay[0]])/10 )
-Y1          =   tf.matmul( annW1, X) + annB1
-annW2       =   tf.Variable( tf.truncated_normal([annLay[0], annLay[1]], stddev=0.1) )
-annB2       =   tf.Variable( tf.ones([1, annLay[1]])/10 )
-Y2          =   tf.matmul( annW2, Y1) + annB2
-annW3       =   tf.Variable( tf.truncated_normal([annLay[1], 2], stddev=0.1) )
-annB3       =   tf.Variable( tf.ones([1, annLay[1]])/10 )
-annY        =   tf.matmul( annW3, Y2) + annB3
-# Init variables
-init        =   tf.initialize_all_variables()
-# Optimization
-loss        =   tf.losses.mean_squared_error(annY_, annY)
-optimizer   =   tf.train.AdamOptimizer(0.01)
-# Compute accuracy
-accuracy    =   tf.reduce_mean( annY-annY_ )
+
+# Classify player data
+upto, nG    =   '2012-07-01', 82
+DT, classes =   do_ANN_classification(upto, nG, CLS)
+
 
 """
+plt.figure(); plt.scatter( classes[:,0], classes[:,1] )
+plt.figure();
+idPlayers   =   DT['gamesPlayed']>82
+plt.scatter( classes[DT['gamesPlayed']>82,0], classes[DT['gamesPlayed']>82,1] )
+[plt.text(classes[x,0], classes[x,1], DT.index[x]) for x in np.where(idPlayers)[0]]
+"""
+
+
+
+"""
+Xs, Ys      =   do_prep_data( ut_find_folders(repoPbP, True) )
+#Xs, Ys     =   do_prep_data(['Season_20112012'])
+#Xsp, Ysp, Ind   =   do_process_data(Xs, Ys, nComp=18)
+
 # Make classification - manual
 upto    =   '2013-07-01'
 nGames  =   80
