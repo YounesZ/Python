@@ -124,8 +124,9 @@ def to_player(repoRaw, repoPbP, repoPSt):
 repoRaw     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/raw'
 repoPbP     =   '/home/younesz/Documents/Databases/Hockey/PlayByPlay'
 repoPSt     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/player'
-to_pandas(repoRaw)
+#to_pandas(repoRaw)
 to_player(repoRaw, repoPbP, repoPSt)
+
 
 ss  =   '20082009'
 AA  =   pd.read_csv('/home/younesz/Documents/Databases/Hockey/PlayByPlay/Season_'+ss+'/playbyplay_'+ss+'.csv')

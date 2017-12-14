@@ -1,3 +1,4 @@
+import csv
 import pickle
 import pandas as pd
 import numpy as np
@@ -7,11 +8,16 @@ from os import path
 from sys import stdout
 from copy import deepcopy
 from sklearn import preprocessing
+from itertools import compress
 from sklearn.decomposition import PCA
+from Utils.maths.ut_cumsum_thresh import *
+from Utils.clustering.ut_make_constraints import *
+from Utils.programming.ut_find_folders import *
 from sklearn.model_selection import train_test_split
 from Utils.scraping.convert_raw import get_player_names
-from Utils.programming.ut_find_folders import *
-from Utils.maths.ut_cumsum_thresh import *
+from Utils.scraping.convert_trophies import to_pandas_selke, to_pandas_ross
+from Clustering.copkmeans.cop_kmeans import cop_kmeans
+
 
 
 class ANN_classifier():
@@ -321,7 +327,7 @@ def do_prep_data(season):
     return X_train, Y_train
 
 
-def do_process_data(X, Y, nComp=None):
+def do_process_data(X, Y, pca=None, nComp=None):
     # Data
     annInput    =   deepcopy(X.values)
     annTarget   =   deepcopy(Y.values)
@@ -336,15 +342,16 @@ def do_process_data(X, Y, nComp=None):
     annInput    =   preprocessing.scale(annInput)
     annInput    =   annInput - np.mean(annInput, axis=0)
     # Perform PCA - just look for nb of components
-    pca         =   PCA(svd_solver='full', whiten=True)
-    pca.fit(annInput)
-    if nComp is None:
-        nComp   =   ut_cumsum_thresh(pca.explained_variance_, 0.95)
-    # Perform PCA - transform the data
-    pca         =   PCA(n_components=nComp, svd_solver='full', whiten=True)
-    pca.fit(annInput)
+    if pca is None:
+        pca     =   PCA(svd_solver='full', whiten=True)
+        pca.fit(annInput)
+        if nComp is None:
+            nComp   =   ut_cumsum_thresh(pca.explained_variance_, 0.95)
+        # Perform PCA - transform the data
+        pca         =   PCA(n_components=nComp, svd_solver='full', whiten=True)
+        pca.fit(annInput)
     annInput    =   pca.transform(annInput)
-    return annInput, annTarget, indices
+    return annInput, annTarget, pca
 
 
 def do_ANN_training(repoPSt, repoPbP):
@@ -357,7 +364,7 @@ def do_ANN_training(repoPSt, repoPbP):
         X   =   DT['X']
         Y   =   DT['Y']
     # --- PRE-PROCESS DATA
-    annI, annT, _  =   do_process_data(X, Y)
+    annI, annT, pca  =   do_process_data(X, Y)
     # --- BUILD THE NETWORK
     nNodes  =   [annI.shape[1], 40, annT.shape[1]]
     CLS     =   ANN_classifier(nNodes)
@@ -370,20 +377,20 @@ def do_ANN_training(repoPSt, repoPbP):
     CLS.ann_train_network(nIter, annI, annT)
     # --- DISPLAY NETWORK ACCURACY
     #CLS.ann_display_accuracy()
-    return CLS
+    return CLS, pca
 
 
-def do_ANN_classification(upto, nGames, CLS):
+def do_ANN_classification(upto, nGames, CLS, pca):
     # --- RETRIEVE DATA
-    DT, _, numC, nrmC   =   pull_stats(repoPSt, repoPbP, upto=upto, nGames=nGames)     #   sea_pos,
+    DT, plPos, numC, nrmC   =   pull_stats(repoPSt, repoPbP, upto=upto, nGames=nGames)     #   sea_pos,
     dtCols      =   list(set(numC).union(nrmC))
     # --- PRE-PROCESS DATA
-    annI, annT, _  =   do_process_data( DT[dtCols], pd.DataFrame(np.zeros([len(DT), 1])) )
+    annI, annT, _  =   do_process_data( DT[dtCols], pd.DataFrame(np.zeros([len(DT), 1])), pca )
     # --- RELOAD THE NETWORK IMAGE
     # CLS.ann_reload_network(mirror)
     # --- CLASSIFY DATA
     DTfeed      =   {CLS.annX:annI}
-    return DT, CLS.sess.run(CLS.annY, feed_dict=DTfeed)
+    return DT, plPos, CLS.sess.run(CLS.annY, feed_dict=DTfeed)
 
 
 # LAUNCHER:
@@ -393,20 +400,52 @@ repoPSt     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/player'
 repoRaw     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/raw'
 
 # Train automatic classifier - ANN
-CLS         =   do_ANN_training(repoPSt, repoPbP)
-
+CLS, pca        =   do_ANN_training(repoPSt, repoPbP)
 
 # Classify player data
-upto, nG    =   '2012-07-01', 82
-DT, classes =   do_ANN_classification(upto, nG, CLS)
+upto, nG        =   '2012-07-01', 82
+DT, pPos, pCl   =   do_ANN_classification(upto, nG, CLS, pca)
+pCl             =   pd.DataFrame( pCl, index=DT.index, columns=['OFF', 'DEF'])
+
+# Apply constrained clustering
 
 
-"""
-plt.figure(); plt.scatter( classes[:,0], classes[:,1] )
-plt.figure();
-idPlayers   =   DT['gamesPlayed']>82
-plt.scatter( classes[DT['gamesPlayed']>82,0], classes[DT['gamesPlayed']>82,1] )
-[plt.text(classes[x,0], classes[x,1], DT.index[x]) for x in np.where(idPlayers)[0]]
+
+# Filter players
+isForward       =   [x!='D' for x in pPos.values]
+isRegular       =   [x>40 for x in DT['gamesPlayed']]
+filter          =   [True if x and y else False for x,y in zip(isForward, isRegular)]
+fwd_dt          =   DT[filter]
+fwd_cl          =   pCl[filter]     # This is the clustering matrix
+
+# Make constraints
+selke       =   to_pandas_selke('/home/younesz/Documents/Databases/Hockey/PlayerStats/raw/20112012/trophy_selke_nominees.csv')
+selke_id    =   [fwd_dt.index.tolist().index(x) for x in selke.index]
+ross        =   to_pandas_ross('/home/younesz/Documents/Databases/Hockey/PlayerStats/raw/20112012/trophy_ross_nominees.csv')
+ross_id     =   [fwd_dt.index.tolist().index(x) for x in ross[ross['pos']!='D'].index]
+constraints =   ut_make_constraints(selke_id, ross_id)
+
+constraints =   pd.DataFrame(constraints)
+constraints =   constraints[constraints[0]!=constraints[1]]
+
+# Make clusters
+cls_data    =   list(list(x) for x in fwd_cl.values)
+ml, cl      =   [], []
+[ml.append(tuple(x[:2])) if x[-1]==1 else cl.append(tuple(x[:2])) for x in constraints.values]
+clusters, centers = cop_kmeans(cls_data, 3, ml, cl, max_iter=1000, tol=1e-4)
+
+
+plt.figure()
+plt.scatter( fwd_cl['OFF'], fwd_cl['DEF'], color=[0.6, 0.6, 0.6] )
+#allP    =   [plt.text(fwd_cl.iloc[x]['OFF'], fwd_cl.iloc[x]['DEF'], list(fwd_dt.index)[x]) for x in range(len(fwd_dt))]
+
+# Plot Selke
+plt.scatter( fwd_cl.loc[selke,'OFF'].dropna().values, fwd_cl.loc[selke,'DEF'].dropna().values, color='y' )
+# Plot Ross
+plt.scatter( fwd_cl.loc[ross,'OFF'].dropna().values, fwd_cl.loc[ross,'DEF'].dropna().values, color='b' )
+plt.gca().set_xlabel('likelihood to win offensive trophy')
+plt.gca().set_ylabel('likelihood to win defensive trophy')
+plt.gca().legend(['Not nominated', 'Nominated for the Art Ross (off)', 'Nominated for the Selke (def)'])
 """
 
 
