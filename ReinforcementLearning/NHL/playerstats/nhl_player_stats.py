@@ -362,22 +362,22 @@ def do_process_data(X, Y, pca=None, mu=None, sigma=None):
     return annInput, annTarget, pca, mu, sigma
 
 
-def do_ANN_training(repoPSt, repoPbP):
+def do_ANN_training(repoPSt, repoPbP, repoCode):
     # --- PREP DATASET
     # List non-lockout seasons
     allS_p  =   ut_find_folders(repoPbP, True)
-
     X,Y,mu,sigma   =   do_prep_data(allS_p)
     with open('/home/younesz/Documents/Code/Python/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p', 'wb') as f:
         pickle.dump({'X':X, 'Y':Y, 'mu':mu, 'sigma':sigma}, f)
     """
-    with open('/home/younesz/Documents/Code/Python/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p', 'rb') as f:
+    with open( path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p'), 'rb') as f:
         DT      =   pickle.load(f)
         X       =   DT['X']
         Y       =   DT['Y']
         mu      =   DT['mu']
         sigma   =   DT['sigma']
     """
+
 
 
     # --- PRE-PROCESS DATA
@@ -410,12 +410,12 @@ def do_ANN_classification(upto, nGames, CLS, pca=None, mu=None, sigma=None):
     return DT, plPos, CLS.sess.run(CLS.annY, feed_dict=DTfeed), annI, annT
 
 
-def do_clustering(data, classes, upto):
+def do_clustering(data, classes, upto, root):
     # Make constraints
     years       =   ''.join([str(int(x)) for x in list((int(upto.split('-')[0]) * np.ones([1, 2]) - np.array([1, 0]))[0])])
-    selke       =   to_pandas_selke('/home/younesz/Documents/Databases/Hockey/PlayerStats/raw/' + years + '/trophy_selke_nominees.csv')
+    selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + years + '/trophy_selke_nominees.csv') )
     selke_id    =   [data.index.tolist().index(x) for x in selke[selke['Pos'] != 'D'].index]
-    ross        =   to_pandas_ross('/home/younesz/Documents/Databases/Hockey/PlayerStats/raw/' + years + '/trophy_ross_nominees.csv')
+    ross        =   to_pandas_ross( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + years + '/trophy_ross_nominees.csv') )
     ross_id     =   [data.index.tolist().index(x) for x in ross[ross['pos'] != 'D'].index]
 
     # --- Clean constraints
@@ -462,21 +462,20 @@ def display_clustering(classification, clusters, ross_id, selke_id):
 
 # LAUNCHER:
 # =========
-repoPbP     =   '/home/younesz/Documents/Databases/Hockey/PlayByPlay'
-repoPSt     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/player'
-repoRaw     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/raw'
-
-
-
-
+#root        =   '/home/younesz/Documents'
+root        =   '/Users/younes_zerouali/Documents/Stradigi'
+repoPbP     =   path.join(root, 'Databases/Hockey/PlayByPlay')
+repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
+repoRaw     =   path.join(root, 'Databases/Hockey/PlayerStats/raw')
+repoCode    =   path.join(root, 'Python')
 
 # Train automatic classifier - ANN
-CLS, pca, mu, sigma     =   do_ANN_training(repoPSt, repoPbP)
+CLS, pca, mu, sigma =   do_ANN_training(repoPSt, repoPbP, repoCode)
 
 # --- Classify player data
-upto, nG        =   '2010-07-01', 80
+upto, nG    =   '2010-07-01', 80
 DT, pPos, pCl, annI, annT   =   do_ANN_classification(upto, nG, CLS, pca=pca, mu=mu, sigma=sigma)
-pCl             =   pd.DataFrame( pCl, index=DT.index, columns=['OFF', 'DEF'])
+pCl         =   pd.DataFrame( pCl, index=DT.index, columns=['OFF', 'DEF'])
 # Filter players - keep forwards only
 isForward   =   [x != 'D' for x in pPos.values]
 isRegular   =   [x > int(nG*.75) for x in DT['gamesPlayed']]
@@ -484,7 +483,7 @@ filter      =   [True if x and y else False for x, y in zip(isForward, isRegular
 fwd_dt      =   DT[filter]
 fwd_cl      =   pCl[filter]  # This is the clustering matrix
 # Apply constrained clustering
-clusters, centers, selke_id, ross_id    =   do_clustering(fwd_dt, fwd_cl, upto)
+clusters, centers, selke_id, ross_id    =   do_clustering(fwd_dt, fwd_cl, upto, root)
 display_clustering(fwd_cl, clusters, ross_id, selke_id)
 
 

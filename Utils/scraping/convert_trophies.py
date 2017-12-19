@@ -69,8 +69,11 @@ def to_pandas(repoRaw):
             pickle.dump({'ross':df_r, 'selke':df_s}, f)
 
 
+
+"""
 # LAUNCHER
 # ========
 # Paths
 repoRaw =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/raw'
 to_pandas(repoRaw)
+"""
