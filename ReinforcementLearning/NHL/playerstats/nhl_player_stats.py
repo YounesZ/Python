@@ -147,10 +147,11 @@ def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', nGames=82
     #tobeavg     =   ['goals', 'penaltyMinutes','gameWinningGoals', 'faceoffWinPctg', 'ppGoals', 'ppPoints', 'assists', 'shGoals', 'shootingPctg', 'shots', 'shPoints', 'points', 'plusMinus', 'otGoals', 'timeOnIcePerGame', 'shiftsPerGame', 'gamesPlayed', 'missedShotsPerGame', 'goalsPerGame', 'faceoffsLost', 'blockedShots', 'shotsPerGame', 'missedShots', 'hitsPerGame', 'hits', 'takeaways', 'blockedShotsPerGame', 'giveaways', 'faceoffsWon', 'faceoffs', 'shFaceoffsLost', 'shBlockedShots', 'shGiveaways', 'shMissedShots', 'shTakeaways', 'shFaceoffsWon', 'shShots', 'shAssists', 'shHits', 'shTimeOnIce']
     #nottobenorm =   list( set(list(tobeavg)).difference(tobenorm) )
     # Loop on players and pull stats
+    with open(path.join(repoPSt, 'all_players.p'), 'rb') as f:
+        all_pl  =   pickle.load(f)
     for pl in plNames:
         # Load stats file
-        with open( path.join(repoPSt, pl.replace(' ', '_')+'.p'), 'rb' ) as f:
-            plStat      =   pickle.load(f)
+        plStat          =   all_pl[pl]
         # Sort table by date
         plStat['date']  =   [x.split('T')[0] for x in list(plStat['gameDate'])]
         plStat          =   plStat.sort_values(by='date', ascending=False)
@@ -365,13 +366,22 @@ def do_ANN_training(repoPSt, repoPbP):
     # --- PREP DATASET
     # List non-lockout seasons
     allS_p  =   ut_find_folders(repoPbP, True)
+
     X,Y,mu,sigma   =   do_prep_data(allS_p)
+    with open('/home/younesz/Documents/Code/Python/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p', 'wb') as f:
+        pickle.dump({'X':X, 'Y':Y, 'mu':mu, 'sigma':sigma}, f)
+    """
     with open('/home/younesz/Documents/Code/Python/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p', 'rb') as f:
         DT      =   pickle.load(f)
         X       =   DT['X']
         Y       =   DT['Y']
+        mu      =   DT['mu']
+        sigma   =   DT['sigma']
+    """
+
+
     # --- PRE-PROCESS DATA
-    annI, annT, pca, mu, sigma  =   do_process_data(X, Y)
+    annI, annT, pca, mu, sigma  =   do_process_data(X, Y, mu=mu, sigma=sigma)
     # --- BUILD THE NETWORK
     nNodes  =   [annI.shape[1], 40, annT.shape[1]]
     CLS     =   ANN_classifier(nNodes)
@@ -418,6 +428,7 @@ def do_clustering(data, classes, upto):
     seed        =   classes.min(axis=0)
     distance    =   np.sqrt( ((classes - seed)**2).sum(axis=1) ).sort_values()
     poor_id     =   [classes.index.get_loc(x) for x in distance.index[:30]]
+    poor_id     =   list( set(poor_id).difference(selke_id).difference(ross_id) )
     constraints =   ut_make_constraints(selke_id, ross_id, poor_id)
     constraints =   pd.DataFrame(constraints)
     constraints =   constraints[constraints[0] != constraints[1]]
@@ -457,31 +468,28 @@ repoRaw     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/raw'
 
 
 
-"""
+
+
 # Train automatic classifier - ANN
 CLS, pca, mu, sigma     =   do_ANN_training(repoPSt, repoPbP)
 
 # --- Classify player data
-upto, nG        =   '2014-07-01', 80
+upto, nG        =   '2010-07-01', 80
 DT, pPos, pCl, annI, annT   =   do_ANN_classification(upto, nG, CLS, pca=pca, mu=mu, sigma=sigma)
 pCl             =   pd.DataFrame( pCl, index=DT.index, columns=['OFF', 'DEF'])
 # Filter players - keep forwards only
 isForward   =   [x != 'D' for x in pPos.values]
-isRegular   =   [x > 40 for x in DT['gamesPlayed']]
+isRegular   =   [x > int(nG*.75) for x in DT['gamesPlayed']]
 filter      =   [True if x and y else False for x, y in zip(isForward, isRegular)]
 fwd_dt      =   DT[filter]
 fwd_cl      =   pCl[filter]  # This is the clustering matrix
 # Apply constrained clustering
-clusters, centers, Sid, Rid     =   do_clustering(fwd_dt, fwd_cl, upto)
-# Display classification
-display_clustering(fwd_cl, clusters, Rid, Sid)
+clusters, centers, selke_id, ross_id    =   do_clustering(fwd_dt, fwd_cl, upto)
+display_clustering(fwd_cl, clusters, ross_id, selke_id)
 
 
 
-
-
-
-
+"""
 
 
 
@@ -499,4 +507,16 @@ season  =   '20122013'
 validate_classes(PLclass, PLnames, repoRaw, season)
 
 PQuart_off.index[CLASS==0]
+
+
+
+
+
+plNames     =   get_player_names(repoPbP)
+all_dt      =   {}
+for pl in plNames:
+    with open(path.join(repoPSt, pl.replace(' ', '_')+'.p'), 'rb') as f:
+        all_dt[pl]  =   pickle.load(f)
+with open(path.join(repoPSt, 'all_players.p'), 'wb') as f:
+        pickle.dump(all_dt, f)
 """

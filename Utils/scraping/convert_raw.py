@@ -15,7 +15,7 @@ def get_player_names(repoPbP):
     plNames = [pd.read_csv(path.join(repoPbP, x, x.replace('Season', 'roster') + '.csv')) for x in allS_p]
     plNames = [x['firstlast'] for x in plNames]
     plNames = pd.concat(plNames)
-    plNames.drop_duplicates(inplace=True)
+    plNames.drop_duplicates(inplace=True, keep='first')
     # Are strings?
     areS = [type(x) is str for x in plNames]
     plNames = plNames[areS]
@@ -124,7 +124,7 @@ def to_player(repoRaw, repoPbP, repoPSt):
 repoRaw     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/raw'
 repoPbP     =   '/home/younesz/Documents/Databases/Hockey/PlayByPlay'
 repoPSt     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/player'
-#to_pandas(repoRaw)
+to_pandas(repoRaw)
 to_player(repoRaw, repoPbP, repoPSt)
 
 
