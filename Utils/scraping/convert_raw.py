@@ -59,6 +59,22 @@ def to_pandas(repoRaw):
         hitDF   =   hitDF.sort_values(by=['gameId', 'teamAbbrev', 'playerName'], ascending=True)
         hitDF   =   hitDF.set_index(np.arange(len(hitDF)))
 
+        # --- Process powerplays - get header
+        ppF     =   path.join(repoRaw, isea, 'powerplay.csv')
+        # Read the file
+        ppR     =   open(ppF, 'r')
+        ppR     =   eval(ppR.readline().replace('null', 'None'))
+        # Process the file
+        pEntries=   ppR['total']
+        ppRdt   =   ppR['data']
+        ppKeys  =   ppRdt[0].keys()
+        # Turn into a pandas dataframe
+        ppdt    =   [list(x.values()) for x in ppRdt]
+        ppDF    =   pd.DataFrame(np.array(ppdt), columns=ppKeys)
+        # Sort by teamAbbrev, playerName, gameId
+        pplDF   =   ppDF.sort_values(by=['gameId', 'teamAbbrev', 'playerName'], ascending=True)
+        ppDF    =   ppDF.set_index(np.arange(len(ppDF)))
+
         # --- Process penalty kills - get header
         kilF    =   path.join(repoRaw, isea, 'penalty_kills.csv')
         # Read the file
@@ -76,7 +92,7 @@ def to_pandas(repoRaw):
         kilDF   =   kilDF.set_index(np.arange(len(kilDF)))
 
         # --- Join the two tables into a pandas series
-        DF      =   pd.concat( (sumDF, hitDF, kilDF), axis=1)
+        DF      =   pd.concat( (sumDF, hitDF, ppDF, kilDF), axis=1)
         # Drop duplicates
         DF      =   DF.loc[:, ~DF.columns.duplicated()]
         # Pickle the result
@@ -118,12 +134,13 @@ def to_player(repoRaw, repoPbP, repoPSt):
         stdout.flush()
 
 
-"""
+
 # LAUNCHER
 # ========
 repoRaw     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/raw'
 repoPbP     =   '/home/younesz/Documents/Databases/Hockey/PlayByPlay'
 repoPSt     =   '/home/younesz/Documents/Databases/Hockey/PlayerStats/player'
+"""
 to_pandas(repoRaw)
 to_player(repoRaw, repoPbP, repoPSt)
 
