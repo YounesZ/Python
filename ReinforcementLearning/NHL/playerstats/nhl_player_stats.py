@@ -14,6 +14,7 @@ from Utils.maths.ut_cumsum_thresh import *
 from Utils.clustering.ut_make_constraints import *
 from Utils.programming.ut_find_folders import *
 from sklearn.model_selection import train_test_split
+from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
 from Utils.scraping.convert_raw import get_player_names
 from Utils.scraping.convert_trophies import to_pandas_selke, to_pandas_ross
 from Clustering.copkmeans.cop_kmeans import cop_kmeans
@@ -297,7 +298,7 @@ def do_manual_classification(repoPSt, repoPbP, upto, nGames):
     return PLclass, PQuart_off.index
 
 
-def do_prep_data(season):
+def get_training_data(season):
     X_train     =   pd.DataFrame()
     Y_train     =   pd.DataFrame()
     X_all       =   pd.DataFrame()
@@ -327,13 +328,42 @@ def do_prep_data(season):
         X_train =   pd.concat((X_train, tempX), axis=0)
         Y_train =   pd.concat([Y_train, tempY], axis=0)
         X_all   =   pd.concat([X_all, sea_stats[dtCols]])
-    # Compute mean, standard dev
-    mu      =   X_all.mean(axis=0)
-    sigma   =   X_all.std(axis=0)
-    return X_train, Y_train, mu, sigma
+    return X_train, Y_train, X_all
 
 
-def do_process_data(X, Y, pca=None, mu=None, sigma=None):
+def do_normalize_data(data, mu=None, sigma=None, normalizer=None):
+    # Custom normalization
+    wtd     =   ['max', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'max*2+1', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'minmax', 'minmax', 'minmax', 'max', 'max', 'max', 'max', 'minmax', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'minmax']
+    donorm  =   False
+    # Remove NaNs
+    data    =   data.values
+    if normalizer is None:
+        normalizer  =   [[]] * len(wtd)
+        donorm      =   True
+    for ii in range( data.shape[1] ):
+        todo    =   wtd[ii]
+        vec     =   data[:, ii]
+        if todo=='max':
+            if donorm: normalizer[ii] = np.max(vec)
+            data[:,ii]  =   vec / normalizer[ii]
+        elif todo=='minmax':
+            if donorm: normalizer[ii] = [np.min(vec), np.max(vec)]
+            data[:,ii]  =   (vec - normalizer[ii][0])/(normalizer[ii][1] - normalizer[ii][0])
+        elif todo=='max*2+1':
+            if donorm: normalizer[ii] = np.max(np.abs(vec))
+            data[:,ii]  =   vec / 2 / normalizer[ii] + 0.5
+    """            
+    # Center the data
+    if mu is None:
+        mu      =   np.mean(data, axis=0)
+    if sigma is None:
+        sigma   =   np.std(data, axis=0)
+    data        =   (data - np.tile(mu, [len(data), 1])) / np.tile(sigma, [len(data), 1])
+    """
+    return data, normalizer
+
+
+def do_reduce_data(X, Y, pca=None, mu=None, sigma=None):
     # Data
     annInput    =   deepcopy(X.values)
     annTarget   =   deepcopy(Y.values)
@@ -363,27 +393,28 @@ def do_process_data(X, Y, pca=None, mu=None, sigma=None):
 
 
 def do_ANN_training(repoPSt, repoPbP, repoCode):
-    # --- PREP DATASET
+    # --- GET TRAINING DATASET
+    """
     # List non-lockout seasons
-    allS_p  =   ut_find_folders(repoPbP, True)
-    X,Y,mu,sigma   =   do_prep_data(allS_p)
-    with open('/home/younesz/Documents/Code/Python/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p', 'wb') as f:
-        pickle.dump({'X':X, 'Y':Y, 'mu':mu, 'sigma':sigma}, f)
+    allS_p          =   ut_find_folders(repoPbP, True)
+    # Get data
+    X,Y, X_all      =   get_training_data(allS_p)
+    colNm           =   X.columns
+    with open( path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p'), 'wb') as f:
+        pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'colNm':X.columns}, f)
     """
     with open( path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p'), 'rb') as f:
         DT      =   pickle.load(f)
-        X       =   DT['X']
+        colNm   =   DT['colNm']
+        X       =   DT['X'][colNm]
         Y       =   DT['Y']
-        mu      =   DT['mu']
-        sigma   =   DT['sigma']
-    """
-
-
-
+        X_all   =   DT['X_all']
     # --- PRE-PROCESS DATA
-    annI, annT, pca, mu, sigma  =   do_process_data(X, Y, mu=mu, sigma=sigma)
+    Y, X, X_all =   ut_sanitize_matrix(Y, X), ut_sanitize_matrix(X), ut_sanitize_matrix(X_all)
+    X_all_S, Nrm=   do_normalize_data(X_all)
+    X_S, _      =   do_normalize_data(X, normalizer=Nrm)
     # --- BUILD THE NETWORK
-    nNodes  =   [annI.shape[1], 40, annT.shape[1]]
+    nNodes  =   [X_S.shape[1], 40, Y.shape[1]]
     CLS     =   ANN_classifier(nNodes)
     # --- TRAIN THE NETWORK
     nIter   =   50
@@ -391,23 +422,24 @@ def do_ANN_training(repoPSt, repoPbP, repoCode):
     netname =   'MODEL_perceptron_1layer_10units_relu/model.ckpt'
     svname  =   path.join('/home/younesz/Documents/Code/Python/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification', netname)
     """
-    CLS.ann_train_network(nIter, annI, annT)
+    CLS.ann_train_network(nIter, X_S, Y.values)
     # --- DISPLAY NETWORK ACCURACY
     #CLS.ann_display_accuracy()
-    return CLS, pca, mu, sigma
+    return CLS, Nrm, colNm
 
 
-def do_ANN_classification(upto, nGames, CLS, pca=None, mu=None, sigma=None):
+def do_ANN_classification(upto, nGames, dtCols, normalizer, CLS):
     # --- RETRIEVE DATA
     DT, plPos, numC, nrmC   =   pull_stats(repoPSt, repoPbP, upto=upto, nGames=nGames)     #   sea_pos,
-    dtCols      =   list(set(numC).union(nrmC))
     # --- PRE-PROCESS DATA
-    annI, annT, _, _, _     =   do_process_data( DT[dtCols], pd.DataFrame(np.zeros([len(DT), 1])), pca=pca, mu=mu, sigma=sigma )
+    plPos, DT   =   ut_sanitize_matrix(plPos, DT[dtCols]), ut_sanitize_matrix(DT[dtCols])
+    DT_n, _     =   do_normalize_data(DT[dtCols], normalizer=normalizer)
+    #annI, annT, _, _, _     =   do_process_data( DT[dtCols], pd.DataFrame(np.zeros([len(DT), 1])), pca=pca, mu=mu, sigma=sigma )
     # --- RELOAD THE NETWORK IMAGE
     # CLS.ann_reload_network(mirror)
     # --- CLASSIFY DATA
-    DTfeed      =   {CLS.annX:annI}
-    return DT, plPos, CLS.sess.run(CLS.annY, feed_dict=DTfeed), annI, annT
+    DTfeed      =   {CLS.annX:DT_n}
+    return DT, pd.DataFrame(DT_n, index=DT.index, columns=dtCols), plPos, CLS.sess.run(CLS.annY, feed_dict=DTfeed)
 
 
 def do_clustering(data, classes, upto, root):
@@ -417,6 +449,51 @@ def do_clustering(data, classes, upto, root):
     selke_id    =   [data.index.tolist().index(x) for x in selke[selke['Pos'] != 'D'].index]
     ross        =   to_pandas_ross( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + years + '/trophy_ross_nominees.csv') )
     ross_id     =   [data.index.tolist().index(x) for x in ross[ross['pos'] != 'D'].index]
+
+    # --- Clean constraints
+    # Remove duplicates
+    torem       =   list( set(ross_id).intersection(selke_id) )
+    maxV        =   np.argmax(classes.iloc[torem].values, axis=1).astype(bool)
+    selke_id    =   list( set(selke_id).difference(list( compress(torem, maxV) )) )
+    ross_id     =   list( set(ross_id).difference(list( compress(torem, maxV!=True) )) )
+    # Get poorest ranked players
+    seed        =   classes.min(axis=0)
+    distance    =   np.sqrt( ((classes - seed)**2).sum(axis=1) ).sort_values()
+    poor_id     =   [classes.index.get_loc(x) for x in distance.index[:30]]
+    poor_id     =   list( set(poor_id).difference(selke_id).difference(ross_id) )
+    constraints =   ut_make_constraints(selke_id, ross_id, poor_id)
+    constraints =   pd.DataFrame(constraints)
+    constraints =   constraints[constraints[0] != constraints[1]]
+
+    # Make clusters
+    cls_data    =   list(list(x) for x in classes.values)
+    ml, cl      =   [], []
+    [ml.append(tuple(x[:2])) if x[-1] == 1 else cl.append(tuple(x[:2])) for x in constraints.values]
+    clusters, centers = cop_kmeans(cls_data, 3, ml, cl, max_iter=1000, tol=1e-4)
+    return clusters, centers, selke_id, ross_id
+
+
+def get_data_for_clustering(upto, nGames, dtCols, normalizer, CLS):
+    DT, DT_n, pPos, pCl   =   do_ANN_classification(upto, nGames, dtCols, normalizer, CLS)
+    pCl         =   pd.DataFrame(pCl, index=DT.index, columns=['OFF', 'DEF'])
+    # Filter players - keep forwards only
+    isForward   =   [x != 'D' for x in pPos.values]
+    isRegular   =   [x > int(nGames * .75) for x in DT['gamesPlayed']]
+    filter      =   [True if x and y else False for x, y in zip(isForward, isRegular)]
+    fwd_dt      =   DT[filter]
+    fwd_cl      =   pCl[filter]  # This is the clustering matrix
+    return fwd_dt, fwd_cl
+
+
+def do_clustering_multiyear(data, classes, root):
+    # Make constraints
+    allS_p      =   ut_find_folders(repoPbP, True)
+    years       =   [[x.split('_')[1][:4], x.split('_')[1][4:]] for x in allS_p]
+    for iy in years:
+        selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + ''.join(iy) + '/trophy_selke_nominees.csv') )
+        selke_id    =   [data.index.tolist().index(x) for x in selke[selke['Pos'] != 'D'].index]
+        ross        =   to_pandas_ross( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + years + '/trophy_ross_nominees.csv') )
+        ross_id     =   [data.index.tolist().index(x) for x in ross[ross['pos'] != 'D'].index]
 
     # --- Clean constraints
     # Remove duplicates
@@ -469,26 +546,21 @@ repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
 repoRaw     =   path.join(root, 'Databases/Hockey/PlayerStats/raw')
 repoCode    =   path.join(root, 'Python')
 
-# Train automatic classifier - ANN
-CLS, pca, mu, sigma =   do_ANN_training(repoPSt, repoPbP, repoCode)
-
-# --- Classify player data
-upto, nG    =   '2010-07-01', 80
-DT, pPos, pCl, annI, annT   =   do_ANN_classification(upto, nG, CLS, pca=pca, mu=mu, sigma=sigma)
-pCl         =   pd.DataFrame( pCl, index=DT.index, columns=['OFF', 'DEF'])
-# Filter players - keep forwards only
-isForward   =   [x != 'D' for x in pPos.values]
-isRegular   =   [x > int(nG*.75) for x in DT['gamesPlayed']]
-filter      =   [True if x and y else False for x, y in zip(isForward, isRegular)]
-fwd_dt      =   DT[filter]
-fwd_cl      =   pCl[filter]  # This is the clustering matrix
-# Apply constrained clustering
-clusters, centers, selke_id, ross_id    =   do_clustering(fwd_dt, fwd_cl, upto, root)
-display_clustering(fwd_cl, clusters, ross_id, selke_id)
-
-
 
 """
+# Train automatic classifier - ANN
+CLS, normalizer, dtCols     =   do_ANN_training(repoPSt, repoPbP, repoCode)     # Nrm is the normalizing terms for the raw player features
+
+# --- Classify player data
+upto, nGames            =   '2010-07-01', 80
+pl_data, pl_classes     =   get_data_for_clustering(upto, nGames, dtCols, normalizer, CLS)
+# Apply constrained clustering
+clusters, centers, selke_id, ross_id    =   do_clustering(pl_data, pl_classes, upto, root)
+display_clustering(pl_classes, clusters, ross_id, selke_id)
+
+
+
+
 
 
 
