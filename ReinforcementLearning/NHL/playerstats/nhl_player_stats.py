@@ -14,6 +14,7 @@ from Utils.maths.ut_cumsum_thresh import *
 from Utils.clustering.ut_make_constraints import *
 from Utils.programming.ut_find_folders import *
 from sklearn.model_selection import train_test_split
+from Utils.programming.ut_difference import *
 from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
 from Utils.scraping.convert_raw import get_player_names
 from Utils.scraping.convert_trophies import to_pandas_selke, to_pandas_ross
@@ -130,10 +131,7 @@ class ANN_classifier():
 
 
 def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', nGames=82):
-    # Initiate empty container
-    allStat     =   pd.DataFrame()
-    allPos      =   []
-    allGP       =   []
+
     # Get player names
     plNames     =   get_player_names(repoPbP)
     count       =   0
@@ -150,6 +148,11 @@ def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', nGames=82
     tobenorm_pp =   ['ppPoints', 'ppGoals', 'ppShots', 'ppGiveaways', 'ppTakeaways', 'ppHits', 'ppFaceoffsWon', 'ppMissedShots', 'ppFaceoffsLost', 'ppTimeOnIce', 'ppAssists']
     tobenorm_pk =   ['shGoals', 'shPoints', 'shMissedShots', 'shHits', 'shFaceoffsWon', 'shShots', 'shGiveaways', 'shFaceoffsLost', 'shBlockedShots', 'shTakeaways', 'shAssists']
     columns     =   tobeavg + tobenorm_rs + tobenorm_pp + tobenorm_pk
+
+    # Initiate empty container
+    allStat     =   pd.DataFrame( columns = columns )
+    allPos      =   []
+    allGP       =   []
     #tobeavg     =   ['goals', 'penaltyMinutes','gameWinningGoals', 'faceoffWinPctg', 'ppGoals', 'ppPoints', 'assists', 'shGoals', 'shootingPctg', 'shots', 'shPoints', 'points', 'plusMinus', 'otGoals', 'timeOnIcePerGame', 'shiftsPerGame', 'gamesPlayed', 'missedShotsPerGame', 'goalsPerGame', 'faceoffsLost', 'blockedShots', 'shotsPerGame', 'missedShots', 'hitsPerGame', 'hits', 'takeaways', 'blockedShotsPerGame', 'giveaways', 'faceoffsWon', 'faceoffs', 'shFaceoffsLost', 'shBlockedShots', 'shGiveaways', 'shMissedShots', 'shTakeaways', 'shFaceoffsWon', 'shShots', 'shAssists', 'shHits']
     #nottobenorm =   list( set(list(tobeavg)).difference(tobenorm) )
     # Loop on players and pull stats
@@ -172,19 +175,19 @@ def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', nGames=82
             # Select columns of interest
             plStat          =   plStat.loc[0:nGames, :]
             timeplayed_rs   =   deepcopy( plStat.loc[0:nGames, 'timeOnIcePerGame'] )
-            timeplayed_pp   =   deepcopy(plStat.loc[0:nGames, 'ppTimeOnIce'])
-            timeplayed_pk   =   deepcopy(plStat.loc[0:nGames, 'shTimeOnIce'])
+            #timeplayed_pp   =   deepcopy(plStat.loc[0:nGames, 'ppTimeOnIce'])
+            #timeplayed_pk   =   deepcopy(plStat.loc[0:nGames, 'shTimeOnIce'])
             # Remove games where the TOI was 0
             plStat          =   plStat[timeplayed_rs>0]
-            timeplayed_pp   =   timeplayed_pp[timeplayed_rs>0]
-            timeplayed_pk   =   timeplayed_pk[timeplayed_rs>0]
-            timeplayed_rs   =   timeplayed_rs[timeplayed_rs>0]
+            #timeplayed_pp   =   timeplayed_pp[timeplayed_rs>0]
+            #timeplayed_pk   =   timeplayed_pk[timeplayed_rs>0]
+            #timeplayed_rs   =   timeplayed_rs[timeplayed_rs>0]
             if len(plStat)>0:
                 # Init new dataframe
                 plStat      =   plStat.reset_index()
+                """
                 newDF       =   pd.DataFrame( np.zeros([1, len(columns)]), columns=columns)
                 # Normalize regular stats by time played
-                """
                 for iC in tobenorm_rs:
                     newDF[iC]   =   ( plStat[iC].div(timeplayed_rs) * 3600 ).mean(axis=0)                    
                 # Normalize powerplay stats by time played
@@ -195,26 +198,31 @@ def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', nGames=82
                 for iC in tobenorm_pk:
                     newDF[iC]   =   ( plStat[iC][(timeplayed_pk > 0).values].div(timeplayed_pk[timeplayed_pk>0]) * 3600 ).sum()/len(plStat)                    
                     if newDF[iC].isnull().any(): newDF[iC]    =   0
-                """
                 # Normalize by number of games played
                 for iC in columns:
                     newDF[iC] = plStat[iC].sum(axis=0) / len(plStat)
                 # Average columns
                 newDF[tobeavg]  =   plStat[tobeavg].mean(axis=0).values
-                newDF['player'] =   pl
-                newDF['position']=  plStat.loc[0,'playerPositionCode']
-                newDF['gmPl']   =   np.sum(plStat['gamesPlayed'])
+                """
+                tbavg       =   plStat[tobeavg].sum(axis=0).values / len(plStat)
+                tbnrm_rs    =   plStat[tobenorm_rs].sum(axis=0).values / len(plStat)
+                tbnrm_pp    =   plStat[tobenorm_pp].sum(axis=0).values / len(plStat)
+                tbnrm_pk    =   plStat[tobenorm_pk].sum(axis=0).values / len(plStat)
+                allV        =   np.concatenate( (tbavg, tbnrm_rs, tbnrm_pp, tbnrm_pk) )
+                newDF       =   pd.DataFrame( np.reshape(allV, [1, len(columns)]), columns=columns)
+                newDF['player']     =   pl
+                newDF['position']   =  plStat.loc[0,'playerPositionCode']
+                newDF['gmPl']       =   np.sum(plStat['gamesPlayed'])
                 # Add to DB
-                allStat         =   pd.concat( (allStat, newDF), axis=0, ignore_index=True )
+                allStat =   pd.concat( (allStat, newDF), axis=0, ignore_index=True )
 
         count+=1
-        if count % 100 == 0:
+        if count % 500 == 0:
             stdout.write('\r')
             # the exact output you're looking for:
             stdout.write("Player %i/%i - %s: [%-40s] %d%%, completed" % (count, len(plNames), pl, '=' * int(count / len(plNames) * 40), 100 * count / len(plNames)))
             stdout.flush()
     allStat     =   allStat.set_index('player')
-    allPos      =   pd.DataFrame(allPos, columns=['playerPositionCode'])
     return allStat, columns
 
 
@@ -381,11 +389,8 @@ def do_normalize_data(data, mu=None, sigma=None, normalizer=None):
     return data, normalizer
 
 
-def do_reduce_data(X, Y, pca=None, mu=None, sigma=None):
-    # Data
-    annInput    =   deepcopy(X.values)
-    annTarget   =   deepcopy(Y.values)
-    indices     =   X.index
+def do_reduce_data(X, pca=None, mu=None, sigma=None, nComp=None):
+    """
     # Remove NAN - by the way this should be fixed upfront
     x, y        =   np.where(X.isnull())
     x           =   np.unique(x)
@@ -398,22 +403,25 @@ def do_reduce_data(X, Y, pca=None, mu=None, sigma=None):
     if sigma is None:
         sigma   =   np.std( annInput.astype(float), axis=0 )
     annInput    =   ( annInput - np.tile(mu, [len(annInput),1]) ) / np.tile(sigma, [len(annInput),1])
+    """
     # Perform PCA - just look for nb of components
     if pca is None:
-        pca     =   PCA(svd_solver='full', whiten=True)
-        pca.fit(annInput)
-        nComp   =   ut_cumsum_thresh(pca.explained_variance_, 0.95)
+        if nComp is None:
+            pca     =   PCA(svd_solver='full', whiten=True)
+            pca.fit(X)
+            nComp   =   ut_cumsum_thresh(pca.explained_variance_, 0.95)
         # Perform PCA - transform the data
         pca     =   PCA(n_components=nComp, svd_solver='full', whiten=True)
-        pca.fit(annInput)
-    annInput    =   pca.transform(annInput)
-    return annInput, annTarget, pca, mu, sigma
+        pca.fit(X)
+    annInput    =   pca.transform(X)
+    return annInput, pca
 
 
 def do_ANN_training(repoPSt, repoPbP, repoCode):
     # --- GET TRAINING DATASET
     # List non-lockout seasons
     allS_p          =   ut_find_folders(repoPbP, True)
+    """
     # Get data
     X,Y, X_all,POS_all,colNm=   get_training_data(allS_p)
     with open( path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p'), 'wb') as f:
@@ -426,115 +434,149 @@ def do_ANN_training(repoPSt, repoPbP, repoCode):
         Y       =   DT['Y']
         X_all   =   DT['X_all']
         POS_all =   DT['POS_all']
-    """
+
+
     # --- PRE-PROCESS DATA
     Y, X, POS_all, X_all =   ut_sanitize_matrix(Y, X), ut_sanitize_matrix(X), ut_sanitize_matrix(POS_all, X_all), ut_sanitize_matrix(X_all)
     X_all_S, Nrm=   do_normalize_data(X_all[(POS_all!='D').values])
     X_S, _      =   do_normalize_data(X, normalizer=Nrm)
+    _, pca      =   do_reduce_data(X_all_S, nComp=18)
+    X_S_P, _    =   do_reduce_data(X_S, pca=pca, nComp=18)
     # --- BUILD THE NETWORK
-    nNodes  =   [X_S.shape[1], 40, Y.shape[1]]
+    nNodes  =   [X_S_P.shape[1], 15, Y.shape[1]]
     CLS     =   ANN_classifier(nNodes)
     # --- TRAIN THE NETWORK
     nIter   =   50
-    CLS.ann_train_network(nIter, X_S, Y.values)
+    CLS.ann_train_network(nIter, X_S_P, Y.values)
     # --- DISPLAY NETWORK ACCURACY
     #CLS.ann_display_accuracy()
-    return CLS, Nrm, colNm
+    return CLS, Nrm, pca, colNm
 
 
-def do_ANN_classification(dtCols, normalizer, CLS, upto='2016-07-01', asof='2015-09-01', nGames=80):
+def do_ANN_classification(dtCols, normalizer, CLS, pca, upto='2016-07-01', asof='2015-09-01', nGames=80):
     # --- RETRIEVE DATA
     DT, _       =   pull_stats(repoPSt, repoPbP, upto=upto, asof=asof, nGames=nGames)     #   sea_pos,
     # --- PRE-PROCESS DATA
     DT[dtCols]  =   ut_sanitize_matrix(DT[dtCols])
     DT_n, _     =   do_normalize_data(DT[dtCols], normalizer=normalizer)
+    DT_n_p, _   =   do_reduce_data(DT_n, pca=pca)
     #annI, annT, _, _, _     =   do_process_data( DT[dtCols], pd.DataFrame(np.zeros([len(DT), 1])), pca=pca, mu=mu, sigma=sigma )
     # --- RELOAD THE NETWORK IMAGE
     # CLS.ann_reload_network(mirror)
     # --- CLASSIFY DATA
-    DTfeed      =   {CLS.annX:DT_n}
-    return DT, pd.DataFrame(DT_n, index=DT.index, columns=dtCols), CLS.sess.run(CLS.annY, feed_dict=DTfeed)
+    DTfeed      =   {CLS.annX:DT_n_p}
+    return DT, pd.DataFrame(DT_n_p, index=DT.index), CLS.sess.run(CLS.annY, feed_dict=DTfeed)
 
 
 def do_clustering(data, classes, upto, root):
+
     # Make constraints
     years       =   ''.join([str(int(x)) for x in list((int(upto.split('-')[0]) * np.ones([1, 2]) - np.array([1, 0]))[0])])
     selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + years + '/trophy_selke_nominees.csv') )
-    selke_id    =   [data.index.tolist().index(x) for x in selke[selke['Pos'] != 'D'].index]
+    selke_id    =   [list(data.index).index(x) for x in selke[selke['Pos'] != 'D'].index]
     ross        =   to_pandas_ross( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + years + '/trophy_ross_nominees.csv') )
-    ross_id     =   [data.index.tolist().index(x) for x in ross[ross['pos'] != 'D'].index]
+    ross_id     =   [list(data.index).index(x) for x in ross[ross['pos'] != 'D'].index]
 
     # --- Clean constraints
     # Remove duplicates
-    torem       =   list( set(ross_id).intersection(selke_id) )
+    torem       =   list(set(ross_id).intersection(selke_id))
     maxV        =   np.argmax(classes.iloc[torem].values, axis=1).astype(bool)
-    selke_id    =   list( set(selke_id).difference(list( compress(torem, maxV) )) )
-    ross_id     =   list( set(ross_id).difference(list( compress(torem, maxV!=True) )) )
+    selke_id    =   ut_difference(selke_id, list(compress(torem, maxV)))
+    selke_wgt   =   selke['WEIGHT'].values / np.max(selke['WEIGHT'].values)
+    ross_id     =   ut_difference(ross_id, list(compress(torem, maxV != True)))
+    ross_wgt    =   ross['WEIGHT'].values / np.max(ross['WEIGHT'].values)
+
     # Get poorest ranked players
     seed        =   classes.min(axis=0)
-    distance    =   np.sqrt( ((classes - seed)**2).sum(axis=1) ).sort_values()
+    distance    =   np.sqrt(((classes - seed) ** 2).sum(axis=1)).sort_values()
     poor_id     =   [classes.index.get_loc(x) for x in distance.index[:30]]
-    poor_id     =   list( set(poor_id).difference(selke_id).difference(ross_id) )
-    constraints =   ut_make_constraints(selke_id, ross_id, poor_id)
+    poor_id     =   ut_difference(ut_difference(poor_id, selke_id), ross_id)
+    constraints =   ut_make_constraints((selke_id, selke_wgt), (ross_id, ross_wgt), poor_id)
     constraints =   pd.DataFrame(constraints)
     constraints =   constraints[constraints[0] != constraints[1]]
 
     # Make clusters
     cls_data    =   list(list(x) for x in classes.values)
-    ml, cl      =   [], []
-    [ml.append(tuple(x[:2])) if x[-1] == 1 else cl.append(tuple(x[:2])) for x in constraints.values]
-    clusters, centers = cop_kmeans(cls_data, 3, ml, cl, max_iter=1000, tol=1e-4)
+    ml, cl, dmp =   [], [], []
+    [ml.append(tuple(x[:2].astype('int'))) if x[-1] > 0.25 else dmp.append(tuple(x[:2])) for x in constraints.values]
+    [cl.append(tuple(x[:2].astype('int'))) if x[-1] < -0.25 else dmp.append(tuple(x[:2])) for x in constraints.values]
+    clusters, centers = cop_kmeans(cls_data, 3, ml, cl, max_iter=100000, tol=1e-4)
     return clusters, centers, selke_id, ross_id
 
 
-def get_data_for_clustering(dtCols, normalizer, CLS, upto='2016-07-01', asof='2015-09-01', nGames=80):
-    DT, DT_n, pCl   =   do_ANN_classification(dtCols, normalizer, CLS, upto=upto, asof=asof, nGames=nGames)
+def get_data_for_clustering(dtCols, normalizer, CLS, pca, upto='2016-07-01', asof='2015-09-01', nGames=80):
+    DT, DT_n, pCl   =   do_ANN_classification(dtCols, normalizer, CLS, pca, upto=upto, asof=asof, nGames=nGames)
     pCl         =   pd.DataFrame(pCl, index=DT.index, columns=['OFF', 'DEF'])
     # Filter players - keep forwards only
     isForward   =   [x != 'D' for x in DT['position'].values]
-    isRegular   =   [x > int(nGames * .5) for x in DT['gmPl']]
+    isRegular   =   [x > int(nGames * .05) for x in DT['gmPl']]
     filter      =   [True if x and y else False for x, y in zip(isForward, isRegular)]
     fwd_dt      =   DT[filter]
     fwd_cl      =   pCl[filter]  # This is the clustering matrix
     return fwd_dt, fwd_cl
 
 
-def do_clustering_multiyear(dtCols, normalizer, CLS, root):
+def do_clustering_multiyear(dtCols, normalizer, CLS, pca, root):
     # Make constraints
     allS_p      =   ut_find_folders(repoPbP, True)
     years       =   [[x.split('_')[1][:4], x.split('_')[1][4:]] for x in allS_p]
+    count       =   0
+    allCl       =   pd.DataFrame()
+    allCON      =   pd.DataFrame()
+    allSLK      =   []
+    allROS      =   []
+
+    ###### ECLUDE YEAR 2003-2004 : PROBLEM WITH FREDRIK MODIN'S DATA - NAMED AS FREDDY MODIN IN THE NHL STATS PAGE
+    years.pop( years.index(['2003', '2004']) )
     for iy in years:
         # Get data
-        data, classes   =   get_data_for_clustering(dtCols, normalizer, CLS, upto=iy[1]+'-07-01', asof=iy[0]+'-09-01', nGames=81)
+        data, classes   =   get_data_for_clustering(dtCols, normalizer, CLS, pca, upto=iy[1]+'-07-01', asof=iy[0]+'-09-01', nGames=81)
+        allCl       =   pd.concat( (allCl, classes), axis=0 )
         # Get trophy nominees
         selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + ''.join(iy) + '/trophy_selke_nominees.csv') )
-        selke_id    =   [data.index.tolist().index(x) for x in selke[selke['Pos'] != 'D'].index]
-        ross        =   to_pandas_ross( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + years + '/trophy_ross_nominees.csv') )
-        ross_id     =   [data.index.tolist().index(x) for x in ross[ross['pos'] != 'D'].index]
+        selke_id    =   [list(data.index).index(x) for x in selke[selke['Pos'] != 'D'].index]
+        ross        =   to_pandas_ross( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + ''.join(iy) + '/trophy_ross_nominees.csv') )
+        ross_id     =   [list(data.index).index(x) for x in ross[ross['pos'] != 'D'].index]
         # --- Clean constraints
         # Remove duplicates
         torem       =   list( set(ross_id).intersection(selke_id) )
         maxV        =   np.argmax(classes.iloc[torem].values, axis=1).astype(bool)
-        selke_id    =   list( set(selke_id).difference(list( compress(torem, maxV) )) )
-        ross_id     =   list( set(ross_id).difference(list( compress(torem, maxV!=True) )) )
+        selke_id    =   ut_difference( selke_id, list( compress(torem, maxV) ))
+        selke_wgt   =   selke['WEIGHT'].values/np.max(selke['WEIGHT'].values)
+        ross_id     =   ut_difference( ross_id, list( compress(torem, maxV!=True) ))
+        ross_wgt    =   ross['WEIGHT'].values/np.max(ross['WEIGHT'].values)
         # Get poorest ranked players
         seed        =   classes.min(axis=0)
         distance    =   np.sqrt( ((classes - seed)**2).sum(axis=1) ).sort_values()
         poor_id     =   [classes.index.get_loc(x) for x in distance.index[:30]]
-        poor_id     =   list( set(poor_id).difference(selke_id).difference(ross_id) )
-
-
-
-        constraints =   ut_make_constraints(selke_id, ross_id, poor_id)
+        poor_id     =   ut_difference( ut_difference( poor_id, selke_id ), ross_id )
+        # Make the constraints
+        constraints =   ut_make_constraints( (selke_id, selke_wgt), (ross_id, ross_wgt), poor_id )
         constraints =   pd.DataFrame(constraints)
         constraints =   constraints[constraints[0] != constraints[1]]
+        constraints[[0,1]] +=   count
+        allCON      =   pd.concat( (allCON, constraints), axis=0 )
+        allSLK      =   allSLK + list( np.add(selke_id, count) )
+        allROS      =   allROS + list(np.add(selke_id, count))
+        count       +=  len(classes)
 
     # Make clusters
-    cls_data    =   list(list(x) for x in classes.values)
-    ml, cl      =   [], []
-    [ml.append(tuple(x[:2])) if x[-1] == 1 else cl.append(tuple(x[:2])) for x in constraints.values]
+    cls_data        =   list(list(x) for x in allCl.values)
+
+    # Remove negative values - makes the clustering crash
+    negCL           =   np.array(cls_data)
+    negCL           =   np.where( (negCL < 0).any(axis=1) )[0]
+    # Remove from data
+    [cls_data.pop(x) for x in negCL[::-1]]
+    # Remove from constraints
+    allCON          =   allCON[~allCON[0].isin(negCL)]
+    allCON          =   allCON[~allCON[1].isin(negCL)]
+
+    ml, cl, dmp     =   [], [], []
+    [ml.append(tuple(x[:2].astype('int'))) if x[-1] > 0.85 else dmp.append(tuple(x[:2])) for x in allCON.values]
+    [cl.append(tuple(x[:2].astype('int'))) if x[-1] < -0.85 else dmp.append(tuple(x[:2])) for x in allCON.values]
     clusters, centers = cop_kmeans(cls_data, 3, ml, cl, max_iter=1000, tol=1e-4)
-    return clusters, centers, selke_id, ross_id
+    return pl_classes, clusters, centers, selke_id, ross_id
 
 
 def display_clustering(classification, clusters, ross_id, selke_id):
@@ -566,17 +608,20 @@ repoRaw     =   path.join(root, 'Databases/Hockey/PlayerStats/raw')
 repoCode    =   path.join(root, 'Code/Python')
 
 
+# Train automatic classifier - ANN
+CLS, normalizer, pca, dtCols    =   do_ANN_training(repoPSt, repoPbP, repoCode)     # Nrm is the normalizing terms for the raw player features
+
 
 """
-# Train automatic classifier - ANN
-CLS, normalizer, dtCols     =   do_ANN_training(repoPSt, repoPbP, repoCode)     # Nrm is the normalizing terms for the raw player features
 
 # --- Classify player data : SINGLE TIME SLOT
-upto, asof, nGames      =   '2010-07-01', '2009-09-01', 80
-pl_data, pl_classes     =   get_data_for_clustering(dtCols, normalizer, CLS, upto=upto, asof=asof, nGames=nGames)
+upto, asof, nGames      =   '2014-07-01', '2013-09-01', 80
+pl_data, pl_classes     =   get_data_for_clustering(dtCols, normalizer, CLS, pca, upto=upto, asof=asof, nGames=nGames)
 # Apply constrained clustering
 clusters, centers, selke_id, ross_id    =   do_clustering(pl_data, pl_classes, upto, root)
 display_clustering(pl_classes, clusters, ross_id, selke_id)
+
+
 
 
 # --- Classify player data : MULTIPLE YEARS
