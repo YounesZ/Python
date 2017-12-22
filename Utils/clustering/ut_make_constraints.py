@@ -15,11 +15,11 @@ def ut_make_constraints( cl1, cl2, vec3):
     constraints     =   []
     for ix in range(len(vec1)-1):
         for iy in range(ix+1, len(vec1)):
-            constraints.append([vec1[ix], vec1[iy], 1-vec1w[ix]*vec1w[ix]])
+            constraints.append([vec1[ix], vec1[iy], vec1w[ix]*vec1w[ix]])
     # class2
     for ix in range(len(vec2) - 1):
         for iy in range(ix+1, len(vec2)):
-            constraints.append([vec2[ix], vec2[iy], 1-vec2w[ix]*vec2w[ix]])
+            constraints.append([vec2[ix], vec2[iy], vec2w[ix]*vec2w[ix]])
     # class3
     for ix in range(len(vec3) - 1):
         for iy in range(ix + 1, len(vec3)):

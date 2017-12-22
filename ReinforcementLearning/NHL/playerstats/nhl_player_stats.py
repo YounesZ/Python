@@ -498,9 +498,11 @@ def do_clustering(data, classes, upto, root):
     # Make clusters
     cls_data    =   list(list(x) for x in classes.values)
     ml, cl, dmp =   [], [], []
-    [ml.append(tuple(x[:2].astype('int'))) if x[-1] > 0.25 else dmp.append(tuple(x[:2])) for x in constraints.values]
-    [cl.append(tuple(x[:2].astype('int'))) if x[-1] < -0.25 else dmp.append(tuple(x[:2])) for x in constraints.values]
-    clusters, centers = cop_kmeans(cls_data, 3, ml, cl, max_iter=100000, tol=1e-4)
+    [ml.append(tuple(constraints.iloc[x][:2].astype('int'))) if constraints.iloc[x][2] > 0.95 else dmp.append(tuple(constraints.iloc[x][:2])) for x in constraints.index]
+
+    [cl.append(tuple(constraints.iloc[x][:2].astype('int'))) if x[-1] < -0.95 else dmp.append(tuple(constraints.iloc[x][:2])) for x in constraints.index]
+    clusters, centers = cop_kmeans(cls_data, 3, ml, cl, max_iter=3000000, tol=1e+5, initialization='hockey')
+    #display_clustering(classes, clusters, ross_id, selke_id)
     return clusters, centers, selke_id, ross_id
 
 
@@ -531,7 +533,6 @@ def do_clustering_multiyear(dtCols, normalizer, CLS, pca, root):
     for iy in years:
         # Get data
         data, classes   =   get_data_for_clustering(dtCols, normalizer, CLS, pca, upto=iy[1]+'-07-01', asof=iy[0]+'-09-01', nGames=81)
-        allCl       =   pd.concat( (allCl, classes), axis=0 )
         # Get trophy nominees
         selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + ''.join(iy) + '/trophy_selke_nominees.csv') )
         selke_id    =   [list(data.index).index(x) for x in selke[selke['Pos'] != 'D'].index]
@@ -554,14 +555,14 @@ def do_clustering_multiyear(dtCols, normalizer, CLS, pca, root):
         constraints =   ut_make_constraints( (selke_id, selke_wgt), (ross_id, ross_wgt), poor_id )
         constraints =   pd.DataFrame(constraints)
         constraints =   constraints[constraints[0] != constraints[1]]
-        constraints[[0,1]] +=   count
-        allCON      =   pd.concat( (allCON, constraints), axis=0 )
-        allSLK      =   allSLK + list( np.add(selke_id, count) )
-        allROS      =   allROS + list(np.add(selke_id, count))
-        count       +=  len(classes)
 
-    # Make clusters
-    cls_data        =   list(list(x) for x in allCl.values)
+        # Make clusters
+        cls_data        =   list(list(x) for x in classes.values)
+        ml, cl, dmp     = [], [], []
+        [ml.append(tuple(x[:2].astype('int'))) if x[-1] > 0.5 else dmp.append(tuple(x[:2])) for x in constraints.values]
+        [cl.append(tuple(x[:2].astype('int'))) if x[-1] < -0.5 else dmp.append(tuple(x[:2])) for x in constraints.values]
+        clusters, centers   =   cop_kmeans(cls_data, 3, ml, cl, max_iter=100000, tol=1e-4, initialization='random')
+        display_clustering(classes, clusters, ross_id, selke_id)
 
     # Remove negative values - makes the clustering crash
     negCL           =   np.array(cls_data)
@@ -615,7 +616,7 @@ CLS, normalizer, pca, dtCols    =   do_ANN_training(repoPSt, repoPbP, repoCode) 
 """
 
 # --- Classify player data : SINGLE TIME SLOT
-upto, asof, nGames      =   '2014-07-01', '2013-09-01', 80
+upto, asof, nGames      =   '2003-07-01', '2002-09-01', 80
 pl_data, pl_classes     =   get_data_for_clustering(dtCols, normalizer, CLS, pca, upto=upto, asof=asof, nGames=nGames)
 # Apply constrained clustering
 clusters, centers, selke_id, ross_id    =   do_clustering(pl_data, pl_classes, upto, root)

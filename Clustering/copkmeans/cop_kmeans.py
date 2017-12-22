@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 import random
+from numpy import mean
+from Utils.programming import ut_closest
+
 
 def cop_kmeans(dataset, k, ml=[], cl=[], 
                initialization='kmpp', 
@@ -80,8 +83,13 @@ def initialize_centers(dataset, k, method):
             for index, point in enumerate(dataset):
                 cids, distances = closest_clusters(centers, point)
                 chances[index] = distances[cids[0]]
-                
         return centers
+
+    elif method == 'hockey':
+        pts = [[0,1], list(mean(dataset, axis=0)), [1,0]]
+        return ut_closest.main(pts, dataset)[1]
+
+
 
 def violate_constraints(data_index, cluster_index, clusters, ml, cl):
     for i in ml[data_index]:
