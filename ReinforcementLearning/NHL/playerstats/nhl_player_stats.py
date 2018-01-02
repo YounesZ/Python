@@ -12,6 +12,7 @@ from itertools import compress
 from sklearn.decomposition import PCA
 from Utils.maths.ut_cumsum_thresh import *
 from Utils.clustering.ut_make_constraints import *
+from Utils.clustering.ut_center_of_mass import *
 from Utils.programming.ut_find_folders import *
 from sklearn.model_selection import train_test_split
 from Utils.programming.ut_difference import *
@@ -530,22 +531,27 @@ def do_clustering_multiyear(dtCols, normalizer, CLS, pca, root):
 
     ###### ECLUDE YEAR 2003-2004 : PROBLEM WITH FREDRIK MODIN'S DATA - NAMED AS FREDDY MODIN IN THE NHL STATS PAGE
     years.pop( years.index(['2003', '2004']) )
+    all_centers =   []
     for iy in years:
         # Get data
         data, classes   =   get_data_for_clustering(dtCols, normalizer, CLS, pca, upto=iy[1]+'-07-01', asof=iy[0]+'-09-01', nGames=81)
         # Get trophy nominees
         selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + ''.join(iy) + '/trophy_selke_nominees.csv') )
+        selke       =   selke[~selke.index.duplicated(keep='first')]
         selke_id    =   [list(data.index).index(x) for x in selke[selke['Pos'] != 'D'].index]
         ross        =   to_pandas_ross( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + ''.join(iy) + '/trophy_ross_nominees.csv') )
+        ross        =   ross[~ross.index.duplicated(keep='first')]
         ross_id     =   [list(data.index).index(x) for x in ross[ross['pos'] != 'D'].index]
         # --- Clean constraints
         # Remove duplicates
         torem       =   list( set(ross_id).intersection(selke_id) )
         maxV        =   np.argmax(classes.iloc[torem].values, axis=1).astype(bool)
         selke_id    =   ut_difference( selke_id, list( compress(torem, maxV) ))
-        selke_wgt   =   selke['WEIGHT'].values/np.max(selke['WEIGHT'].values)
+        selke_wgt   =   selke.loc[data.iloc[selke_id].index]['WEIGHT'].values
+        selke_wgt   =   selke_wgt/np.max(selke_wgt)
         ross_id     =   ut_difference( ross_id, list( compress(torem, maxV!=True) ))
-        ross_wgt    =   ross['WEIGHT'].values/np.max(ross['WEIGHT'].values)
+        ross_wgt    =   ross.loc[data.iloc[ross_id].index]['WEIGHT'].values
+        ross_wgt    =   ross_wgt / np.max(ross_wgt)
         # Get poorest ranked players
         seed        =   classes.min(axis=0)
         distance    =   np.sqrt( ((classes - seed)**2).sum(axis=1) ).sort_values()
@@ -558,11 +564,28 @@ def do_clustering_multiyear(dtCols, normalizer, CLS, pca, root):
 
         # Make clusters
         cls_data        =   list(list(x) for x in classes.values)
+        cOm             =   [list(ut_center_of_mass(classes.iloc[x].values, np.reshape(y, [-1, 1]))) for x, y in zip([selke_id, ross_id, poor_id], [selke_wgt, ross_wgt, np.ones([1, len(poor_id)])])]
         ml, cl, dmp     = [], [], []
         [ml.append(tuple(x[:2].astype('int'))) if x[-1] > 0.5 else dmp.append(tuple(x[:2])) for x in constraints.values]
         [cl.append(tuple(x[:2].astype('int'))) if x[-1] < -0.5 else dmp.append(tuple(x[:2])) for x in constraints.values]
-        clusters, centers   =   cop_kmeans(cls_data, 3, ml, cl, max_iter=100000, tol=1e-4, initialization='random')
-        display_clustering(classes, clusters, ross_id, selke_id)
+        clusters, centers, cost   =   cop_kmeans(cls_data, 3, ml, cl, max_iter=1000, tol=1e-4, initialization=cOm)
+        all_centers.append(centers)
+        display_clustering(classes, clusters, centers, ross_id, selke_id)
+        print('year: ', iy, 'cost: ', np.sum(cost))
+    # Cluster the centers
+    all_centers     =   np.concatenate( np.array(all_centers), axis=0 )
+    all_centers     =   list([list(x) for x in all_centers])
+    index           =   np.array(range( int(len(all_centers)/3) ))*3
+    constraints     =   ut_make_constraints( (list(index), list(np.ones([len(index),1]))), (list(index+1), list(np.ones([len(index),1]))), list(index+2))
+    constraints     =   pd.DataFrame(constraints)
+    constraints     =   constraints[constraints[0] != constraints[1]]
+    ml, cl, dmp     =   [], [], []
+    [ml.append(tuple(x[:2].astype('int'))) if x[-1] > 0.5 else dmp.append(tuple(x[:2])) for x in constraints.values]
+    [cl.append(tuple(x[:2].astype('int'))) if x[-1] < -0.5 else dmp.append(tuple(x[:2])) for x in constraints.values]
+    cOm             =   [list(ut_center_of_mass(classes.iloc[x].values, np.reshape(y, [-1,1]) )) for x,y in zip([selke_id, ross_id, poor_id], [selke_wgt, ross_wgt, np.ones([1, len(poor_id)])])]
+    glCL, glCT      =   cop_kmeans(all_centers, 3, ml, cl, max_iter=1000, tol=1e-4, initialization='hockey')
+    display_clustering(pd.DataFrame(all_centers, columns=['OFF', 'DEF']), glCL, glCT, list(index), list(index+1))
+
 
     # Remove negative values - makes the clustering crash
     negCL           =   np.array(cls_data)
@@ -580,7 +603,7 @@ def do_clustering_multiyear(dtCols, normalizer, CLS, pca, root):
     return pl_classes, clusters, centers, selke_id, ross_id
 
 
-def display_clustering(classification, clusters, ross_id, selke_id):
+def display_clustering(classification, clusters, centers, ross_id, selke_id):
     Fig     =   plt.figure()
     # Display ground truth
     Ax1     =   Fig.add_subplot(121)
@@ -594,6 +617,7 @@ def display_clustering(classification, clusters, ross_id, selke_id):
     # Display constrained clustering
     Ax2     =   Fig.add_subplot(122)
     Ax2.scatter(classification['OFF'], classification['DEF'], c=clusters)
+    Ax2.scatter([x[0] for x in centers], [x[1] for x in centers], marker="D", c=[0,1,2])
     Ax2.set_xlabel('likelihood to win offensive trophy')
     Ax2.set_ylabel('likelihood to win defensive trophy')
     return Fig, Ax1, Ax2

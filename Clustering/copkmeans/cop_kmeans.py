@@ -34,7 +34,7 @@ def cop_kmeans(dataset, k, ml=[], cl=[],
                 if not found_cluster:
                     return None
         
-        clusters_, centers_ = compute_centers(clusters_, dataset, k, ml_info)
+        clusters_, centers_, cost = compute_centers(clusters_, dataset, k, ml_info)
         shift = sum(l2_distance(centers[i], centers_[i]) for i in range(k))
         if shift <= tol:
             break
@@ -42,7 +42,7 @@ def cop_kmeans(dataset, k, ml=[], cl=[],
         clusters = clusters_
         centers = centers_
 
-    return clusters_, centers_
+    return clusters_, centers_, cost
 
 def l2_distance(point1, point2):
     return sum([(float(i)-float(j))**2 for (i, j) in zip(point1, point2)])
@@ -89,7 +89,8 @@ def initialize_centers(dataset, k, method):
         pts = [[0,1], list(mean(dataset, axis=0)), [1,0]]
         return ut_closest.main(pts, dataset)[1]
 
-
+    elif type(method) is list and len(method)==k:
+        return method
 
 def violate_constraints(data_index, cluster_index, clusters, ml, cl):
     for i in ml[data_index]:
@@ -121,12 +122,10 @@ def compute_centers(clusters, dataset, k, ml_info):
         for i in range(dim):
             centers[j][i] = centers[j][i]/float(counts[j])
 
+    ml_groups, ml_scores, ml_centroids = ml_info
+    current_scores = [sum(l2_distance(centers[clusters[i]], dataset[i]) for i in group) for group in ml_groups]
     if k_new < k:
-        ml_groups, ml_scores, ml_centroids = ml_info
-        current_scores = [sum(l2_distance(centers[clusters[i]], dataset[i]) 
-                              for i in group) 
-                          for group in ml_groups]
-        group_ids = sorted(range(len(ml_groups)), 
+        group_ids = sorted(range(len(ml_groups)),
                            key=lambda x: current_scores[x] - ml_scores[x],
                            reverse=True)
         
@@ -137,7 +136,7 @@ def compute_centers(clusters, dataset, k, ml_info):
             for i in ml_groups[gid]:
                 clusters[i] = cid
                 
-    return clusters, centers
+    return clusters, centers, current_scores
     
 def get_ml_info(ml, dataset):
     flags = [True] * len(dataset)
