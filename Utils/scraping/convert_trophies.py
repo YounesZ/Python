@@ -19,8 +19,11 @@ def to_pandas_selke(filename):
     df_s    =   convert_names(df_s, 'Player')
     df_s    =   df_s.set_index('Player')
     # Set places
-    places  =   np.array([int(x) for x in df_s['Place'].values])
-    df_s['WEIGHT'] = max(places) - places + 1
+    #places  =   np.array([int(x) for x in df_s['Place'].values])
+    #df_s['WEIGHT'] = max(places) - places + 1
+    votes   =   np.array([int(x) for x in df_s['Votes'].values])
+    df_s['WEIGHT'] = votes / np.sum(votes)
+
     return df_s
 
 
@@ -67,7 +70,6 @@ def to_pandas(repoRaw):
         svname  =   path.join( repoRaw, isea, 'trophy_nominees.p')
         with open(svname, 'wb') as f:
             pickle.dump({'ross':df_r, 'selke':df_s}, f)
-
 
 
 """

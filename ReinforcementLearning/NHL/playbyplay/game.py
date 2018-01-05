@@ -1,26 +1,90 @@
+import pickle
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sys import stdout
+from copy import deepcopy
+from Utils.programming.ut_find_folders import *
+from ReinforcementLearning.NHL.playerstats.nhl_player_stats import pull_stats
+
+
+class HockeySS:
+
+    def __init__(self, repoPbP, repoPSt):
+        self.repoPbP    =   repoPbP
+        self.repoPSt    =   repoPSt
+        self.seasons    =   ut_find_folders(repoPbP, True)
+
+
+    def list_all_games(self):
+        # List games
+        games_lst       =   pd.DataFrame()
+        for iy in self.seasons:
+            iSea        =   Season(iy)
+            iSea.list_game_ids( path.join(self.repoPbP, iSea) )
+            games_lst   =   pd.concat( (games_lst, iSea.games_id), axis=0 )
+        self.games_lst  =   games_lst
+
+
+    def pull_line_data(self):
+        # List line shifts
+        shifts_lst      =   pd.DataFrame()
+        count           =   0
+        for iy,ic in zip(self.games_lst['season'].values,self.games_lst['gcode'].values):
+            iGame       =   Game(self.repoPbP, self.repoPSt, iy, ic)
+            iGame.pull_line_shifts('both')
+            iGame.pull_player_categories()
+
+            # Save data
+            shifts_lst  =   pd.concat( (shifts_lst, pd.DataFrame.from_dict( iGame.lineShifts )), axis=0, ignore_index=True )
+
+            # Status bar
+            stdout.write('\r')
+            # the exact output you're looking for:
+            stdout.write("Game %i/%i - season %s game %s: [%-60s] %d%%, completed" % (count, len(self.games_lst), iy, ic, '=' * int(count / len(self.games_lst) * 60), 100 * count / len(self.games_lst)))
+            stdout.flush()
+
+            count   +=  1
+        self.line_shifts=   shifts_lst
+
+
+class Season:
+
+    def __init__(self, year):
+        self.year   =   year
+
+
+    def list_game_ids(self, dataRep):
+        # Format year
+        iyear           =   self.year.replace('Season_', '')
+        # Get data - long
+        gc              =   Game(dataRep, iyear)
+        # Get game IDs
+        self.games_id   =   gc.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate']]
 
 
 class Game:
 
-    def __init__(self, dataRep, season, gameId=None, gameQty=None):
+    def __init__(self, repoPbP, repoPSt, season, gameId=None, gameQty=None):
         # Retrieve game info
-        dataPath    =   dataRep+'/Season_'+str(season)+'/playbyplay_'+str(season)+'.csv'
-        dataFrame   =   pd.read_csv( dataPath, engine='python' )
-        # Retrieve roster info
-        rosterPath  =   dataRep+'/Season_'+str(season)+'/roster_'+str(season)+'.csv'
-        rosterFrame =   pd.read_csv( rosterPath, engine='python' )
+        self.season =   season
+        self.gameId =   gameId
+        self.repoPbP=   repoPbP
+        self.repoPSt=   repoPSt
+        dataPath    =   path.join(repoPbP, 'Season_'+str(season), 'converted_data.p')
+        dataFrames  =   pickle.load( open(dataPath, 'rb') )
         # Make sure to pick right season
-        dataFrame   =   dataFrame[ dataFrame.loc[:, 'season']==int(season)]
+        #dataFrame   =   dataFrame[ dataFrame.loc[:, 'season']==int(season)]
         # Store frames
-        self.hd     =   list(dataFrame.dtypes.index)
-        self.df     =   dataFrame
-        self.df_wc  =   dataFrame       #Working copy
-        self.rf     =   rosterFrame
+        self.hd     =   dataFrames['playbyplay'].columns
+        self.df     =   dataFrames['playbyplay']
+        self.df_wc  =   dataFrames['playbyplay']       #Working copy
+        self.rf     =   dataFrames['roster']
         # Fecth line shifts
         self.lineShifts     =   {}
+        # Filter for game Id
+        if not gameId is None:
+            self.df_wc  =   self.df[self.df['gcode']==gameId]
 
 
     def get_game_ids(self):
@@ -73,10 +137,13 @@ class Game:
         tmP     =   tmDict[team]
 
         # Make containers
-        LINES       =   {'playersID':[], 'onice':[0], 'office':[], 'iceduration':[], 'SHOT':[0], 'GOAL':[0], 'equalstrength':[True], 'regulartime':[True]}
+        LINES       =   {'playersID':[], 'onice':[0], 'office':[], 'iceduration':[], 'SHOT':[0], 'GOAL':[0], 'BLOCK':[0], 'MISS':[0], 'PENL':[0], 'equalstrength':[True], 'regulartime':[True]}
         # Loop on all table entries
         prevDt      =   []
         prevLine    =   np.array([1, 1, 1])
+        evTypes     =   ['GOAL', 'SHOT', 'PENL', 'BLOCK', 'MISS']
+        ts_a        =   0
+        ts_h        =   0
         if team=='both':
             prevLine=   (np.ones([1,3])[0], np.ones([1,3])[0])
         for idL, Line in self.df_wc.iterrows():
@@ -105,13 +172,18 @@ class Game:
                 LINES['regulartime'].append(prevDt['period']<4)
                 LINES['SHOT'].append(0)
                 LINES['GOAL'].append(0)
-            if Line['etype']=='GOAL' or Line['etype']=='SHOT':
-                LINES[Line['etype']][-1]    +=  1
+                LINES['PENL'].append(0)
+                LINES['BLOCK'].append(0)
+                LINES['MISS'].append(0)
+            if any([x==Line['etype'] for x in evTypes]):
+                sign    =   int(Line['hometeam']==Line['ev.team'])*2-1
+                LINES[Line['etype']][-1]    +=  sign
+                if Line['etype']=='GOAL':
+                    LINES['SHOT'][-1]       +=  sign
             if Line['etype']=='PENL':
                 LINES['equalstrength'][-1]  =   False
-
-            prevDt      =   Line
-            prevLine    =   curLine
+            prevDt      =   deepcopy(Line)
+            prevLine    =   deepcopy(curLine)
 
         # Terminate line history
         LINES['office'].append(Line['seconds'])
@@ -121,7 +193,19 @@ class Game:
         self.lineShifts =   LINES
 
 
-"""
+    def pull_player_categories(self):
+        # List concerned players
+        all_pl  =   self.lineShifts['playersID'].values
+        all_plC =   np.unique( np.concatenate(all_pl) )
+        all_plN =   self.rf.set_index('Unnamed: 0').loc[all_plC[all_plC>1]]['firstlast']
+        # Get raw player stats
+        gcode   =   str(self.season)[:4]+'0'+str(self.gameId)
+        all_plS =   pull_stats(self.repoPSt, self.repoPbP, uptocode=gcode, nGames=30, plNames=all_plN.values)
+
+
+
+
+"""     
     class Line:
 
 
@@ -132,12 +216,21 @@ class Game:
 """
 
 
-
 # LAUNCHER
 # ========
 # Pointers
-dataRep =   '/home/younesz/Documents/Databases/Hockey/PlayByPlay'
-season  =   '20022003'
+root        =   '/home/younesz/Documents'
+#root        =   '/Users/younes_zerouali/Documents/Stradigi'
+repoPbP     =   path.join(root, 'Databases/Hockey/PlayByPlay')
+repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
+
+
+HSS     =   HockeySS(repoPbP, repoPSt)
+#HSS.list_all_games()
+#HSS.pull_line_data()
+
+
+"""
 # Instantiate class
 gc      =   Game(dataRep, season)    #20128, 20129, 20130, 20131, 20132, 20133, 20136, 20137, 20138, 20139, 20140, 20141]
 gameId  =   gc.get_game_ids()
@@ -150,7 +243,7 @@ for ig in gameId:
     gc.pick_regulartime()
     LS  +=  list( gc.lineShifts['iceduration'] )
 
-"""
+
 
 [x.pull_line_shifts() for x in gc]
 [x.filter_line_shifts() for x in gc]

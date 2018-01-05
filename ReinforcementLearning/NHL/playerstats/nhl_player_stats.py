@@ -15,6 +15,8 @@ from Utils.clustering.ut_make_constraints import *
 from Utils.clustering.ut_center_of_mass import *
 from Utils.programming.ut_find_folders import *
 from sklearn.model_selection import train_test_split
+from tensorflow.python.saved_model import tag_constants
+from tensorflow.python.saved_model.builder import SavedModelBuilder
 from Utils.programming.ut_difference import *
 from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
 from Utils.scraping.convert_raw import get_player_names
@@ -25,23 +27,24 @@ from Clustering.copkmeans.cop_kmeans import cop_kmeans
 
 class ANN_classifier():
 
-    def __init__(self, nNodes):
+    def __init__(self, nNodes=[10,20,2]):
         # Launch the builder
-        nInputs     =   nNodes.pop(0)
-        nOutputs    =   nNodes.pop(-1)
-        nHidden     =   len(nNodes)
-        self.ann_build_network(nInputs, nOutputs, nNodes)
+        nodes       =   deepcopy(nNodes)
+        nInputs     =   nodes.pop(0)
+        nOutputs    =   nodes.pop(-1)
+        nHidden     =   len(nodes)
+        self.ann_build_network(nInputs, nOutputs, nodes)
 
     def ann_build_network(self, nInputs, noutputs, nNodes):
         # Architecture - 1 layer
         self.annX   =   tf.placeholder(tf.float32, [None, nInputs], name='Input_to_the_network-player_features')
         self.annY_  =   tf.placeholder(tf.float32, [None, 2], name='Ground_truth')
-        annW1       =   tf.Variable(tf.truncated_normal([nInputs, nNodes[0]], stddev=0.1))
-        annB1       =   tf.Variable(tf.ones([1, nNodes[0]]) / 10)
-        Y1          =   tf.nn.relu(tf.matmul(self.annX, annW1) + annB1)
-        annW2       =   tf.Variable(tf.truncated_normal([nNodes[0], noutputs], stddev=0.1))
-        annB2       =   tf.Variable(tf.ones([1, noutputs]) / 10)
-        self.annY   =   tf.matmul(Y1, annW2) + annB2
+        self.annW1  =   tf.Variable(tf.truncated_normal([nInputs, nNodes[0]], stddev=0.1), name='weights_inp_hid')
+        self.annB1  =   tf.Variable(tf.ones([1, nNodes[0]]) / 10, name='bias_inp_hid')
+        self.Y1     =   tf.nn.relu(tf.matmul(self.annX, self.annW1) + self.annB1)
+        self.annW2  =   tf.Variable(tf.truncated_normal([nNodes[0], noutputs], stddev=0.1), name='weights_hid_out')
+        self.annB2  =   tf.Variable(tf.ones([1, noutputs]) / 10, name='bias_hid_out')
+        self.annY   =   tf.add( tf.matmul(self.Y1, self.annW2), self.annB2, name='prediction' )
         # Init variables
         init        =   tf.global_variables_initializer()
         # Optimization
@@ -54,7 +57,8 @@ class ANN_classifier():
     def ann_train_network(self, nIter, annI, annT, svname=None):
         self.trLoss, self.tsLoss, self.trAcc, self.tsAcc, nIter = [], [], [], [], 50
         # Initialize the model saver
-        saver   =   tf.train.Saver()
+        #builder         =   SavedModelBuilder(svname)
+        saver           =   tf.train.Saver()
         for iIt in range(nIter):
             # --- TRAIN ANN
             # Init instance
@@ -93,8 +97,13 @@ class ANN_classifier():
             self.batchSize  =   batchSize
         # Save session
         if not svname is None:
-            save_path       =   saver.save(self.sess, svname)
-            self.mirror     =   svname
+            """
+            builder.add_meta_graph_and_variables(self.sess, [tag_constants.SERVING])
+            builder.save()
+            """
+            saver.save(self.sess, path.join(repoModel, 'MODEL_perceptron_1layer_10units_relu'))
+            pickle.dump({'trLoss':self.trLoss, 'tsLoss':self.tsLoss, 'trAcc':self.trAcc, 'tsAcc':self.tsAcc, 'batchSize':self.batchSize}, \
+                        open(path.join(repoModel, 'addedVariables.p'), 'wb') )
 
     def ann_display_accuracy(self):
         # Make figure
@@ -120,21 +129,30 @@ class ANN_classifier():
         Ax2.set_xlim([min(self.batchSize), np.sum(self.batchSize)])
         Ax2.set_ylim([0.4, 1])
 
-    def ann_reload_network(self, image):
-        # Init saver
-        saver       =   tf.train.Saver()
-        # Initialize the variables
+    def ann_reload_network(self, repoModel):
+        # Reload the graph and variables
         self.sess   =   tf.Session()
-        init        =   tf.global_variables_initializer()
-        self.sess.run(init)
-        # Restore model weights from previously saved model
-        saver.restore(self.sess, image)
+        saver       =   tf.train.import_meta_graph( path.join(repoModel, path.basename(repoModel)+'.meta') )
+        saver.restore(self.sess, tf.train.latest_checkpoint(path.join(repoModel, './')))
+        # Link TF variables to the classifier class
+        graph       =   self.sess.graph
+        self.annX   =   graph.get_tensor_by_name('Input_to_the_network-player_features:0')
+        self.annY_  =   graph.get_tensor_by_name('Ground_truth:0')
+        self.annY   =   graph.get_tensor_by_name('prediction:0')
+        # Restore additional variables
+        VAR         =   pickle.load( open(path.join(repoModel, 'addedVariables.p'), 'rb') )
+        self.trLoss =   VAR['trLoss']
+        self.tsLoss =   VAR['tsLoss']
+        self.trAcc  =   VAR['trAcc']
+        self.tsAcc  =   VAR['tsAcc']
+        self.batchSize = VAR['batchSize']
 
 
-def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', nGames=82):
+def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', uptocode=None, nGames=82, plNames=None):
 
     # Get player names
-    plNames     =   get_player_names(repoPbP)
+    if plNames is None:
+        plNames =   get_player_names(repoPbP)
     count       =   0
     # Prep
     """
@@ -169,6 +187,8 @@ def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', nGames=82
         if len(plStat['date'])>0:
             plStat      =   plStat[plStat['date']>=asof]
             plStat      =   plStat[plStat['date']<=upto]
+            if not uptocode is None:
+                plStat  =   plStat[plStat['gameId']<uptocode]
             # Reset indexing
             plStat          =   plStat.reset_index()
             #nottobeavg      =   list( set(list(plStat.columns)).difference(tobeavg) )
@@ -418,7 +438,7 @@ def do_reduce_data(X, pca=None, mu=None, sigma=None, nComp=None):
     return annInput, pca
 
 
-def do_ANN_training(repoPSt, repoPbP, repoCode):
+def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel):
     # --- GET TRAINING DATASET
     # List non-lockout seasons
     allS_p          =   ut_find_folders(repoPbP, True)
@@ -445,16 +465,16 @@ def do_ANN_training(repoPSt, repoPbP, repoCode):
     X_S_P, _    =   do_reduce_data(X_S, pca=pca, nComp=18)
     # --- BUILD THE NETWORK
     nNodes  =   [X_S_P.shape[1], 15, Y.shape[1]]
-    CLS     =   ANN_classifier(nNodes)
+    CLS     =   ANN_classifier( deepcopy(nNodes) )
     # --- TRAIN THE NETWORK
     nIter   =   50
-    CLS.ann_train_network(nIter, X_S_P, Y.values)
+    CLS.ann_train_network(nIter, X_S_P, Y.values, svname=repoModel)
     # --- DISPLAY NETWORK ACCURACY
     #CLS.ann_display_accuracy()
-    return CLS, Nrm, pca, colNm
+    return Nrm, pca, colNm
 
 
-def do_ANN_classification(dtCols, normalizer, CLS, pca, upto='2016-07-01', asof='2015-09-01', nGames=80):
+def do_ANN_classification(repoModel, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80):
     # --- RETRIEVE DATA
     DT, _       =   pull_stats(repoPSt, repoPbP, upto=upto, asof=asof, nGames=nGames)     #   sea_pos,
     # --- PRE-PROCESS DATA
@@ -463,7 +483,8 @@ def do_ANN_classification(dtCols, normalizer, CLS, pca, upto='2016-07-01', asof=
     DT_n_p, _   =   do_reduce_data(DT_n, pca=pca)
     #annI, annT, _, _, _     =   do_process_data( DT[dtCols], pd.DataFrame(np.zeros([len(DT), 1])), pca=pca, mu=mu, sigma=sigma )
     # --- RELOAD THE NETWORK IMAGE
-    # CLS.ann_reload_network(mirror)
+    CLS         =   ANN_classifier()
+    CLS.ann_reload_network(repoModel)
     # --- CLASSIFY DATA
     DTfeed      =   {CLS.annX:DT_n_p}
     return DT, pd.DataFrame(DT_n_p, index=DT.index), CLS.sess.run(CLS.annY, feed_dict=DTfeed)
@@ -499,16 +520,16 @@ def do_clustering(data, classes, upto, root):
     # Make clusters
     cls_data    =   list(list(x) for x in classes.values)
     ml, cl, dmp =   [], [], []
-    [ml.append(tuple(constraints.iloc[x][:2].astype('int'))) if constraints.iloc[x][2] > 0.95 else dmp.append(tuple(constraints.iloc[x][:2])) for x in constraints.index]
+    [ml.append(tuple(x[:2].astype('int'))) if x[-1] > 0.5 else dmp.append(tuple(x[:2])) for x in constraints.values]
+    [cl.append(tuple(x[:2].astype('int'))) if x[-1] < -0.5 else dmp.append(tuple(x[:2])) for x in constraints.values]
 
-    [cl.append(tuple(constraints.iloc[x][:2].astype('int'))) if x[-1] < -0.95 else dmp.append(tuple(constraints.iloc[x][:2])) for x in constraints.index]
-    clusters, centers = cop_kmeans(cls_data, 3, ml, cl, max_iter=3000000, tol=1e+5, initialization='hockey')
+    clusters, centers, cost = cop_kmeans(cls_data, 3, ml, cl, max_iter=3000000, tol=1e+5, initialization='hockey')
     #display_clustering(classes, clusters, ross_id, selke_id)
     return clusters, centers, selke_id, ross_id
 
 
-def get_data_for_clustering(dtCols, normalizer, CLS, pca, upto='2016-07-01', asof='2015-09-01', nGames=80):
-    DT, DT_n, pCl   =   do_ANN_classification(dtCols, normalizer, CLS, pca, upto=upto, asof=asof, nGames=nGames)
+def get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80):
+    DT, DT_n, pCl   =   do_ANN_classification(repoModel, dtCols, normalizer, pca, upto=upto, asof=asof, nGames=nGames)
     pCl         =   pd.DataFrame(pCl, index=DT.index, columns=['OFF', 'DEF'])
     # Filter players - keep forwards only
     isForward   =   [x != 'D' for x in DT['position'].values]
@@ -519,13 +540,14 @@ def get_data_for_clustering(dtCols, normalizer, CLS, pca, upto='2016-07-01', aso
     return fwd_dt, fwd_cl
 
 
-def do_clustering_multiyear(dtCols, normalizer, CLS, pca, root):
+def do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root):
     # Make constraints
     allS_p      =   ut_find_folders(repoPbP, True)
     years       =   [[x.split('_')[1][:4], x.split('_')[1][4:]] for x in allS_p]
     count       =   0
-    allCl       =   pd.DataFrame()
+    allCla      =   pd.DataFrame()
     allCON      =   pd.DataFrame()
+    allCls      =   []
     allSLK      =   []
     allROS      =   []
 
@@ -534,7 +556,7 @@ def do_clustering_multiyear(dtCols, normalizer, CLS, pca, root):
     all_centers =   []
     for iy in years:
         # Get data
-        data, classes   =   get_data_for_clustering(dtCols, normalizer, CLS, pca, upto=iy[1]+'-07-01', asof=iy[0]+'-09-01', nGames=81)
+        data, classes   =   get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto=iy[1]+'-07-01', asof=iy[0]+'-09-01', nGames=81)
         # Get trophy nominees
         selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + ''.join(iy) + '/trophy_selke_nominees.csv') )
         selke       =   selke[~selke.index.duplicated(keep='first')]
@@ -570,8 +592,17 @@ def do_clustering_multiyear(dtCols, normalizer, CLS, pca, root):
         [cl.append(tuple(x[:2].astype('int'))) if x[-1] < -0.5 else dmp.append(tuple(x[:2])) for x in constraints.values]
         clusters, centers, cost   =   cop_kmeans(cls_data, 3, ml, cl, max_iter=1000, tol=1e-4, initialization=cOm)
         all_centers.append(centers)
-        display_clustering(classes, clusters, centers, ross_id, selke_id)
-        print('year: ', iy, 'cost: ', np.sum(cost))
+
+        # Append
+        allSLK  =   allSLK + list(np.add(selke_id, len(allCla)))
+        allROS  =   allROS + list(np.add(ross_id, len(allCla)))
+        allCla  =   pd.concat((allCla, classes), axis=0)
+        allCls  =   allCls + clusters
+        allCtr  =   [list(x) for x in np.mean(np.array(all_centers),axis=0)]
+        #display_clustering(classes, clusters, centers, ross_id, selke_id)
+    #print('year: ', iy, 'cost: ', np.sum(cost))
+    #display_clustering(allCla, allCls, allCtr, allROS, allSLK)
+
     # Cluster the centers
     all_centers     =   np.concatenate( np.array(all_centers), axis=0 )
     all_centers     =   list([list(x) for x in all_centers])
@@ -583,24 +614,17 @@ def do_clustering_multiyear(dtCols, normalizer, CLS, pca, root):
     [ml.append(tuple(x[:2].astype('int'))) if x[-1] > 0.5 else dmp.append(tuple(x[:2])) for x in constraints.values]
     [cl.append(tuple(x[:2].astype('int'))) if x[-1] < -0.5 else dmp.append(tuple(x[:2])) for x in constraints.values]
     cOm             =   [list(ut_center_of_mass(classes.iloc[x].values, np.reshape(y, [-1,1]) )) for x,y in zip([selke_id, ross_id, poor_id], [selke_wgt, ross_wgt, np.ones([1, len(poor_id)])])]
-    glCL, glCT      =   cop_kmeans(all_centers, 3, ml, cl, max_iter=1000, tol=1e-4, initialization='hockey')
+    glCL, glCT, _   =   cop_kmeans(all_centers, 3, ml, cl, max_iter=1000, tol=1e-4, initialization='hockey')
     display_clustering(pd.DataFrame(all_centers, columns=['OFF', 'DEF']), glCL, glCT, list(index), list(index+1))
-
-
-    # Remove negative values - makes the clustering crash
-    negCL           =   np.array(cls_data)
-    negCL           =   np.where( (negCL < 0).any(axis=1) )[0]
-    # Remove from data
-    [cls_data.pop(x) for x in negCL[::-1]]
-    # Remove from constraints
-    allCON          =   allCON[~allCON[0].isin(negCL)]
-    allCON          =   allCON[~allCON[1].isin(negCL)]
-
-    ml, cl, dmp     =   [], [], []
-    [ml.append(tuple(x[:2].astype('int'))) if x[-1] > 0.85 else dmp.append(tuple(x[:2])) for x in allCON.values]
-    [cl.append(tuple(x[:2].astype('int'))) if x[-1] < -0.85 else dmp.append(tuple(x[:2])) for x in allCON.values]
-    clusters, centers = cop_kmeans(cls_data, 3, ml, cl, max_iter=1000, tol=1e-4)
-    return pl_classes, clusters, centers, selke_id, ross_id
+    # Relate centers to trophies
+    iSlk            =   np.argmin( [np.sqrt(np.sum(np.subtract([0,1], x)**2)) for x in glCT] )
+    iRoss           =   np.argmin( [np.sqrt(np.sum(np.subtract([1,0], x)**2)) for x in glCT] )
+    iPoor           =   list( set(range(3)).difference([iSlk,iRoss]) )[0]
+    global_centers  =   {'selke':glCT[iSlk], 'ross':glCT[iRoss], 'poor':glCT[iPoor]}
+    # Save result
+    pickle.dump({'global_centers':global_centers, 'normalizer':normalizer, 'pca':pca, 'dtCols':dtCols}, \
+                open(path.join(repoModel, 'baseVariables.p'), 'wb') )
+    return global_centers
 
 
 def display_clustering(classification, clusters, centers, ross_id, selke_id):
@@ -623,6 +647,51 @@ def display_clustering(classification, clusters, centers, ross_id, selke_id):
     return Fig, Ax1, Ax2
 
 
+def do_assess_clustering_robustness(dtCols, normalizer, global_centers, pca, nGames=80):
+    # This function computes the confusion of the global classification
+    # List years
+    allS_p      =   ut_find_folders(repoPbP, True)
+    years       =   [[x.split('_')[1][:4], x.split('_')[1][4:]] for x in allS_p]
+    years.pop(years.index(['2003', '2004']))
+    nGamesL     =   list( range(10,81,10) )
+    accuracy    =   pd.DataFrame(np.zeros([len(years), 8]), columns=nGamesL, index=[''.join(x) for x in years])
+    for iy in years:
+        for nG in nGamesL:
+            # Retrieve data
+            data, classes   =   get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto=iy[1]+'-07-01', asof=iy[0]+'-09-01', nGames=nG)
+            # Get trophy nominees
+            selke       =   to_pandas_selke(path.join(root, 'Databases/Hockey/PlayerStats/raw/' + ''.join(iy) + '/trophy_selke_nominees.csv'))
+            selke       =   selke[~selke.index.duplicated(keep='first')]
+            selke_id    =   [list(data.index).index(x) for x in selke[selke['Pos'] != 'D'].index]
+            ross        =   to_pandas_ross(path.join(root, 'Databases/Hockey/PlayerStats/raw/' + ''.join(iy) + '/trophy_ross_nominees.csv'))
+            ross        =   ross[~ross.index.duplicated(keep='first')]
+            ross_id     =   [list(data.index).index(x) for x in ross[ross['pos'] != 'D'].index]
+            seed        =   classes.min(axis=0)
+            distance    =   np.sqrt(((classes - seed) ** 2).sum(axis=1)).sort_values()
+            poor_id     =   [classes.index.get_loc(x) for x in distance.index[:30]]
+            poor_id     =   ut_difference(ut_difference(poor_id, selke_id), ross_id)
+            # --- Compute confusion
+            # Selke players
+            dst_slk     =   np.sqrt( np.sum(np.subtract(classes.iloc[selke_id].values, global_centers['selke'])**2, axis=1) )
+            dst_ross    =   np.sqrt( np.sum(np.subtract(classes.iloc[selke_id].values, global_centers['ross']) ** 2, axis=1))
+            dst_poor    =   np.sqrt( np.sum(np.subtract(classes.iloc[selke_id].values, global_centers['poor']) ** 2, axis=1))
+            slk_min     =   np.argmin( np.array([dst_slk, dst_ross, dst_poor]), axis=0 )
+            # Ross players
+            dst_slk     =   np.sqrt(np.sum(np.subtract(classes.iloc[ross_id].values, global_centers['selke']) ** 2, axis=1))
+            dst_ross    =   np.sqrt(np.sum(np.subtract(classes.iloc[ross_id].values, global_centers['ross']) ** 2, axis=1))
+            dst_poor    =   np.sqrt(np.sum(np.subtract(classes.iloc[ross_id].values, global_centers['poor']) ** 2, axis=1))
+            ros_min     =   np.argmin(np.array([dst_slk, dst_ross, dst_poor]), axis=0)
+            # Poor players
+            dst_slk     =   np.sqrt(np.sum(np.subtract(classes.iloc[poor_id].values, global_centers['selke']) ** 2, axis=1))
+            dst_ross    =   np.sqrt(np.sum(np.subtract(classes.iloc[poor_id].values, global_centers['ross']) ** 2, axis=1))
+            dst_poor    =   np.sqrt(np.sum(np.subtract(classes.iloc[poor_id].values, global_centers['poor']) ** 2, axis=1))
+            por_min     =   np.argmin(np.array([dst_slk, dst_ross, dst_poor]), axis=0)
+            # Make matrix
+            MTX         =   [[np.sum(x==0)/len(x), np.sum(x==1)/len(x), np.sum(x==2)/len(x)] for x in [slk_min, ros_min, por_min]]
+            accuracy.loc[''.join(iy)][nG]    =   np.sum(np.diag(MTX))/np.sum(MTX)
+    return accuracy
+
+
 # LAUNCHER:
 # =========
 root        =   '/home/younesz/Documents'
@@ -631,26 +700,57 @@ repoPbP     =   path.join(root, 'Databases/Hockey/PlayByPlay')
 repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
 repoRaw     =   path.join(root, 'Databases/Hockey/PlayerStats/raw')
 repoCode    =   path.join(root, 'Code/Python')
+repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
 
+
+
+"""
+# ============================================
+# === MAKE THE PLAYER CLASSIFICATION FRAMEWORK
 
 # Train automatic classifier - ANN
-CLS, normalizer, pca, dtCols    =   do_ANN_training(repoPSt, repoPbP, repoCode)     # Nrm is the normalizing terms for the raw player features
+normalizer, pca, dtCols     =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel)     # Nrm is the normalizing terms for the raw player features
+# Classify player data : MULTIPLE YEARS
+global_centers  =   do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root)
+# ============================================
+
+
+# ============================================
+# === ASSESS ROBUSTNESS OF THE CLASSIFICATION FRAMEWORK
+
+# Reload pre-saved clustering
+VAR         =   pickle.load( open(path.join(repoModel, 'baseVariables.p'), 'rb') )
+dtCols, normalizer, global_centers, pca     =   VAR['dtCols'], VAR['normalizer'], VAR['global_centers'], VAR['pca']
+# Assess robustness
+accuracy    =   do_assess_clustering_robustness()
+# ============================================
+
+
+
+
+
+
+
+
+"""
+
+#
+
 
 
 """
 
 # --- Classify player data : SINGLE TIME SLOT
-upto, asof, nGames      =   '2003-07-01', '2002-09-01', 80
-pl_data, pl_classes     =   get_data_for_clustering(dtCols, normalizer, CLS, pca, upto=upto, asof=asof, nGames=nGames)
+upto, asof, nGames  =   '2011-07-01', '2010-09-01', 80
+data, classes       =   get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto=upto, asof=asof, nGames=nGames)
 # Apply constrained clustering
-clusters, centers, selke_id, ross_id    =   do_clustering(pl_data, pl_classes, upto, root)
-display_clustering(pl_classes, clusters, ross_id, selke_id)
+clusters, centers, selke_id, ross_id    =   do_clustering(data, classes, upto, root)
+display_clustering(classes, clusters, centers, ross_id, selke_id)
 
 
 
 
-# --- Classify player data : MULTIPLE YEARS
-clusters, centers, selke_id, ross_id    =   do_clustering_multiyear(dtCols, normalizer, CLS, root)
+
 
 
 
