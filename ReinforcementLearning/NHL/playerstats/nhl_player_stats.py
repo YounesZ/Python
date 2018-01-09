@@ -39,12 +39,12 @@ class ANN_classifier():
         # Architecture - 1 layer
         self.annX   =   tf.placeholder(tf.float32, [None, nInputs], name='Input_to_the_network-player_features')
         self.annY_  =   tf.placeholder(tf.float32, [None, 2], name='Ground_truth')
-        self.annW1  =   tf.Variable(tf.truncated_normal([nInputs, nNodes[0]], stddev=0.1), name='weights_inp_hid')
-        self.annB1  =   tf.Variable(tf.ones([1, nNodes[0]]) / 10, name='bias_inp_hid')
-        self.Y1     =   tf.nn.relu(tf.matmul(self.annX, self.annW1) + self.annB1)
-        self.annW2  =   tf.Variable(tf.truncated_normal([nNodes[0], noutputs], stddev=0.1), name='weights_hid_out')
-        self.annB2  =   tf.Variable(tf.ones([1, noutputs]) / 10, name='bias_hid_out')
-        self.annY   =   tf.add( tf.matmul(self.Y1, self.annW2), self.annB2, name='prediction' )
+        annW1       =   tf.Variable(tf.truncated_normal([nInputs, nNodes[0]], stddev=0.1), name='weights_inp_hid')
+        annB1       =   tf.Variable(tf.ones([1, nNodes[0]]) / 10, name='bias_inp_hid')
+        Y1          =   tf.add( tf.nn.relu(tf.matmul(self.annX, annW1)), annB1, name='hid_output')
+        annW2       =   tf.Variable(tf.truncated_normal([nNodes[0], noutputs], stddev=0.1), name='weights_hid_out')
+        annB2       =   tf.Variable(tf.ones([1, noutputs]) / 10, name='bias_hid_out')
+        self.annY   =   tf.add( tf.matmul(Y1, annW2), annB2, name='prediction' )
         # Init variables
         init        =   tf.global_variables_initializer()
         # Optimization
@@ -137,7 +137,12 @@ class ANN_classifier():
         # Link TF variables to the classifier class
         graph       =   self.sess.graph
         self.annX   =   graph.get_tensor_by_name('Input_to_the_network-player_features:0')
-        self.annY_  =   graph.get_tensor_by_name('Ground_truth:0')
+        """self.annY_  =   graph.get_tensor_by_name('Ground_truth:0')
+        self.annW1  =   graph.get_tensor_by_name('weights_inp_hid:0')
+        self.annB1  =   graph.get_tensor_by_name('bias_inp_hid:0')
+        self.Y1     =   graph.get_operation_by_name('hid_output')
+        self.annW2  =   graph.get_tensor_by_name('weights_hid_out:0')
+        self.annB2  =   graph.get_tensor_by_name('bias_hid_out:0')"""
         self.annY   =   graph.get_tensor_by_name('prediction:0')
         # Restore additional variables
         VAR         =   pickle.load( open(path.join(repoModel, 'addedVariables.p'), 'rb') )
@@ -151,9 +156,14 @@ class ANN_classifier():
 def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', uptocode=None, nGames=82, plNames=None):
 
     # Get player names
+    depickle        =   True
     if plNames is None:
-        plNames =   get_player_names(repoPbP)
-    count       =   0
+        plNames     =   get_player_names(repoPbP)
+        # De-pickle all players
+        depickle    =   False
+        with open(path.join(repoPSt, 'all_players.p'), 'rb') as f:
+            all_pl  =   pickle.load(f)
+    count   =   0
     # Prep
     """
     tobesum     =   ['gamesPlayed', 'goals', 'assists', 'points', 'plusMinus', 'penaltyMinutes', 'ppGoals', 'ppPoints', \
@@ -174,16 +184,21 @@ def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', uptocode=
     allGP       =   []
     #tobeavg     =   ['goals', 'penaltyMinutes','gameWinningGoals', 'faceoffWinPctg', 'ppGoals', 'ppPoints', 'assists', 'shGoals', 'shootingPctg', 'shots', 'shPoints', 'points', 'plusMinus', 'otGoals', 'timeOnIcePerGame', 'shiftsPerGame', 'gamesPlayed', 'missedShotsPerGame', 'goalsPerGame', 'faceoffsLost', 'blockedShots', 'shotsPerGame', 'missedShots', 'hitsPerGame', 'hits', 'takeaways', 'blockedShotsPerGame', 'giveaways', 'faceoffsWon', 'faceoffs', 'shFaceoffsLost', 'shBlockedShots', 'shGiveaways', 'shMissedShots', 'shTakeaways', 'shFaceoffsWon', 'shShots', 'shAssists', 'shHits']
     #nottobenorm =   list( set(list(tobeavg)).difference(tobenorm) )
-    # Loop on players and pull stats
-    with open(path.join(repoPSt, 'all_players.p'), 'rb') as f:
-        all_pl  =   pickle.load(f)
+
     for pl in plNames:
         # Load stats file
-        plStat          =   all_pl[pl]
+        if depickle:
+            plStat      =   pickle.load( open( path.join(repoPSt, pl.replace(' ', '_')+'.p'), 'rb') )
+        else:
+            plStat      =   all_pl[pl]
         # Sort table by date
         plStat['date']  =   [x.split('T')[0] for x in list(plStat['gameDate'])]
         plStat          =   plStat.sort_values(by='date', ascending=False)
         # Get past games
+        newDF           =   pd.DataFrame(np.zeros([1, len(columns)]), columns=columns)
+        newDF['player'] =   pl
+        newDF['position']=  'U'
+        newDF['gmPl']   =   0
         if len(plStat['date'])>0:
             plStat      =   plStat[plStat['date']>=asof]
             plStat      =   plStat[plStat['date']<=upto]
@@ -234,8 +249,8 @@ def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', uptocode=
                 newDF['player']     =   pl
                 newDF['position']   =  plStat.loc[0,'playerPositionCode']
                 newDF['gmPl']       =   np.sum(plStat['gamesPlayed'])
-                # Add to DB
-                allStat =   pd.concat( (allStat, newDF), axis=0, ignore_index=True )
+        # Add to DB
+        allStat =   pd.concat( (allStat, newDF), axis=0, ignore_index=True )
 
         count+=1
         if count % 500 == 0:
@@ -483,7 +498,7 @@ def do_ANN_classification(repoModel, dtCols, normalizer, pca, upto='2016-07-01',
     DT_n_p, _   =   do_reduce_data(DT_n, pca=pca)
     #annI, annT, _, _, _     =   do_process_data( DT[dtCols], pd.DataFrame(np.zeros([len(DT), 1])), pca=pca, mu=mu, sigma=sigma )
     # --- RELOAD THE NETWORK IMAGE
-    CLS         =   ANN_classifier()
+    CLS         =   ANN_classifier([DT_n_p.shape[1], 20, 2])
     CLS.ann_reload_network(repoModel)
     # --- CLASSIFY DATA
     DTfeed      =   {CLS.annX:DT_n_p}
@@ -713,23 +728,20 @@ normalizer, pca, dtCols     =   do_ANN_training(repoPSt, repoPbP, repoCode, repo
 # Classify player data : MULTIPLE YEARS
 global_centers  =   do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root)
 # ============================================
+"""
 
 
+"""
 # ============================================
 # === ASSESS ROBUSTNESS OF THE CLASSIFICATION FRAMEWORK
 
 # Reload pre-saved clustering
 VAR         =   pickle.load( open(path.join(repoModel, 'baseVariables.p'), 'rb') )
 dtCols, normalizer, global_centers, pca     =   VAR['dtCols'], VAR['normalizer'], VAR['global_centers'], VAR['pca']
+get_data_for_clustering(repoModel, dtCols, normalizer, pca)
 # Assess robustness
 accuracy    =   do_assess_clustering_robustness()
 # ============================================
-
-
-
-
-
-
 
 
 """

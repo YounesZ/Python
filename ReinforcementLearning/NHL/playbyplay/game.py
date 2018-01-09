@@ -1,11 +1,13 @@
 import pickle
 import pandas as pd
 import numpy as np
+import tensorflow as tf
 import matplotlib.pyplot as plt
 from sys import stdout
 from copy import deepcopy
 from Utils.programming.ut_find_folders import *
-from ReinforcementLearning.NHL.playerstats.nhl_player_stats import pull_stats
+from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
+from ReinforcementLearning.NHL.playerstats.nhl_player_stats import pull_stats, do_normalize_data, do_reduce_data, ANN_classifier
 
 
 class HockeySS:
@@ -21,31 +23,59 @@ class HockeySS:
         games_lst       =   pd.DataFrame()
         for iy in self.seasons:
             iSea        =   Season(iy)
-            iSea.list_game_ids( path.join(self.repoPbP, iSea) )
+            iSea.list_game_ids( self.repoPbP, self.repoPSt )
             games_lst   =   pd.concat( (games_lst, iSea.games_id), axis=0 )
         self.games_lst  =   games_lst
 
 
-    def pull_line_data(self):
+    def pull_RL_data(self, repoModel, repoSave=None):
+        # Prepare players model: reload info
+        self.players_model  =   pickle.load(open(path.join(repoModel, 'baseVariables.p'), 'rb'))
+        self.classifier     =   {'sess':tf.Session(), 'annX':[], 'annY':[]}
+        saver               =   tf.train.import_meta_graph(path.join(repoModel, path.basename(repoModel) + '.meta'))
+        graph               =   self.classifier['sess'].graph
+        self.classifier['annX'] =   graph.get_tensor_by_name('Input_to_the_network-player_features:0')
+        self.classifier['annY'] =   graph.get_tensor_by_name('prediction:0')
+        saver.restore(self.classifier['sess'], tf.train.latest_checkpoint(path.join(repoModel, './')))
+        # Make lines dictionary
+        self.make_line_dictionary()
         # List line shifts
-        shifts_lst      =   pd.DataFrame()
-        count           =   0
-        for iy,ic in zip(self.games_lst['season'].values,self.games_lst['gcode'].values):
+        RL_data =   pd.DataFrame()
+        count   =   0
+        for iy,ic in zip(self.games_lst.iloc[:30]['season'].values,self.games_lst.iloc[:30]['gcode'].values):
+            # Extract state-space
             iGame       =   Game(self.repoPbP, self.repoPSt, iy, ic)
             iGame.pull_line_shifts('both')
-            iGame.pull_player_categories()
+            iGame.pick_regulartime()
+            iGame.pick_equalstrength()
+            iGame.pull_players_classes(self.players_model, self.classifier)
+            S, A, R, nS, nA     =   iGame.build_statespace(self.line_dictionary)
+
+            # Concatenate data
+            df_ic   =   np.transpose( np.reshape( np.concatenate( (S,A,R) ), [3,-1]) )
+            RL_data =   pd.concat( (RL_data, pd.DataFrame(df_ic, columns=['state', 'action', 'reward'])), axis=0 )
 
             # Save data
-            shifts_lst  =   pd.concat( (shifts_lst, pd.DataFrame.from_dict( iGame.lineShifts )), axis=0, ignore_index=True )
+            if not repoSave is None and count%20==0:
+                pickle.dump({'RL_data':RL_data, 'nStates':nS, 'nActions':nA}, open(path.join(repoSave, 'RL_teaching_data.p'), 'wb'))
 
             # Status bar
             stdout.write('\r')
             # the exact output you're looking for:
             stdout.write("Game %i/%i - season %s game %s: [%-60s] %d%%, completed" % (count, len(self.games_lst), iy, ic, '=' * int(count / len(self.games_lst) * 60), 100 * count / len(self.games_lst)))
             stdout.flush()
-
             count   +=  1
-        self.line_shifts=   shifts_lst
+        self.RL_data        =   RL_data
+        self.state_size     =   nS
+        self.action_size    =   nA
+
+
+    def make_line_dictionary(self):
+        # Possible entries : [0,1,2]
+        self.line_dictionary    =   {(0,0,0):0, (0,0,1):1, (0,1,1):2, (1,1,1):3,\
+                                    (0,0,2):4, (0,2,2):5, (2,2,2):6, (0,1,2):7,\
+                                    (1,1,2):8, (1,2,2):9}
+
 
 
 class Season:
@@ -54,11 +84,11 @@ class Season:
         self.year   =   year
 
 
-    def list_game_ids(self, dataRep):
+    def list_game_ids(self, repoPbP, repoPSt):
         # Format year
         iyear           =   self.year.replace('Season_', '')
         # Get data - long
-        gc              =   Game(dataRep, iyear)
+        gc              =   Game(repoPbP, repoPSt, iyear)
         # Get game IDs
         self.games_id   =   gc.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate']]
 
@@ -94,17 +124,19 @@ class Game:
 
 
     def pick_equalstrength(self):
-        dataFrame   =   self.lineShifts
+        self.lineShifts     =   self.lineShifts[self.lineShifts['equalstrength']]
+        """dataFrame   =   self.lineShifts
         # Filter out powerplays
         isEqs       =   dataFrame['equalstrength']
-        self.lineShifts =   {_key:np.array(dataFrame[_key])[np.array(isEqs)] for _key in dataFrame.keys()}
+        self.lineShifts =   {_key:np.array(dataFrame[_key])[np.array(isEqs)] for _key in dataFrame.keys()}"""
 
 
     def pick_regulartime(self):
-        dataFrame   =   self.lineShifts
+        self.lineShifts     =   self.lineShifts[self.lineShifts['regulartime']]
+        """dataFrame   =   self.lineShifts
         # Filter out overtime
         isRt        =   dataFrame['regulartime']
-        self.lineShifts =   {_key:np.array(dataFrame[_key])[np.array(isRt)] for _key in dataFrame.keys()}
+        self.lineShifts =   {_key:np.array(dataFrame[_key])[np.array(isRt)] for _key in dataFrame.keys()}"""
 
 
     def pick_game(self, gameId=None, gameQty=None):
@@ -137,7 +169,7 @@ class Game:
         tmP     =   tmDict[team]
 
         # Make containers
-        LINES       =   {'playersID':[], 'onice':[0], 'office':[], 'iceduration':[], 'SHOT':[0], 'GOAL':[0], 'BLOCK':[0], 'MISS':[0], 'PENL':[0], 'equalstrength':[True], 'regulartime':[True]}
+        LINES       =   {'playersID':[], 'onice':[0], 'office':[], 'iceduration':[], 'SHOT':[0], 'GOAL':[0], 'BLOCK':[0], 'MISS':[0], 'PENL':[0], 'equalstrength':[True], 'regulartime':[True], 'period':[], 'differential':[]}
         # Loop on all table entries
         prevDt      =   []
         prevLine    =   np.array([1, 1, 1])
@@ -166,6 +198,8 @@ class Game:
                 LINES['playersID'].append(prevLine)
                 LINES['office'].append(prevDt['seconds'])
                 LINES['iceduration'].append(LINES['office'][-1] - LINES['onice'][-1])
+                LINES['period'].append(prevDt['period'])
+                LINES['differential'].append(np.sum(LINES['GOAL']))
                 # Start new shift
                 LINES['onice'].append(prevDt['seconds'])
                 LINES['equalstrength'].append(prevDt['away.skaters']==6 and prevDt['home.skaters']==6)
@@ -189,20 +223,97 @@ class Game:
         LINES['office'].append(Line['seconds'])
         LINES['iceduration'].append(LINES['office'][-1] - LINES['onice'][-1])
         LINES['playersID'].append(prevLine)
+        LINES['period'].append(prevDt['period'])
+        LINES['differential'].append(np.sum(LINES['GOAL']))
+
         # Store
-        self.lineShifts =   LINES
+        self.lineShifts =   pd.DataFrame.from_dict(LINES)
 
 
-    def pull_player_categories(self):
+    def pull_players_classes(self, model, classifier):
         # List concerned players
         all_pl  =   self.lineShifts['playersID'].values
         all_plC =   np.unique( np.concatenate(all_pl) )
-        all_plN =   self.rf.set_index('Unnamed: 0').loc[all_plC[all_plC>1]]['firstlast']
+        all_plN =   self.rf.set_index('player.id').loc[all_plC[all_plC>1]]['firstlast'].drop_duplicates(keep='first')
         # Get raw player stats
-        gcode   =   str(self.season)[:4]+'0'+str(self.gameId)
-        all_plS =   pull_stats(self.repoPSt, self.repoPbP, uptocode=gcode, nGames=30, plNames=all_plN.values)
+        gcode   =   int( str(self.season)[:4]+'0'+str(self.gameId) )
+        DT, dtCols  =   pull_stats(self.repoPSt, self.repoPbP, uptocode=gcode, nGames=30, plNames=all_plN.values)
+        # --- Get player classes
+        # pre-process data
+        DT[dtCols]  =   ut_sanitize_matrix(DT[dtCols])
+        DT_n, _     =   do_normalize_data(DT[dtCols], normalizer=model['normalizer'])
+        DT_n_p, _   =   do_reduce_data(DT_n, pca=model['pca'])
+        # model players' performance
+        DTfeed      =   {classifier['annX']: DT_n_p}
+        classif     =   classifier['sess'].run(classifier['annY'], feed_dict=DTfeed)
+        # Get players class
+        pl_class    =   [np.argmin( np.sum( (classif[x,:] - np.array( model['global_centers'] ))**2, axis=1 ) ) for x in range(classif.shape[0])]
+        pl_class    =   pd.DataFrame(pl_class, columns=['class'], index=all_plN.index.values)
+        pl_class.loc[:, 'firstlast'] =   all_plN
+        self.player_classes =   pl_class
 
 
+    def recode_line(self, lineDict, line):
+        if not type(line) is tuple:
+            line    =   tuple(line)
+
+        if line in lineDict.keys():
+            return lineDict[line]
+        else:
+            return -1
+
+
+    def encode_line_players(self):
+        lComp   =   self.lineShifts['playersID']
+        lineCode=   []
+        for iR in lComp.index:
+            row     =   lComp.loc[iR]
+            nrow    =   []
+            for iT in row:
+                nTuple  =   []
+                for iN in iT:
+                    if iN in self.player_classes.index:
+                        nTuple.append( self.player_classes.loc[iN]['class'] )
+                    else:
+                        nTuple.append( -1 )
+                nrow.append( tuple( np.sort(nTuple) ) )
+            lineCode.append(nrow)
+        return lineCode
+
+
+    def recode_period(self, periods):
+        return periods-1
+
+
+    def recode_differential(self, differential):
+        return np.minimum( np.maximum(differential, -2), 2 ) + 2
+
+
+    def recode_reward(self, lineShift):
+        return lineShift['GOAL'].values*5 + lineShift['SHOT'].values
+
+
+    def recode_states(self, state1, state2, state3):
+        return state3*50 + state2*10 + state1, 10*50*3
+
+
+    def build_statespace(self, lineDict):
+        # --- States
+        # Encode line compositions
+        lCode   =   self.encode_line_players()
+        lComp   =   np.array( [[self.recode_line(lineDict, a) for a in b] for b in lCode] )
+        # Remove -1
+        remL    =   ~(lComp==-1).any(axis=1)
+        lComp   =   lComp[remL,:]
+        state1  =   lComp[:,0] # opposing line composition
+        state2  =   self.recode_differential(self.lineShifts['differential'][remL].values)  # differential
+        state3  =   self.recode_period( self.lineShifts['period'][remL].values )    # period
+        state, nstates  =   self.recode_states( state1, state2, state3 )
+        # Actions
+        action, nactions=   lComp[:,1], len(lineDict)
+        # Reward
+        reward  =   self.recode_reward(self.lineShifts[remL])
+        return state, action, reward, nstates, nactions
 
 
 """     
@@ -223,11 +334,17 @@ root        =   '/home/younesz/Documents'
 #root        =   '/Users/younes_zerouali/Documents/Stradigi'
 repoPbP     =   path.join(root, 'Databases/Hockey/PlayByPlay')
 repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
+repoCode    =   path.join(root, 'Code/Python')
+repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
+repoSave    =   path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data')
 
 
-HSS     =   HockeySS(repoPbP, repoPSt)
-#HSS.list_all_games()
-#HSS.pull_line_data()
+# LEARN LINE VALUES
+# =================
+HSS         =   HockeySS(repoPbP, repoPSt)
+HSS.list_all_games()
+HSS.pull_RL_data(repoModel, repoSave)
+#HSS.teach_RL_agent()
 
 
 """
