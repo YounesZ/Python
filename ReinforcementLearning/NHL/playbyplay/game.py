@@ -5,8 +5,10 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from sys import stdout
 from copy import deepcopy
+from random import shuffle
 from Utils.programming.ut_find_folders import *
 from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
+from ReinforcementLearning.NHL.playbyplay.agent import Agent
 from ReinforcementLearning.NHL.playerstats.nhl_player_stats import pull_stats, do_normalize_data, do_reduce_data, ANN_classifier
 
 
@@ -40,24 +42,35 @@ class HockeySS:
         # Make lines dictionary
         self.make_line_dictionary()
         # List line shifts
-        RL_data =   pd.DataFrame()
-        count   =   0
-        for iy,ic in zip(self.games_lst.iloc[:30]['season'].values,self.games_lst.iloc[:30]['gcode'].values):
+        RL_data     =   pd.DataFrame()
+        GAME_data   =   pd.DataFrame()
+        count       =   0
+        for iy,ic in zip(self.games_lst['season'].values,self.games_lst['gcode'].values):
             # Extract state-space
             iGame       =   Game(self.repoPbP, self.repoPSt, iy, ic)
-            iGame.pull_line_shifts('both')
-            iGame.pick_regulartime()
-            iGame.pick_equalstrength()
-            iGame.pull_players_classes(self.players_model, self.classifier)
-            S, A, R, nS, nA     =   iGame.build_statespace(self.line_dictionary)
 
-            # Concatenate data
-            df_ic   =   np.transpose( np.reshape( np.concatenate( (S,A,R) ), [3,-1]) )
-            RL_data =   pd.concat( (RL_data, pd.DataFrame(df_ic, columns=['state', 'action', 'reward'])), axis=0 )
-
-            # Save data
-            if not repoSave is None and count%20==0:
-                pickle.dump({'RL_data':RL_data, 'nStates':nS, 'nActions':nA}, open(path.join(repoSave, 'RL_teaching_data.p'), 'wb'))
+            # Check if some data was retrieved:
+            if len(iGame.df_wc)>0:
+                iGame.pull_line_shifts('both', minduration=20)
+                iGame.pick_regulartime()
+                iGame.pick_equalstrength()
+                iGame.pull_players_classes(self.players_model, self.classifier)
+                # Check if some data was retrieved:
+                if len(iGame.player_classes)>0:
+                    S, A, R, nS, nA, coded  =   iGame.build_statespace(self.line_dictionary)
+                    # Concatenate data
+                    df_ic       =   np.transpose(np.reshape(np.concatenate((S, A, R)), [3, -1]))
+                    RL_data     =   pd.concat((RL_data, pd.DataFrame(df_ic, columns=['state', 'action', 'reward'])), axis=0)
+                    GAME_data   =   pd.concat((GAME_data, iGame.lineShifts[coded]), axis=0)
+                    # Save data
+                    if not repoSave is None and count % 20 == 0:
+                        pickle.dump({'RL_data': RL_data, 'nStates': nS, 'nActions': nA},
+                                    open(path.join(repoSave, 'RL_teaching_data.p'), 'wb'))
+                        pickle.dump({'GAME_data': GAME_data}, open(path.join(repoSave, 'GAME_data.p'), 'wb'))
+                else:
+                    print('*** EMPTY GAME ***')
+            else:
+                print('*** EMPTY GAME ***')
 
             # Status bar
             stdout.write('\r')
@@ -68,6 +81,27 @@ class HockeySS:
         self.RL_data        =   RL_data
         self.state_size     =   nS
         self.action_size    =   nA
+
+
+    def teach_RL_agent(self):
+        # Instantiate the agent
+        agent       =   Agent(self.state_size, self.action_size)
+        # --- TEACH THE AGENT
+        # List all samples
+        iSamples    =   list( range(self.RL_data.shape[0]) )
+        shuffle(iSamples)
+        # Loop on samples and teach
+        for iS in iSamples:
+            # Get new teaching example
+            S,A,R   =   self.RL_data.iloc[iS]['state'], self.RL_data.iloc[iS]['action'], self.RL_data.iloc[iS]['reward']
+            if iS==np.max(iSamples) or self.RL_data.iloc[iS+1].name==0:
+                Sp  =   []
+            else:
+                Sp  =   self.RL_data.iloc[iS + 1]['state']
+            # Do teaching
+            agent.agent_move(S,A,R,Sp)
+        self.action_value   =   np.reshape( agent.action_value, [3, 5, 10, 10] )
+        pickle.dump({'action_values':self.action_value}, open(path.join(repoSave, 'RL_action_values.p'), 'wb'))
 
 
     def make_line_dictionary(self):
@@ -163,7 +197,7 @@ class Game:
         return (list( np.array(pID)[pOFF] )+[1,1,1])[:3]
 
 
-    def pull_line_shifts(self, team='home'):
+    def pull_line_shifts(self, team='home', minduration=None):
         # Pick the right team
         tmDict  =   {'home':'h', 'away':'a', 'both':'ha'}
         tmP     =   tmDict[team]
@@ -174,8 +208,6 @@ class Game:
         prevDt      =   []
         prevLine    =   np.array([1, 1, 1])
         evTypes     =   ['GOAL', 'SHOT', 'PENL', 'BLOCK', 'MISS']
-        ts_a        =   0
-        ts_h        =   0
         if team=='both':
             prevLine=   (np.ones([1,3])[0], np.ones([1,3])[0])
         for idL, Line in self.df_wc.iterrows():
@@ -203,7 +235,7 @@ class Game:
                 # Start new shift
                 LINES['onice'].append(prevDt['seconds'])
                 LINES['equalstrength'].append(prevDt['away.skaters']==6 and prevDt['home.skaters']==6)
-                LINES['regulartime'].append(prevDt['period']<4)
+                LINES['regulartime'].append(Line['period']<4)
                 LINES['SHOT'].append(0)
                 LINES['GOAL'].append(0)
                 LINES['PENL'].append(0)
@@ -228,13 +260,21 @@ class Game:
 
         # Store
         self.lineShifts =   pd.DataFrame.from_dict(LINES)
+        if not minduration is None:
+            self.lineShifts     =   self.lineShifts[self.lineShifts['iceduration']>=20]
 
 
     def pull_players_classes(self, model, classifier):
         # List concerned players
         all_pl  =   self.lineShifts['playersID'].values
+        if len(all_pl) == 0:
+            self.player_classes = []
+            return
         all_plC =   np.unique( np.concatenate(all_pl) )
-        all_plN =   self.rf.set_index('player.id').loc[all_plC[all_plC>1]]['firstlast'].drop_duplicates(keep='first')
+        all_plN = self.rf.set_index('player.id').loc[all_plC[all_plC > 1]]['firstlast'].drop_duplicates(keep='first')
+        if len(all_plN) == 0:
+            self.player_classes = []
+            return
         # Get raw player stats
         gcode   =   int( str(self.season)[:4]+'0'+str(self.gameId) )
         DT, dtCols  =   pull_stats(self.repoPSt, self.repoPbP, uptocode=gcode, nGames=30, plNames=all_plN.values)
@@ -273,7 +313,10 @@ class Game:
                 nTuple  =   []
                 for iN in iT:
                     if iN in self.player_classes.index:
-                        nTuple.append( self.player_classes.loc[iN]['class'] )
+                        number  =   self.player_classes.loc[iN]['class']
+                        if not type(number) is np.int64:
+                            number  =   number.iloc[0]
+                        nTuple.append( number )
                     else:
                         nTuple.append( -1 )
                 nrow.append( tuple( np.sort(nTuple) ) )
@@ -294,7 +337,7 @@ class Game:
 
 
     def recode_states(self, state1, state2, state3):
-        return state3*50 + state2*10 + state1, 10*50*3
+        return state3*50 + state2*10 + state1, 10*5*3
 
 
     def build_statespace(self, lineDict):
@@ -313,7 +356,7 @@ class Game:
         action, nactions=   lComp[:,1], len(lineDict)
         # Reward
         reward  =   self.recode_reward(self.lineShifts[remL])
-        return state, action, reward, nstates, nactions
+        return state, action, reward, nstates, nactions, remL
 
 
 """     
@@ -339,15 +382,16 @@ repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVS
 repoSave    =   path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data')
 
 
+"""
 # LEARN LINE VALUES
 # =================
 HSS         =   HockeySS(repoPbP, repoPSt)
 HSS.list_all_games()
 HSS.pull_RL_data(repoModel, repoSave)
-#HSS.teach_RL_agent()
+HSS.teach_RL_agent()
 
 
-"""
+
 # Instantiate class
 gc      =   Game(dataRep, season)    #20128, 20129, 20130, 20131, 20132, 20133, 20136, 20137, 20138, 20139, 20140, 20141]
 gameId  =   gc.get_game_ids()

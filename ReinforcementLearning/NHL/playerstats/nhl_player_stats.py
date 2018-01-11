@@ -179,7 +179,7 @@ def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', uptocode=
     columns     =   tobeavg + tobenorm_rs + tobenorm_pp + tobenorm_pk
 
     # Initiate empty container
-    allStat     =   pd.DataFrame( columns = columns )
+    allStat     =   pd.DataFrame( columns = columns+['player', 'position', 'gmPl'] )
     allPos      =   []
     allGP       =   []
     #tobeavg     =   ['goals', 'penaltyMinutes','gameWinningGoals', 'faceoffWinPctg', 'ppGoals', 'ppPoints', 'assists', 'shGoals', 'shootingPctg', 'shots', 'shPoints', 'points', 'plusMinus', 'otGoals', 'timeOnIcePerGame', 'shiftsPerGame', 'gamesPlayed', 'missedShotsPerGame', 'goalsPerGame', 'faceoffsLost', 'blockedShots', 'shotsPerGame', 'missedShots', 'hitsPerGame', 'hits', 'takeaways', 'blockedShotsPerGame', 'giveaways', 'faceoffsWon', 'faceoffs', 'shFaceoffsLost', 'shBlockedShots', 'shGiveaways', 'shMissedShots', 'shTakeaways', 'shFaceoffsWon', 'shShots', 'shAssists', 'shHits']
