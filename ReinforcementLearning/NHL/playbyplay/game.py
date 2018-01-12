@@ -44,6 +44,7 @@ class HockeySS:
         # List line shifts
         RL_data     =   pd.DataFrame()
         GAME_data   =   pd.DataFrame()
+        PLAYER_data =   pd.DataFrame()
         count       =   0
         for iy,ic in zip(self.games_lst['season'].values,self.games_lst['gcode'].values):
             # Extract state-space
@@ -55,18 +56,26 @@ class HockeySS:
                 iGame.pick_regulartime()
                 iGame.pick_equalstrength()
                 iGame.pull_players_classes(self.players_model, self.classifier)
+                # Add game identifier data
+                iGame.lineShifts['season']      =   iy
+                iGame.lineShifts['gameCode']    =   ic
                 # Check if some data was retrieved:
                 if len(iGame.player_classes)>0:
-                    S, A, R, nS, nA, coded  =   iGame.build_statespace(self.line_dictionary)
+                    S, A, R, nS, nA, coded      =   iGame.build_statespace(self.line_dictionary)
                     # Concatenate data
                     df_ic       =   np.transpose(np.reshape(np.concatenate((S, A, R)), [3, -1]))
                     RL_data     =   pd.concat((RL_data, pd.DataFrame(df_ic, columns=['state', 'action', 'reward'])), axis=0)
                     GAME_data   =   pd.concat((GAME_data, iGame.lineShifts[coded]), axis=0)
+                    # Players data
+                    plDT        =   iGame.player_classes
+                    plDT['season']  =   iy
+                    plDT['gameCode']=   ic
+                    PLAYER_data     =   pd.concat((PLAYER_data, plDT), axis=0)
                     # Save data
                     if not repoSave is None and count % 20 == 0:
-                        pickle.dump({'RL_data': RL_data, 'nStates': nS, 'nActions': nA},
-                                    open(path.join(repoSave, 'RL_teaching_data.p'), 'wb'))
-                        pickle.dump({'GAME_data': GAME_data}, open(path.join(repoSave, 'GAME_data.p'), 'wb'))
+                        pickle.dump({'RL_data': RL_data, 'nStates': nS, 'nActions': nA}, open(path.join(repoSave, 'RL_teaching_data.p'), 'wb'))
+                        pickle.dump(GAME_data, open(path.join(repoSave, 'GAME_data.p'), 'wb'))
+                        pickle.dump(PLAYER_data, open(path.join(repoSave, 'PLAYER_data.p'), 'wb') )
                 else:
                     print('*** EMPTY GAME ***')
             else:
@@ -289,7 +298,9 @@ class Game:
         # Get players class
         pl_class    =   [np.argmin( np.sum( (classif[x,:] - np.array( model['global_centers'] ))**2, axis=1 ) ) for x in range(classif.shape[0])]
         pl_class    =   pd.DataFrame(pl_class, columns=['class'], index=all_plN.index.values)
-        pl_class.loc[:, 'firstlast'] =   all_plN
+        pl_class.loc[:, 'firstlast']    =   all_plN
+        pl_class.loc[:, 'pred_ross']    =   classif[:,0]
+        pl_class.loc[:, 'pred_selke']   =   classif[:,1]
         self.player_classes =   pl_class
 
 
@@ -380,6 +391,7 @@ repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
 repoCode    =   path.join(root, 'Code/Python')
 repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
 repoSave    =   path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data')
+
 
 
 """
