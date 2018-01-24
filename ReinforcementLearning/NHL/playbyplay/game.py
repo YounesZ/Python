@@ -46,7 +46,8 @@ class HockeySS:
         GAME_data   =   pd.DataFrame()
         PLAYER_data =   pd.DataFrame()
         count       =   0
-        for iy,ic in zip(self.games_lst['season'].values,self.games_lst['gcode'].values):
+        allR        =   []
+        for iy,ic,ih,ia in zip(self.games_lst['season'].values,self.games_lst['gcode'].values,self.games_lst['hometeam'].values,self.games_lst['awayteam'].values):
             # Extract state-space
             iGame       =   Game(self.repoPbP, self.repoPSt, iy, ic)
 
@@ -59,9 +60,12 @@ class HockeySS:
                 # Add game identifier data
                 iGame.lineShifts['season']      =   iy
                 iGame.lineShifts['gameCode']    =   ic
+                iGame.lineShifts['hometeam']    =   ih
+                iGame.lineShifts['awayteam']    =   ia
                 # Check if some data was retrieved:
                 if len(iGame.player_classes)>0:
                     S, A, R, nS, nA, coded      =   iGame.build_statespace(self.line_dictionary)
+                    allR.append( np.sum(R) )
                     # Concatenate data
                     df_ic       =   np.transpose(np.reshape(np.concatenate((S, A, R)), [3, -1]))
                     RL_data     =   pd.concat((RL_data, pd.DataFrame(df_ic, columns=['state', 'action', 'reward'])), axis=0)
@@ -99,6 +103,7 @@ class HockeySS:
         # List all samples
         iSamples    =   list( range(self.RL_data.shape[0]) )
         shuffle(iSamples)
+        count       =   0
         # Loop on samples and teach
         for iS in iSamples:
             # Get new teaching example
@@ -109,8 +114,17 @@ class HockeySS:
                 Sp  =   self.RL_data.iloc[iS + 1]['state']
             # Do teaching
             agent.agent_move(S,A,R,Sp)
-        self.action_value   =   np.reshape( agent.action_value, [3, 5, 10, 10] )
-        pickle.dump({'action_values':self.action_value}, open(path.join(repoSave, 'RL_action_values.p'), 'wb'))
+
+            count   +=  1
+            if not count % 100:
+                # Status bar
+                stdout.write('\r')
+                # the exact output you're looking for:
+                stdout.write("Move %i/%i : [%-60s] %d%%, completed" % (count, len(iSamples), '=' * int(count / len(iSamples) * 60), 100 * count / len(iSamples)))
+                stdout.flush()
+
+                self.action_value   =   np.reshape( agent.action_value, [3, 5, 10, 10] )
+                pickle.dump({'action_values':self.action_value}, open(path.join(repoSave, 'RL_action_values.p'), 'wb'))
 
 
     def make_line_dictionary(self):
@@ -133,7 +147,7 @@ class Season:
         # Get data - long
         gc              =   Game(repoPbP, repoPSt, iyear)
         # Get game IDs
-        self.games_id   =   gc.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate']]
+        self.games_id   =   gc.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
 
 
 class Game:
@@ -212,7 +226,7 @@ class Game:
         tmP     =   tmDict[team]
 
         # Make containers
-        LINES       =   {'playersID':[], 'onice':[0], 'office':[], 'iceduration':[], 'SHOT':[0], 'GOAL':[0], 'BLOCK':[0], 'MISS':[0], 'PENL':[0], 'equalstrength':[True], 'regulartime':[True], 'period':[], 'differential':[]}
+        LINES       =   {'playersID':[], 'onice':[0], 'office':[], 'iceduration':[], 'SHOT':[0], 'GOAL':[0], 'BLOCK':[0], 'MISS':[0], 'PENL':[0], 'equalstrength':[True], 'regulartime':[], 'period':[], 'differential':[]}
         # Loop on all table entries
         prevDt      =   []
         prevLine    =   np.array([1, 1, 1])
@@ -240,11 +254,11 @@ class Game:
                 LINES['office'].append(prevDt['seconds'])
                 LINES['iceduration'].append(LINES['office'][-1] - LINES['onice'][-1])
                 LINES['period'].append(prevDt['period'])
+                LINES['regulartime'].append(prevDt['period'] < 4)
                 LINES['differential'].append(np.sum(LINES['GOAL']))
                 # Start new shift
                 LINES['onice'].append(prevDt['seconds'])
                 LINES['equalstrength'].append(prevDt['away.skaters']==6 and prevDt['home.skaters']==6)
-                LINES['regulartime'].append(Line['period']<4)
                 LINES['SHOT'].append(0)
                 LINES['GOAL'].append(0)
                 LINES['PENL'].append(0)
@@ -265,6 +279,7 @@ class Game:
         LINES['iceduration'].append(LINES['office'][-1] - LINES['onice'][-1])
         LINES['playersID'].append(prevLine)
         LINES['period'].append(prevDt['period'])
+        LINES['regulartime'].append(prevDt['period']<4)
         LINES['differential'].append(np.sum(LINES['GOAL']))
 
         # Store
@@ -390,17 +405,17 @@ repoPbP     =   path.join(root, 'Databases/Hockey/PlayByPlay')
 repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
 repoCode    =   path.join(root, 'Code/Python')
 repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
-repoSave    =   path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data')
+repoSave    =   None #path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data')
 
 
 
-"""
+
 # LEARN LINE VALUES
 # =================
 HSS         =   HockeySS(repoPbP, repoPSt)
 HSS.list_all_games()
 HSS.pull_RL_data(repoModel, repoSave)
-HSS.teach_RL_agent()
+"""HSS.teach_RL_agent()
 
 
 
