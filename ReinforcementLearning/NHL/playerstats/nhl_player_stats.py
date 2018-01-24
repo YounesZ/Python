@@ -738,19 +738,33 @@ global_centers  =   do_clustering_multiyear(repoModel, dtCols, normalizer, pca, 
 
 """
 # ============
-# TEST
+# TEST - PREDICT ALL NOMINEES
 # ============
-from random import shuffle
-allS        =   ut_find_folders(repoPbP, True)
-ALLacc      =   []
-ALLchl      =   []
+# First get data for each year and save it
+allS_p      =   ut_find_folders(repoPbP, True)
 for iS in allS_p:
     #shuffle(allS_p)
     #iS                      =   allS_p.pop(0)
-    X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( list(set(allS_p).difference(iS)), minGames=0)
-    #pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'POS_all':POS_all, 'PLD_all':PLD_all, 'colNm':colNm}, open('/home/younesz/Desktop/varstest.p', 'wb') )
-    #VV = pickle.load( open('/home/younesz/Desktop/varstest.p', 'rb') )
-    #X,Y,X_all,POS_all, PLD_all,colNm = VV['X'], VV['Y'], VV['X_all'], VV['POS_all'], VV['PLD_all'], VV['colNm']
+    X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( [iS], minGames=0)
+    pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'POS_all':POS_all, 'PLD_all':PLD_all, 'colNm':colNm}, open('/home/younesz/Desktop/varstest'+iS+'.p', 'wb') )
+    
+    
+
+allS_p      =   ut_find_folders(repoPbP, True)
+ALLacc      =   []
+ALLchl      =   []
+for iS in allS_p:
+    
+    X,Y,X_all,POS_all,PLD_all,colNm     =   pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    for iSS in list( set(allS_p).difference(iS) ):
+        VV  =   pickle.load( open('/home/younesz/Desktop/varstest'+iSS+'.p', 'rb') )
+        x,y, x_all,pos_all,pld_all,colNm=   VV['X'],VV['Y'],VV['X_all'],VV['POS_all'],VV['PLD_all'],VV['colNm']
+        X       =   pd.concat( (X,x), axis=0 )
+        Y       =   pd.concat( (Y,y), axis=0 )
+        X_all   =   pd.concat( (X_all,x_all), axis=0 )
+        POS_all =   pd.concat( (POS_all,pos_all), axis=0 )
+        PLD_all =   pd.concat( (PLD_all,pld_all), axis=0 )
+
     colNm                   =   list( set(colNm).difference(['hitsPerGame','blockedShotsPerGame','missedShotsPerGame','shotsPerGame']) )
     X                       =   X[colNm]
     X_all                   =   X_all[PLD_all.values>-1][colNm]
@@ -772,7 +786,8 @@ for iS in allS_p:
     display_clustering(classification, cccl, cccc, np.where(Y[0]>Y[1])[0], np.where(Y[0]<Y[1])[0])
     
     # --- TEST THE NETWORK
-    X,Y, X_all,POS_all,PLD_all,_=   get_training_data([iS], minGames=-1)
+    VV      =   pickle.load( open('/home/younesz/Desktop/varstest'+iS+'.p', 'rb') )
+    X,Y, X_all,POS_all,PLD_all,_=   VV['X'],VV['Y'],VV['X_all'],VV['POS_all'],VV['PLD_all'],VV['colNm']
     X_all       =   X_all[PLD_all.values>20]
     POS_all     =   POS_all[PLD_all.values>20]
     # Pre-process data
@@ -782,7 +797,7 @@ for iS in allS_p:
     # Make classification
     pCl         =   CLS.sess.run(CLS.annY, feed_dict={CLS.annX:DT_n_p})
     pdCL        =   pd.DataFrame(pCl, columns=['off', 'def'], index=X_all.index)
-    pdCL        =   pdCL[pdCL['def']>pdCL['off']]
+    #pdCL        =   pdCL[pdCL['def']>pdCL['off']]
     pdCL        =   pdCL.sort_values(by='def', ascending=False)
         
     selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + iS.replace('Season_','') + '/trophy_selke_nominees.csv') )
@@ -793,6 +808,117 @@ for iS in allS_p:
     print( 'prediction accuracy: %0.2f %%, chance level: %0.2f %%' %(len( list( set(A).intersection(B) ) )/ len(B) * 100, len(A)/len(X_all)*100) )
     ALLacc.append(len( list( set(A).intersection(B) ) )/ len(B) * 100)
     ALLchl.append(len(A)/len(X_all)*100)
+    
+    
+    # Display prediction accuracy
+    plt.figure()
+    plt.scatter( ALLchl, ALLacc)
+    plt.gca().set_xlim([np.min(ALLchl+ALLacc), np.max(ALLchl+ALLacc)])
+    plt.gca().set_ylim([np.min(ALLchl+ALLacc), np.max(ALLchl+ALLacc)])
+    plt.plot( range(np.max(ALLchl+ALLacc).astype('int')), range(np.max(ALLchl+ALLacc).astype('int')), color='red' )
+    plt.gca().set_xlabel('chance level')
+    plt.gca().set_ylabel('accuracy')
+    plt.gca().set_title('Prediction of Selke nominees')
+    [plt.text(x,y,z) for x,y,z in zip(ALLchl, ALLacc, allS_p)]
+"""
+    
+
+# ============
+# TEST - PREDICT N NOMINEES
+# ============
+# First get data for each year and save it
+allS_p      =   ut_find_folders(repoPbP, True)
+"""
+for iS in allS_p:
+    #shuffle(allS_p)
+    #iS                      =   allS_p.pop(0)
+    X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( [iS], minGames=0)
+    pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'POS_all':POS_all, 'PLD_all':PLD_all, 'colNm':colNm}, open('/home/younesz/Desktop/varstest'+iS+'.p', 'wb') )
+"""
+ACCm, ACCe  =   [], []
+CHLm, CHLe  =   [], []    
+lNnom       =   [1]+list(range(5,31,5)) # Sets the N
+for Nnom in lNnom:
+
+    ALLacc      =   []
+    ALLchl      =   []
+    for iS in allS_p:
+        
+        X,Y,X_all,POS_all,PLD_all,colNm     =   pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        for iSS in list( set(allS_p).difference(iS) ):
+            VV  =   pickle.load( open('/home/younesz/Desktop/varstest'+iSS+'.p', 'rb') )
+            x,y, x_all,pos_all,pld_all,colNm=   VV['X'],VV['Y'],VV['X_all'],VV['POS_all'],VV['PLD_all'],VV['colNm']
+            X       =   pd.concat( (X,x), axis=0 )
+            Y       =   pd.concat( (Y,y), axis=0 )
+            X_all   =   pd.concat( (X_all,x_all), axis=0 )
+            POS_all =   pd.concat( (POS_all,pos_all), axis=0 )
+            PLD_all =   pd.concat( (PLD_all,pld_all), axis=0 )
+    
+        colNm                   =   list( set(colNm).difference(['hitsPerGame','blockedShotsPerGame','missedShotsPerGame','shotsPerGame']) )
+        X                       =   X[colNm]
+        X_all                   =   X_all[PLD_all.values>-1][colNm]
+        POS_all                 =   POS_all[PLD_all.values>-1]
+        Y, X, POS_all, X_all    =   ut_sanitize_matrix(Y, X), ut_sanitize_matrix(X), ut_sanitize_matrix(POS_all, X_all), ut_sanitize_matrix(X_all)
+        X_all_S, Nrm            =   do_normalize_data(X_all[(POS_all!='D').values])
+        X_S, _                  =   do_normalize_data(X, normalizer=Nrm)
+        _, pca                  =   do_reduce_data(X_all_S, nComp=18)
+        X_S_P, _                =   do_reduce_data(X_S, pca=pca, nComp=18)
+        nNodes                  =   [X_S_P.shape[1], 15, Y.shape[1]]
+        CLS                     =   ANN_classifier( deepcopy(nNodes) )
+        # --- TRAIN THE NETWORK
+        nIter                   =   50
+        CLS.ann_train_network(nIter, X_S_P, Y.values, svname=repoModel)
+        classification  =   pd.DataFrame( CLS.sess.run(CLS.annY, feed_dict={CLS.annX:X_S_P}), columns=['OFF', 'DEF'])
+        #CLS.ann_display_accuracy()   
+        cccc    =   np.array([[0,1], [1,0], [0,0]])
+        cccl    =   [np.argmin(np.sum((np.tile(x,[3,1])-cccc)**2, axis=1)) for x in classification.values]
+        #display_clustering(classification, cccl, cccc, np.where(Y[0]>Y[1])[0], np.where(Y[0]<Y[1])[0])
+        
+        # --- TEST THE NETWORK
+        VV      =   pickle.load( open('/home/younesz/Desktop/varstest'+iS+'.p', 'rb') )
+        X,Y, X_all,POS_all,PLD_all,_=   VV['X'],VV['Y'],VV['X_all'],VV['POS_all'],VV['PLD_all'],VV['colNm']
+        X_all       =   X_all[PLD_all.values>20]
+        POS_all     =   POS_all[PLD_all.values>20]
+        # Pre-process data
+        X_all[colNm]=   ut_sanitize_matrix(X_all[colNm])
+        DT_n, _     =   do_normalize_data(X_all[colNm], normalizer=Nrm)
+        DT_n_p, _   =   do_reduce_data(DT_n, pca=pca)
+        # Make classification
+        pCl         =   CLS.sess.run(CLS.annY, feed_dict={CLS.annX:DT_n_p})
+        pdCL        =   pd.DataFrame(pCl, columns=['off', 'def'], index=X_all.index)
+        #pdCL        =   pdCL[pdCL['def']>pdCL['off']]
+        pdCL        =   pdCL.sort_values(by='def', ascending=False)
+            
+        selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + iS.replace('Season_','') + '/trophy_selke_nominees.csv') )
+        selke       =   selke[~selke.index.duplicated(keep='first')]
+        
+        A = selke.index.values
+        B = pdCL.index.values[:Nnom]
+        #print( 'prediction accuracy: %0.2f %%, chance level: %0.2f %%' %(len( list( set(A).intersection(B) ) )/ Nnom * 100, Nnom/len(X_all)*100) )
+        ALLacc.append(len( list( set(A).intersection(B) ) )/ len(B) * 100)
+        ALLchl.append(len(A)/len(X_all)*100)
+    
+    print('Guess level: %i/%i done' %(Nnom, len(lNnom)) )
+    ACCm.append( np.mean(ALLacc) )
+    ACCe.append( np.std(ALLacc) )
+    CHLm.append( np.mean(ALLchl) )
+    CHLe.append( np.std(ALLchl) )
+    
+"""    
+# Display prediction accuracy
+N = len(lNnom)
+fig, ax = plt.subplots()
+ind = np.arange(N)    # the x locations for the groups
+width = 0.35         # the width of the bars
+p1 = ax.bar(ind, ACCm, width, color='r', bottom=0*cm, yerr=ACCe)
+p2 = ax.bar(ind + width, CHLm, width, color='y', bottom=0*cm, yerr=CHLe)
+ax.set_title('Scores by group and gender')
+ax.set_xticks(ind + width / 2)
+ax.set_xticklabels(lNnom)
+ax.legend((p1[0], p2[0]), ('model prediction', 'chance level'))
+#ax.autoscale_view()
+plt.show()
+    
     
 """
 
