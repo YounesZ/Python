@@ -86,7 +86,7 @@ def make_feed(GAME_data, PLAYER_data, RL_data, Qvalues, P):
     # Second the dynamic part
     # =======================
     nRows           =   len(GAME_data)
-    nRows           =   5
+    #nRows           =   5
     Qrange          =   [np.min(Qvalues), np.max(Qvalues)]
     clips_dynamic   =   []
     for iR  in range(nRows):
@@ -207,10 +207,10 @@ def make_feed_dynamic(players_a, players_h, start, dur, equalS, diff, per, Hteam
 
 # LAUNCHER
 # ========
-season      =   '20152016'
-gcode       =   '21008'
-videopath   =   'gameId_'+season+'0'+gcode+'.mp4'
-videopath   =   '/home/younesz/Downloads/test_hockey_120s.mp4'
+season      =   '20132014'
+gcode       =   '20727'
+videopath   =   '/home/younesz/Downloads/gameId_'+season[:4]+'0'+gcode+'.mp4'
+#videopath   =   '/home/younesz/Downloads/test_hockey_120s.mp4'
 datapath    =   '/home/younesz/Documents/Code/Python/ReinforcementLearning/NHL/playbyplay/data'
 
 
@@ -224,7 +224,7 @@ feed_clips      =   make_feed(GAME_data, PLAYER_data, RL_data, Qvalues, P)
 
 # Superimpose videos
 result          =   CompositeVideoClip([VID]+feed_clips) # Overlay text on video
-result.write_videofile('/home/younesz/Downloads/test_output_120s.mp4',fps=r)
+result.write_videofile('/home/younesz/Downloads/gameId_'+season[:4]+'0'+gcode+'_wFeed.mp4',fps=r)
 
 
 

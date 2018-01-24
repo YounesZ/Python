@@ -359,11 +359,12 @@ def do_manual_classification(repoPSt, repoPbP, upto, nGames):
     return PLclass, PQuart_off.index
 
 
-def get_training_data(season):
+def get_training_data(season, minGames=0):
     X_train     =   pd.DataFrame()
     Y_train     =   pd.DataFrame()
     X_all       =   pd.DataFrame()
     POS_all     =   pd.DataFrame()
+    PLD_all     =   pd.DataFrame()
     # Loop on seasons and collect data
     for isea in season:
         # Get end time stamp
@@ -372,6 +373,7 @@ def get_training_data(season):
         sea_end =   sea_name[-4:] + '-07-01'
         # Pull stats
         sea_stats, dtCols   =   pull_stats(repoPSt, repoPbP, asof=sea_strt, upto=sea_end)
+        sea_stats           =   sea_stats[sea_stats['gmPl']>=minGames]
         # Pull Selke and Ross nominees for that season
         with open(path.join(repoPSt.replace('player', 'raw'), sea_name, 'trophy_nominees.p'), 'rb') as f:
             trophies = pickle.load(f)
@@ -390,7 +392,8 @@ def get_training_data(season):
         Y_train =   pd.concat([Y_train, tempY], axis=0)
         X_all   =   pd.concat([X_all, sea_stats[dtCols]])
         POS_all =   pd.concat([POS_all, sea_stats['position']])
-    return X_train, Y_train, X_all, POS_all, dtCols
+        PLD_all =   pd.concat([PLD_all, sea_stats['gmPl']])
+    return X_train, Y_train, X_all, POS_all, PLD_all, dtCols
 
 
 def do_normalize_data(data, mu=None, sigma=None, normalizer=None):
@@ -453,16 +456,17 @@ def do_reduce_data(X, pca=None, mu=None, sigma=None, nComp=None):
     return annInput, pca
 
 
-def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel):
+def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=None, minGames=0):
     # --- GET TRAINING DATASET
-    # List non-lockout seasons
-    allS_p          =   ut_find_folders(repoPbP, True)
-    """
+    if allS_p is None:
+        # List non-lockout seasons
+        allS_p  =   ut_find_folders(repoPbP, True)
+
     # Get data
-    X,Y, X_all,POS_all,colNm=   get_training_data(allS_p)
+    X,Y, X_all,POS_all,colNm=   get_training_data(allS_p, minGames=minGames)
+    """
     with open( path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p'), 'wb') as f:
         pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'colNm':colNm, 'POS_all':POS_all}, f)
-    """
     with open( path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p'), 'rb') as f:
         DT      =   pickle.load(f)
         colNm   =   DT['colNm']
@@ -470,7 +474,7 @@ def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel):
         Y       =   DT['Y']
         X_all   =   DT['X_all']
         POS_all =   DT['POS_all']
-
+    """
 
     # --- PRE-PROCESS DATA
     Y, X, POS_all, X_all =   ut_sanitize_matrix(Y, X), ut_sanitize_matrix(X), ut_sanitize_matrix(POS_all, X_all), ut_sanitize_matrix(X_all)
@@ -486,12 +490,13 @@ def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel):
     CLS.ann_train_network(nIter, X_S_P, Y.values, svname=repoModel)
     # --- DISPLAY NETWORK ACCURACY
     #CLS.ann_display_accuracy()
-    return Nrm, pca, colNm
+    return Nrm, pca, colNm, CLS
 
 
-def do_ANN_classification(repoModel, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80):
+def do_ANN_classification(repoModel, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80, minGames=0):
     # --- RETRIEVE DATA
     DT, _       =   pull_stats(repoPSt, repoPbP, upto=upto, asof=asof, nGames=nGames)     #   sea_pos,
+    DT          =   DT[DT['gmPl']>=minGames]
     # --- PRE-PROCESS DATA
     DT[dtCols]  =   ut_sanitize_matrix(DT[dtCols])
     DT_n, _     =   do_normalize_data(DT[dtCols], normalizer=normalizer)
@@ -543,8 +548,8 @@ def do_clustering(data, classes, upto, root):
     return clusters, centers, selke_id, ross_id
 
 
-def get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80):
-    DT, DT_n, pCl   =   do_ANN_classification(repoModel, dtCols, normalizer, pca, upto=upto, asof=asof, nGames=nGames)
+def get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80, minGames=1):
+    DT, DT_n, pCl   =   do_ANN_classification(repoModel, dtCols, normalizer, pca, upto=upto, asof=asof, nGames=nGames, minGames=minGames)
     pCl         =   pd.DataFrame(pCl, index=DT.index, columns=['OFF', 'DEF'])
     # Filter players - keep forwards only
     isForward   =   [x != 'D' for x in DT['position'].values]
@@ -616,7 +621,7 @@ def do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root):
         allCtr  =   [list(x) for x in np.mean(np.array(all_centers),axis=0)]
         #display_clustering(classes, clusters, centers, ross_id, selke_id)
     #print('year: ', iy, 'cost: ', np.sum(cost))
-    #display_clustering(allCla, allCls, allCtr, allROS, allSLK)
+    display_clustering(allCla, allCls, allCtr, allROS, allSLK)
 
     # Cluster the centers
     all_centers     =   np.concatenate( np.array(all_centers), axis=0 )
@@ -724,10 +729,71 @@ repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVS
 # === MAKE THE PLAYER CLASSIFICATION FRAMEWORK
 
 # Train automatic classifier - ANN
-normalizer, pca, dtCols     =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel)     # Nrm is the normalizing terms for the raw player features
+normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel)     # Nrm is the normalizing terms for the raw player features
+CLS.ann_display_accuracy()
 # Classify player data : MULTIPLE YEARS
 global_centers  =   do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root)
 # ============================================
+"""
+
+"""
+# ============
+# TEST
+# ============
+from random import shuffle
+allS        =   ut_find_folders(repoPbP, True)
+ALLacc      =   []
+ALLchl      =   []
+for iS in allS_p:
+    #shuffle(allS_p)
+    #iS                      =   allS_p.pop(0)
+    X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( list(set(allS_p).difference(iS)), minGames=0)
+    #pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'POS_all':POS_all, 'PLD_all':PLD_all, 'colNm':colNm}, open('/home/younesz/Desktop/varstest.p', 'wb') )
+    #VV = pickle.load( open('/home/younesz/Desktop/varstest.p', 'rb') )
+    #X,Y,X_all,POS_all, PLD_all,colNm = VV['X'], VV['Y'], VV['X_all'], VV['POS_all'], VV['PLD_all'], VV['colNm']
+    colNm                   =   list( set(colNm).difference(['hitsPerGame','blockedShotsPerGame','missedShotsPerGame','shotsPerGame']) )
+    X                       =   X[colNm]
+    X_all                   =   X_all[PLD_all.values>-1][colNm]
+    POS_all                 =   POS_all[PLD_all.values>-1]
+    Y, X, POS_all, X_all    =   ut_sanitize_matrix(Y, X), ut_sanitize_matrix(X), ut_sanitize_matrix(POS_all, X_all), ut_sanitize_matrix(X_all)
+    X_all_S, Nrm            =   do_normalize_data(X_all[(POS_all!='D').values])
+    X_S, _                  =   do_normalize_data(X, normalizer=Nrm)
+    _, pca                  =   do_reduce_data(X_all_S, nComp=18)
+    X_S_P, _                =   do_reduce_data(X_S, pca=pca, nComp=18)
+    nNodes                  =   [X_S_P.shape[1], 15, Y.shape[1]]
+    CLS                     =   ANN_classifier( deepcopy(nNodes) )
+    # --- TRAIN THE NETWORK
+    nIter                   =   50
+    CLS.ann_train_network(nIter, X_S_P, Y.values, svname=repoModel)
+    classification  =   pd.DataFrame( CLS.sess.run(CLS.annY, feed_dict={CLS.annX:X_S_P}), columns=['OFF', 'DEF'])
+    CLS.ann_display_accuracy()   
+    cccc    =   np.array([[0,1], [1,0], [0,0]])
+    cccl    =   [np.argmin(np.sum((np.tile(x,[3,1])-cccc)**2, axis=1)) for x in classification.values]
+    display_clustering(classification, cccl, cccc, np.where(Y[0]>Y[1])[0], np.where(Y[0]<Y[1])[0])
+    
+    # --- TEST THE NETWORK
+    X,Y, X_all,POS_all,PLD_all,_=   get_training_data([iS], minGames=-1)
+    X_all       =   X_all[PLD_all.values>20]
+    POS_all     =   POS_all[PLD_all.values>20]
+    # Pre-process data
+    X_all[colNm]  =   ut_sanitize_matrix(X_all[colNm])
+    DT_n, _     =   do_normalize_data(X_all[colNm], normalizer=Nrm)
+    DT_n_p, _   =   do_reduce_data(DT_n, pca=pca)
+    # Make classification
+    pCl         =   CLS.sess.run(CLS.annY, feed_dict={CLS.annX:DT_n_p})
+    pdCL        =   pd.DataFrame(pCl, columns=['off', 'def'], index=X_all.index)
+    pdCL        =   pdCL[pdCL['def']>pdCL['off']]
+    pdCL        =   pdCL.sort_values(by='def', ascending=False)
+        
+    selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + iS.replace('Season_','') + '/trophy_selke_nominees.csv') )
+    selke       =   selke[~selke.index.duplicated(keep='first')]
+    
+    A = selke.index.values
+    B = pdCL.index.values[:len(A)]
+    print( 'prediction accuracy: %0.2f %%, chance level: %0.2f %%' %(len( list( set(A).intersection(B) ) )/ len(B) * 100, len(A)/len(X_all)*100) )
+    ALLacc.append(len( list( set(A).intersection(B) ) )/ len(B) * 100)
+    ALLchl.append(len(A)/len(X_all)*100)
+    
 """
 
 
@@ -742,10 +808,54 @@ get_data_for_clustering(repoModel, dtCols, normalizer, pca)
 # Assess robustness
 accuracy    =   do_assess_clustering_robustness()
 # ============================================
+"""
+
 
 
 """
+# ============================================
+# === VALIDATION 1: PREDICT UNSEEN YEAR'S SELKE NOMINEES
 
+# List years with data
+allS    =   ut_find_folders(repoPbP, True)
+minGm   =   0
+# Loop and leave one-out
+for iS in allS:
+    # --- GET CLASSIFICATION
+    # Remaining seasons
+    curS        =   list( set(allS).difference(iS) )
+    # Train model on those seasons
+    normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=curS, minGames=minGm)
+    # Retireve data for that season
+    DT, _       =   pull_stats(repoPSt, repoPbP, asof=iS[-8:-4]+'-07-01', upto=iS[-4:]+'-09-01')     #   sea_pos,
+    DT          =   DT[ DT['gmPl'] >= minGm ]
+    # Pre-process data
+    DT[dtCols]  =   ut_sanitize_matrix(DT[dtCols])
+    DT_n, _     =   do_normalize_data(DT[dtCols], normalizer=normalizer)
+    DT_n_p, _   =   do_reduce_data(DT_n, pca=pca)
+    # Make classification
+    pCl         =   CLS.sess.run(CLS.annY, feed_dict={CLS.annX:DT_n_p})
+    pdCL        =   pd.DataFrame(pCl, columns=['off', 'def'], index=DT.index)
+    pdCL        =   pdCL[pdCL['def']>pdCL['off']]
+    pdCL        =   pdCL.sort_values(by='def', ascending=False)
+    
+    
+
+    # --- LOAD GROUND TRUTH
+    selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + iS.replace('Season_','') + '/trophy_selke_nominees.csv') )
+    selke       =   selke[~selke.index.duplicated(keep='first')]
+    selke_id    =   [list(data.index).index(x) for x in selke[selke['Pos'] != 'D'].index]
+        
+        
+    
+    
+VAR         =   pickle.load( open(path.join(repoModel, 'baseVariables.p'), 'rb') )
+dtCols, normalizer, global_centers, pca     =   VAR['dtCols'], VAR['normalizer'], VAR['global_centers'], VAR['pca']
+get_data_for_clustering(repoModel, dtCols, normalizer, pca)
+# Assess robustness
+accuracy    =   do_assess_clustering_robustness()
+# ============================================
+"""
 #
 
 
