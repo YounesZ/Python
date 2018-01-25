@@ -382,8 +382,8 @@ def get_training_data(season, minGames=0):
         # Process Ross
         df_r    =   trophies['ross']
         # Make the voting dataframes
-        tempy1  =   np.concatenate((np.reshape(df_r['WEIGHT'].values, [len(df_r), 1]), np.zeros([len(df_r), 1])), axis=1)
-        tempy2  =   np.concatenate((np.zeros([len(df_s), 1]), np.reshape(df_s['WEIGHT'].values, [len(df_s), 1])), axis=1)
+        tempy1  =   np.concatenate((np.reshape(df_r['WEIGHT_rank'].values, [len(df_r), 1]), np.zeros([len(df_r), 1])), axis=1)
+        tempy2  =   np.concatenate((np.zeros([len(df_s), 1]), np.reshape(df_s['WEIGHT_rank'].values, [len(df_s), 1])), axis=1)
         tempY   =   pd.concat([pd.DataFrame(tempy1/np.max(tempy1), index=df_r.index), pd.DataFrame(tempy2/np.max(tempy2), index=df_s.index)])
         tempY   =   tempY.groupby(tempY.index).agg({0:sum, 1:sum})
         tempX   =   sea_stats.loc[tempY.index, dtCols]
@@ -463,7 +463,7 @@ def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=None, minGames
         allS_p  =   ut_find_folders(repoPbP, True)
 
     # Get data
-    X,Y, X_all,POS_all,colNm=   get_training_data(allS_p, minGames=minGames)
+    X,Y, X_all,POS_all,PLD_all, colNm=   get_training_data(allS_p, minGames=minGames)
     """
     with open( path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p'), 'wb') as f:
         pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'colNm':colNm, 'POS_all':POS_all}, f)
@@ -477,7 +477,12 @@ def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=None, minGames
     """
 
     # --- PRE-PROCESS DATA
-    Y, X, POS_all, X_all =   ut_sanitize_matrix(Y, X), ut_sanitize_matrix(X), ut_sanitize_matrix(POS_all, X_all), ut_sanitize_matrix(X_all)
+    Y, X, POS_all, PLD_all, X_all =   ut_sanitize_matrix(Y, X), ut_sanitize_matrix(X), ut_sanitize_matrix(POS_all, X_all), ut_sanitize_matrix(PLD_all, X_all), ut_sanitize_matrix(X_all)
+    # --- KEEP >N GAMES
+    if minGames > 0 and minGames < 1:  # Fraction on the max
+        minGames = (np.max(PLD_all) / 5).astype('int')[0]
+    X_all       =   X_all[(PLD_all>=minGames).values]
+    POS_all     =   POS_all[(PLD_all>=minGames).values]
     X_all_S, Nrm=   do_normalize_data(X_all[(POS_all!='D').values])
     X_S, _      =   do_normalize_data(X, normalizer=Nrm)
     _, pca      =   do_reduce_data(X_all_S, nComp=18)
@@ -524,9 +529,9 @@ def do_clustering(data, classes, upto, root):
     torem       =   list(set(ross_id).intersection(selke_id))
     maxV        =   np.argmax(classes.iloc[torem].values, axis=1).astype(bool)
     selke_id    =   ut_difference(selke_id, list(compress(torem, maxV)))
-    selke_wgt   =   selke['WEIGHT'].values / np.max(selke['WEIGHT'].values)
+    selke_wgt   =   selke['WEIGHT_rank'].values / np.max(selke['WEIGHT_rank'].values)
     ross_id     =   ut_difference(ross_id, list(compress(torem, maxV != True)))
-    ross_wgt    =   ross['WEIGHT'].values / np.max(ross['WEIGHT'].values)
+    ross_wgt    =   ross['WEIGHT_rank'].values / np.max(ross['WEIGHT_rank'].values)
 
     # Get poorest ranked players
     seed        =   classes.min(axis=0)
@@ -589,10 +594,10 @@ def do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root):
         torem       =   list( set(ross_id).intersection(selke_id) )
         maxV        =   np.argmax(classes.iloc[torem].values, axis=1).astype(bool)
         selke_id    =   ut_difference( selke_id, list( compress(torem, maxV) ))
-        selke_wgt   =   selke.loc[data.iloc[selke_id].index]['WEIGHT'].values
+        selke_wgt   =   selke.loc[data.iloc[selke_id].index]['WEIGHT_rank'].values
         selke_wgt   =   selke_wgt/np.max(selke_wgt)
         ross_id     =   ut_difference( ross_id, list( compress(torem, maxV!=True) ))
-        ross_wgt    =   ross.loc[data.iloc[ross_id].index]['WEIGHT'].values
+        ross_wgt    =   ross.loc[data.iloc[ross_id].index]['WEIGHT_rank'].values
         ross_wgt    =   ross_wgt / np.max(ross_wgt)
         # Get poorest ranked players
         seed        =   classes.min(axis=0)
@@ -729,7 +734,7 @@ repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVS
 # === MAKE THE PLAYER CLASSIFICATION FRAMEWORK
 
 # Train automatic classifier - ANN
-normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel)     # Nrm is the normalizing terms for the raw player features
+normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, minGames=0.2)     # Nrm is the normalizing terms for the raw player features
 CLS.ann_display_accuracy()
 # Classify player data : MULTIPLE YEARS
 global_centers  =   do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root)
@@ -778,7 +783,7 @@ for iS in allS_p:
     CLS                     =   ANN_classifier( deepcopy(nNodes) )
     # --- TRAIN THE NETWORK
     nIter                   =   50
-    CLS.ann_train_network(nIter, X_S_P, Y.values, svname=repoModel)
+    CLS.ann_train_network(nIter, X_S_P, Y.values, svname=None)
     classification  =   pd.DataFrame( CLS.sess.run(CLS.annY, feed_dict={CLS.annX:X_S_P}), columns=['OFF', 'DEF'])
     CLS.ann_display_accuracy()   
     cccc    =   np.array([[0,1], [1,0], [0,0]])
@@ -810,30 +815,34 @@ for iS in allS_p:
     ALLchl.append(len(A)/len(X_all)*100)
     
     
-    # Display prediction accuracy
-    plt.figure()
-    plt.scatter( ALLchl, ALLacc)
-    plt.gca().set_xlim([np.min(ALLchl+ALLacc), np.max(ALLchl+ALLacc)])
-    plt.gca().set_ylim([np.min(ALLchl+ALLacc), np.max(ALLchl+ALLacc)])
-    plt.plot( range(np.max(ALLchl+ALLacc).astype('int')), range(np.max(ALLchl+ALLacc).astype('int')), color='red' )
-    plt.gca().set_xlabel('chance level')
-    plt.gca().set_ylabel('accuracy')
-    plt.gca().set_title('Prediction of Selke nominees')
-    [plt.text(x,y,z) for x,y,z in zip(ALLchl, ALLacc, allS_p)]
+# Display prediction accuracy
+plt.figure()
+plt.scatter( ALLchl, ALLacc)
+plt.gca().set_xlim([np.min(ALLchl+ALLacc), np.max(ALLchl+ALLacc)])
+plt.gca().set_ylim([np.min(ALLchl+ALLacc), np.max(ALLchl+ALLacc)])
+plt.plot( range(np.max(ALLchl+ALLacc).astype('int')), range(np.max(ALLchl+ALLacc).astype('int')), color='red' )
+plt.gca().set_xlabel('chance level')
+plt.gca().set_ylabel('accuracy')
+plt.gca().set_title('Prediction of Selke nominees')
+[plt.text(x,y,z) for x,y,z in zip(ALLchl, ALLacc, allS_p)]
 """
     
-
+""" 
 # ============
 # TEST - PREDICT N NOMINEES
 # ============
 # First get data for each year and save it
 allS_p      =   ut_find_folders(repoPbP, True)
 """
+
+"""
 for iS in allS_p:
     #shuffle(allS_p)
     #iS                      =   allS_p.pop(0)
     X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( [iS], minGames=0)
     pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'POS_all':POS_all, 'PLD_all':PLD_all, 'colNm':colNm}, open('/home/younesz/Desktop/varstest'+iS+'.p', 'wb') )
+"""
+
 """
 ACCm, ACCe  =   [], []
 CHLm, CHLe  =   [], []    
@@ -904,21 +913,22 @@ for Nnom in lNnom:
     CHLm.append( np.mean(ALLchl) )
     CHLe.append( np.std(ALLchl) )
     
-"""    
+   
 # Display prediction accuracy
 N = len(lNnom)
 fig, ax = plt.subplots()
 ind = np.arange(N)    # the x locations for the groups
 width = 0.35         # the width of the bars
-p1 = ax.bar(ind, ACCm, width, color='r', bottom=0*cm, yerr=ACCe)
-p2 = ax.bar(ind + width, CHLm, width, color='y', bottom=0*cm, yerr=CHLe)
-ax.set_title('Scores by group and gender')
+p1 = ax.bar(ind, ACCm, width, color='r', bottom=0, yerr=ACCe)
+p2 = ax.bar(ind + width, CHLm, width, color='y', bottom=0, yerr=CHLe)
+ax.set_title('Selke nominees prediction accuracy')
 ax.set_xticks(ind + width / 2)
 ax.set_xticklabels(lNnom)
+ax.set_xlabel('Number of guesses (ordered)')
+ax.set_ylabel('Accuracy')
 ax.legend((p1[0], p2[0]), ('model prediction', 'chance level'))
 #ax.autoscale_view()
-plt.show()
-    
+plt.show()  
     
 """
 

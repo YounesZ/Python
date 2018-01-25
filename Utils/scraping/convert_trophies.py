@@ -47,7 +47,7 @@ def to_pandas_ross(filename):
     # Set places
     places = list(range(1, len(df_r) + 1))
     places.reverse()
-    df_r['WEIGHT'] = places
+    df_r['WEIGHT_rank'] = places
     return df_r
 
 
