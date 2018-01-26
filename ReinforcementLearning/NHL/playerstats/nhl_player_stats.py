@@ -361,7 +361,7 @@ def do_manual_classification(repoPSt, repoPbP, upto, nGames):
     return PLclass, PQuart_off.index
 
 
-def get_training_data(season, minGames=0):
+def get_training_data(repoPSt, repoPbP, season, minGames=0):
     X_train     =   pd.DataFrame()
     Y_train     =   pd.DataFrame()
     X_all       =   pd.DataFrame()
@@ -465,7 +465,7 @@ def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=None, minGames
         allS_p  =   ut_find_folders(repoPbP, True)
 
     # Get data
-    X,Y, X_all,POS_all,PLD_all, colNm=   get_training_data(allS_p, minGames=minGames)
+    X,Y, X_all,POS_all,PLD_all, colNm=   get_training_data(repoPSt, repoPbP, allS_p, minGames=minGames)
     """
     with open( path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p'), 'wb') as f:
         pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'colNm':colNm, 'POS_all':POS_all}, f)
@@ -623,7 +623,7 @@ def do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root):
         allCla  =   pd.concat((allCla, classes), axis=0)
         allCls  =   allCls + clusters
         allCtr  =   [list(x) for x in np.mean(np.array(all_centers),axis=0)]
-        #display_clustering(classes, clusters, centers, ross_id, selke_id)
+        display_clustering(classes, clusters, centers, ross_id, selke_id)
     #print('year: ', iy, 'cost: ', np.sum(cost))
     display_clustering(allCla, allCls, allCtr, allROS, allSLK)
 
@@ -718,8 +718,9 @@ def do_assess_clustering_robustness(dtCols, normalizer, global_centers, pca, nGa
 
 # LAUNCHER:
 # =========
+"""
 root        =   '/home/younesz/Documents'
-#root        =   '/Users/younes_zerouali/Documents/Stradigi'
+root        =   '/Users/younes_zerouali/Documents/Stradigi/NHL_stats_SL'
 repoPbP     =   path.join(root, 'Databases/Hockey/PlayByPlay')
 repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
 repoRaw     =   path.join(root, 'Databases/Hockey/PlayerStats/raw')
@@ -728,7 +729,7 @@ repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVS
 
 
 
-"""
+
 # ============================================
 # === MAKE THE PLAYER CLASSIFICATION FRAMEWORK
 
@@ -749,7 +750,7 @@ allS_p      =   ut_find_folders(repoPbP, True)
 for iS in allS_p:
     #shuffle(allS_p)
     #iS                      =   allS_p.pop(0)
-    X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( [iS], minGames=0)
+    X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( repoPSt, repoPbP, [iS], minGames=0)
     pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'POS_all':POS_all, 'PLD_all':PLD_all, 'colNm':colNm}, open('/home/younesz/Desktop/varstest'+iS+'.p', 'wb') )
     
     
@@ -838,7 +839,7 @@ allS_p      =   ut_find_folders(repoPbP, True)
 for iS in allS_p:
     #shuffle(allS_p)
     #iS                      =   allS_p.pop(0)
-    X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( [iS], minGames=0)
+    X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( repoPSt, repoPbP, [iS], minGames=0)
     pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'POS_all':POS_all, 'PLD_all':PLD_all, 'colNm':colNm}, open('/home/younesz/Desktop/varstest'+iS+'.p', 'wb') )
 """
 
