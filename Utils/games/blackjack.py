@@ -28,14 +28,14 @@ from copy import deepcopy
 
 class blackJack:
 
-    def __init__(self, gameType='infinite'):
+    def __init__(self, gameType='infinite', printStatus=True):
         # Data location
         self.gameType   =   gameType
         # Initiate data structures
         self.replace=   {'jack':'10', 'queen':'10', 'king':'10'}
         self.history=   []
         # Initiate game deck
-        self.deck_new()
+        self.deck_new(printStatus=printStatus)
 
     def deck_new(self, statusOnly=False, printStatus=True, initCards=None):
         # Make a new card deck

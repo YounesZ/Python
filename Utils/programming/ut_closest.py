@@ -11,13 +11,13 @@ def main(values, ref_vec):
     Vl      =   [0]*nEl
     for ii in range(nEl):
         # Subtract
-        subV    =   abs( np.array(ref_vec) - values[ii] )
+        subV    =   np.sqrt( np.sum( ( np.array(ref_vec) - np.tile(np.array(values[ii]), [len(ref_vec), 1]) ) ** 2, axis=1 ) )
         ix      =   np.argmin( subV )
 
         # Add to vector
         idX[ii] =   ix
         Vl[ii]  =   ref_vec[ix]
-    return idX
+    return idX, Vl
 
 
 

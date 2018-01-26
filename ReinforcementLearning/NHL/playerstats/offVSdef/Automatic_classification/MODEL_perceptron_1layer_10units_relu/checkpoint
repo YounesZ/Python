@@ -1,0 +1,2 @@
+model_checkpoint_path: "/Users/younes_zerouali/Documents/Stradigi/Code/NHL_stats_SL/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu/MODEL_perceptron_1layer_10units_relu"
+all_model_checkpoint_paths: "/Users/younes_zerouali/Documents/Stradigi/Code/NHL_stats_SL/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu/MODEL_perceptron_1layer_10units_relu"

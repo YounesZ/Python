@@ -9,7 +9,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 class blackjack_policy_solver_light():
 
-    def __init__(self, initMode='random', gameType='finite', eGreedy=0):
+    def __init__(self, initMode='random', gameType='finite', eGreedy=0, learnRate=0.1, discount=0.8):
         # States
         self.agent_states   =   list( range(12,22) )
         self.dealer_states  =   list( range(2,12) )
@@ -29,6 +29,10 @@ class blackjack_policy_solver_light():
         self.state_value    =   np.zeros([len(self.agent_states), len(self.dealer_states), 2])
         # Agent greediness
         self.eGreedy        =   eGreedy
+        self.history        =   []
+        # Learning parameters
+        self.learnRate      =   learnRate
+        self.discount       =   discount
 
     def card_reset(self):
         self.cardProba      =   [1/13]*8 + [4/13] + [1/13]
@@ -76,25 +80,31 @@ class blackjack_policy_solver_light():
         else:
             card1   =   self.card_draw(exception=11)
         card2       =   curState - card1
-        self.agent  =   {'state':curState, 'usable':isUsable}
-
+        self.agent  =   {'state':curState, 'usable':isUsable, 'hand':[card1, card2]}
         # Choose 1 random state for dealer
         self.dealer =   {'state':self.card_draw(choice(self.dealer_states)), 'usable':0}
 
-    def init_episode2(self):
+    def init_episode2(self, A=[], D=[]):
         self.card_reset()
         # Draw cards for Agent
-        self.agent  =   {'state':0, 'usable':False}
+        self.agent  =   {'state':0, 'usable':False, 'hand':[]}
         while self.agent['state']<12:
-            card    =   self.card_draw()
+            if len(A)>0:
+                card    =   A.pop(0)
+            else:
+                card    =   self.card_draw()
             if card ==  11 and self.agent['state']==11:
                 card-=  10
             self.agent['state']     +=  card
-            self.agent['usable']    =   self.agent['usable'] + card==1
+            self.agent['hand']      +=  [card]
+            self.agent['usable']    =   self.agent['usable'] + card==11
         # Draw card for Dealer
-        self.dealer = {'state': self.card_draw(), 'usable': False}
+        if len(D)>0:
+            self.dealer = {'state': D.pop(), 'usable': False}
+        else:
+            self.dealer = {'state': self.card_draw(), 'usable': False}
 
-    def run_MCES_episode(self):
+    def run_episode(self, method='MC', dealerFinalScore=None):
         # Init variables
         state_chain     =   [[self.agent['state'], self.dealer['state']]]
         action_chain    =   []
@@ -112,20 +122,30 @@ class blackjack_policy_solver_light():
             # HIT
             if action:
                 action_chain.append(1)
-                newCard                 =   self.card_draw()
+                prevState   =   self.agent['state']
+                prevUsable  =   self.agent['usable']
+                newCard     =   self.card_draw()
                 self.agent['state']     +=  newCard
+                self.agent['hand']      +=  [newCard]
                 if newCard == 11: self.agent['usable'] += 1
                 if self.agent['state']>21 and bool(self.agent['usable']):
                     self.agent['state'] -=  10
                     self.agent['usable']-=  1
-                elif self.agent['state']>21:
+                if self.agent['state']>21:
                     reward  =   -1
                     loopon  =   False
-                if self.agent['state'] <= 21:
+                    self.agent['state']     =   0
+                else:
                     # Select action
                     action  =   self.greedy_action(method='soft_egreedy')
                     state_chain.append([self.agent['state'], self.dealer['state']])
                     usable_chain.append(int(self.agent['usable']))
+                    # TD update: the old state is not terminal
+                    if method=='TD':
+                        Qold = self.action_value[prevState - 12, self.dealer['state'] - 2, prevUsable, 1]
+                        Qnew = self.action_value[self.agent['state'] - 12, self.dealer['state'] - 2, self.agent['usable'], int(action)]
+                        self.action_value[prevState - 12, self.dealer['state'] - 2, prevUsable, 1] = Qold + self.learnRate * (self.discount * Qnew - Qold)
+                        self.policy_agent[prevState - 12, self.dealer['state'] - 2, prevUsable] = self.greedy_choice(self.action_value[prevState - 12, self.dealer['state'] - 2, prevUsable, :])
             else: # STICK
                 action_chain.append(0)
                 loopon =    False
@@ -133,6 +153,9 @@ class blackjack_policy_solver_light():
         # Dealer's turn
         loopon  =   reward>-1
         action  =   self.policy_dealer[self.dealer['state']-1]
+        if not dealerFinalScore is None:
+            loopon  =   True
+            action  =   False
         card2   =   self.card_draw()
         evalC   =   True
         self.dealer['usable']   =   int(self.dealer['state']==11) + int(card2==11)
@@ -145,7 +168,7 @@ class blackjack_policy_solver_light():
                 if self.dealer['state']>21 and bool(self.dealer['usable']):
                     self.dealer['state'] -=  10
                     self.dealer['usable']-=  1
-                elif self.dealer['state']>21:
+                if self.dealer['state']>21:
                     reward  =   1
                     loopon  =   False
                     evalC   =   False
@@ -162,18 +185,15 @@ class blackjack_policy_solver_light():
             action      =   deepcopy(self.policy_dealer[min(20,self.dealer['state']-1)])
         return reward, state_chain, action_chain, usable_chain
 
-    def monte_carlo_ES(self, nIterations):
+    def monte_carlo(self, nIterations, dealerFinalScore=None):
         # Loop
         for ii in range(nIterations):
             #if not ii%5000: print('Iteration '+str(ii))
             # Init episode
-            self.init_episode()
+            if dealerFinalScore is None: self.init_episode()
             # Run the episode
-            reward, state_chain, action_chain, usable_chain     =   self.run_MCES_episode()
-            #print(state_chain)
-            #print('actions', action_chain)
-            #print('usable', usable_chain)
-            #print('reward', reward)
+            reward, state_chain, action_chain, usable_chain     =   self.run_episode(dealerFinalScore=dealerFinalScore)
+            self.history.append(reward)
             # Distribute reward
             for st, ac, us in zip(state_chain, action_chain, usable_chain):
                 self.returns[st[0]-12, st[1]-2, us, ac]  +=  reward
@@ -181,7 +201,24 @@ class blackjack_policy_solver_light():
                 # State value and policy
                 self.action_value[st[0] - 12, st[1] - 2, us, ac]    =   self.returns[st[0] - 12, st[1] - 2, us, ac] / self.visits[st[0] - 12, st[1] - 2, us, ac]
                 self.policy_agent[st[0] - 12, st[1] - 2, us]        =   self.greedy_choice(self.action_value[st[0] - 12, st[1] - 2, us, :])
-                self.state_value[st[0] - 12, st[1] - 2, us]         =   np.max(self.action_value[st[0] - 12, st[1] - 2, us, :])
+
+    def TD0(self, nIterations):
+        # Basically, combination of pure TD learning with MC
+        # MC method when only 1 state in an episode
+        # TD learning when 2 or more states in an episode
+        # Loop
+        for ii in range(nIterations):
+            #if not ii%5000: print('Iteration '+str(ii))
+            # Init episode
+            self.init_episode()
+            # Run the episode
+            reward, state_chain, action_chain, usable_chain = self.run_episode(method='TD')
+            self.history.append(reward)
+            # Only the last state needs updating:
+            st, ac, us      =   (state_chain[-1], action_chain[-1], usable_chain[-1])
+            self.action_value[st[0] - 12, st[1] - 2, us, ac]    =   self.action_value[st[0] - 12, st[1] - 2, us, ac] + self.learnRate*(reward - self.action_value[st[0] - 12, st[1] - 2, us, ac])
+            self.policy_agent[st[0] - 12, st[1] - 2, us]        =   self.greedy_choice(self.action_value[st[0] - 12, st[1] - 2, us, :])
+        self.state_value    =   np.max(self.action_value, axis=3)
 
     def data_save(self, filename):
         # Package the data
@@ -259,8 +296,8 @@ class blackjack_policy_solver_light():
 
 
 # ==== LAUNCHER
-#BJS    =   blackjack_policy_solver_light(initMode='random', eGreedy=0.0)
-#BJS.monte_carlo_ES(500000)
+#BJS    =   blackjack_policy_solver_light(initMode='random', eGreedy=0.05, learnRate=0.15)
+#BJS.TD0(100000)
 #BJS.data_save('ReinforcementLearning/blackJack/blackjack_MCES_solution.p')
 #BJS.print_policy()
 #BJS.print_stateValue()
