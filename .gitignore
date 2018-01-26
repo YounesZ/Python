@@ -6,6 +6,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Local data
+data/
+
 # 
 ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification
 ReinforcementLearning/NHL/playbyplay/data/GAME_data.p
