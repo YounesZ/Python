@@ -1,3 +1,19 @@
+# backups
+*~
+.ipynb_checkpoints/
+
+# Idea stuff
+.idea/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local data
+data/
+
+# 
 ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification
 ReinforcementLearning/NHL/playbyplay/data/GAME_data.p
 ReinforcementLearning/NHL/playbyplay/data/stable/GAME_data.p
