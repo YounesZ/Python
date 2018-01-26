@@ -29,32 +29,33 @@ class ANN_classifier():
 
     def __init__(self, nNodes=[10,20,2]):
         # Launch the builder
-        nodes       =   deepcopy(nNodes)
-        nInputs     =   nodes.pop(0)
-        nOutputs    =   nodes.pop(-1)
-        nHidden     =   len(nodes)
-        self.ann_build_network(nInputs, nOutputs, nodes)
+        nodes           =   deepcopy(nNodes)
+        self.nInputs    =   nodes.pop(0)
+        self.nOutputs   =   nodes.pop(-1)
+        self.nNodes     =   nodes
 
-    def ann_build_network(self, nInputs, noutputs, nNodes):
+    def ann_train_network(self, nIter, annI, annT, svname=None):
+
+        # === FIRST: build the network
         # Architecture - 1 layer
-        self.annX   =   tf.placeholder(tf.float32, [None, nInputs], name='Input_to_the_network-player_features')
-        self.annY_  =   tf.placeholder(tf.float32, [None, 2], name='Ground_truth')
-        annW1       =   tf.Variable(tf.truncated_normal([nInputs, nNodes[0]], stddev=0.1), name='weights_inp_hid')
-        annB1       =   tf.Variable(tf.ones([1, nNodes[0]]) / 10, name='bias_inp_hid')
-        Y1          =   tf.add( tf.nn.relu(tf.matmul(self.annX, annW1)), annB1, name='hid_output')
-        annW2       =   tf.Variable(tf.truncated_normal([nNodes[0], noutputs], stddev=0.1), name='weights_hid_out')
-        annB2       =   tf.Variable(tf.ones([1, noutputs]) / 10, name='bias_hid_out')
-        self.annY   =   tf.add( tf.matmul(Y1, annW2), annB2, name='prediction' )
+        annX        =   tf.placeholder(tf.float32, [None, self.nInputs], name='Input_to_the_network-player_features')
+        annY_       =   tf.placeholder(tf.float32, [None, 2], name='Ground_truth')
+        annW1       =   tf.Variable(tf.truncated_normal([self.nInputs, self.nNodes[0]], stddev=0.1), name='weights_inp_hid')
+        annB1       =   tf.Variable(tf.ones([1, self.nNodes[0]]) / 10, name='bias_inp_hid')
+        Y1          =   tf.add(tf.nn.relu(tf.matmul(annX, annW1)), annB1, name='hid_output')
+        annW2       =   tf.Variable(tf.truncated_normal([self.nNodes[0], self.nOutputs], stddev=0.1), name='weights_hid_out')
+        annB2       =   tf.Variable(tf.ones([1, self.nOutputs]) / 10, name='bias_hid_out')
+        annY        =   tf.add(tf.matmul(Y1, annW2), annB2, name='prediction')
         # Init variables
         init        =   tf.global_variables_initializer()
         # Optimization
-        self.loss       =   tf.reduce_mean(tf.squared_difference(self.annY_, self.annY))
-        self.train_step =   tf.train.GradientDescentOptimizer(0.1).minimize(self.loss)
+        loss        =   tf.reduce_mean(tf.squared_difference(annY_, annY))
+        train_step  =   tf.train.GradientDescentOptimizer(0.1).minimize(loss)
         # Compute accuracy
-        is_correct      =   tf.equal(tf.argmax(self.annY, axis=1), tf.argmax(self.annY_, axis=1))
-        self.accuracy   =   tf.reduce_mean(tf.cast(is_correct, tf.float32))
+        is_correct  =   tf.equal(tf.argmax(annY, axis=1), tf.argmax(annY_, axis=1))
+        accuracy    =   tf.reduce_mean(tf.cast(is_correct, tf.float32))
 
-    def ann_train_network(self, nIter, annI, annT, svname=None):
+
         self.trLoss, self.tsLoss, self.trAcc, self.tsAcc, nIter = [], [], [], [], 50
         # Initialize the model saver
         #builder         =   SavedModelBuilder(svname)
@@ -62,9 +63,9 @@ class ANN_classifier():
         for iIt in range(nIter):
             # --- TRAIN ANN
             # Init instance
-            init        =   tf.global_variables_initializer()
-            self.sess   =   tf.Session()
-            self.sess.run(init)
+            init    =   tf.global_variables_initializer()
+            sess    =   tf.Session()
+            sess.run(init)
             # Split train/test data
             train_X, test_X, train_Y, test_Y = train_test_split(annI, annT, test_size=0.25)
             # Loop on data splits
@@ -74,21 +75,21 @@ class ANN_classifier():
             while np.sum(batchSize) + maxSize < train_X.shape[0]:
                 nSteps      +=  1
                 batchSize   =   np.floor( ((np.exp(range(nSteps)) - 1) / (np.exp(nSteps) - 1)) ** .05 * (maxSize - minSize)) + minSize
-            batchSize   =   np.append(batchSize, train_X.shape[0] - np.sum(batchSize)).astype(int)
+            batchSize       =   np.append(batchSize, train_X.shape[0] - np.sum(batchSize)).astype(int)
             trL, tsL, trA, tsA  =   [], [], [], []
             for ib in batchSize:
                 # Slice input and target
                 trInput, train_X    =   train_X[:ib, :], train_X[ib:, :]
                 trTarget, train_Y   =   train_Y[:ib, :], train_Y[ib:, :]
                 # Pass them through
-                dictDT  =   {self.annX: trInput, self.annY_: trTarget}
-                self.sess.run(self.train_step, feed_dict=dictDT)
-                trL.append(self.sess.run(self.loss, feed_dict=dictDT))
-                trA.append(self.sess.run(self.accuracy, feed_dict=dictDT))
+                dictDT  =   {annX: trInput, annY_: trTarget}
+                sess.run(train_step, feed_dict=dictDT)
+                trL.append(sess.run(loss, feed_dict=dictDT))
+                trA.append(sess.run(accuracy, feed_dict=dictDT))
                 # Assess accuracy
-                dictTS  =   {self.annX: test_X, self.annY_: test_Y}
-                tsL.append(self.sess.run(self.loss, feed_dict=dictTS))
-                tsA.append(self.sess.run(self.accuracy, feed_dict=dictTS))
+                dictTS  =   {annX: test_X, annY_: test_Y}
+                tsL.append(sess.run(loss, feed_dict=dictTS))
+                tsA.append(sess.run(accuracy, feed_dict=dictTS))
             # plt.figure(); plt.plot(fcnLoss)
             self.trLoss.append(trL)
             self.tsLoss.append(tsL)
@@ -101,7 +102,7 @@ class ANN_classifier():
             builder.add_meta_graph_and_variables(self.sess, [tag_constants.SERVING])
             builder.save()
             """
-            saver.save(self.sess, path.join(repoModel, 'MODEL_perceptron_1layer_10units_relu'))
+            saver.save(sess, path.join(repoModel, 'MODEL_perceptron_1layer_10units_relu'))
             pickle.dump({'trLoss':self.trLoss, 'tsLoss':self.tsLoss, 'trAcc':self.trAcc, 'tsAcc':self.tsAcc, 'batchSize':self.batchSize}, \
                         open(path.join(repoModel, 'addedVariables.p'), 'wb') )
 
@@ -129,21 +130,21 @@ class ANN_classifier():
         Ax2.set_xlim([min(self.batchSize), np.sum(self.batchSize)])
         Ax2.set_ylim([0.4, 1])
 
-    def ann_reload_network(self, repoModel):
+    def ann_forward_pass(self, repoModel, input_data):
         # Reload the graph and variables
-        self.sess   =   tf.Session()
+        sess        =   tf.Session()
         saver       =   tf.train.import_meta_graph( path.join(repoModel, path.basename(repoModel)+'.meta') )
-        saver.restore(self.sess, tf.train.latest_checkpoint(path.join(repoModel, './')))
+        saver.restore(sess, tf.train.latest_checkpoint(path.join(repoModel, './')))
         # Link TF variables to the classifier class
-        graph       =   self.sess.graph
-        self.annX   =   graph.get_tensor_by_name('Input_to_the_network-player_features:0')
+        graph       =   sess.graph
+        annX        =   graph.get_tensor_by_name('Input_to_the_network-player_features:0')
         """self.annY_  =   graph.get_tensor_by_name('Ground_truth:0')
         self.annW1  =   graph.get_tensor_by_name('weights_inp_hid:0')
         self.annB1  =   graph.get_tensor_by_name('bias_inp_hid:0')
         self.Y1     =   graph.get_operation_by_name('hid_output')
         self.annW2  =   graph.get_tensor_by_name('weights_hid_out:0')
         self.annB2  =   graph.get_tensor_by_name('bias_hid_out:0')"""
-        self.annY   =   graph.get_tensor_by_name('prediction:0')
+        annY        =   graph.get_tensor_by_name('prediction:0')
         # Restore additional variables
         VAR         =   pickle.load( open(path.join(repoModel, 'addedVariables.p'), 'rb') )
         self.trLoss =   VAR['trLoss']
@@ -151,6 +152,7 @@ class ANN_classifier():
         self.trAcc  =   VAR['trAcc']
         self.tsAcc  =   VAR['tsAcc']
         self.batchSize = VAR['batchSize']
+        return sess.run(annY, feed_dict={annX:input_data})
 
 
 def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', uptocode=None, nGames=82, plNames=None):
@@ -382,8 +384,8 @@ def get_training_data(season, minGames=0):
         # Process Ross
         df_r    =   trophies['ross']
         # Make the voting dataframes
-        tempy1  =   np.concatenate((np.reshape(df_r['WEIGHT'].values, [len(df_r), 1]), np.zeros([len(df_r), 1])), axis=1)
-        tempy2  =   np.concatenate((np.zeros([len(df_s), 1]), np.reshape(df_s['WEIGHT'].values, [len(df_s), 1])), axis=1)
+        tempy1  =   np.concatenate((np.reshape(df_r['WEIGHT_rank'].values, [len(df_r), 1]), np.zeros([len(df_r), 1])), axis=1)
+        tempy2  =   np.concatenate((np.zeros([len(df_s), 1]), np.reshape(df_s['WEIGHT_rank'].values, [len(df_s), 1])), axis=1)
         tempY   =   pd.concat([pd.DataFrame(tempy1/np.max(tempy1), index=df_r.index), pd.DataFrame(tempy2/np.max(tempy2), index=df_s.index)])
         tempY   =   tempY.groupby(tempY.index).agg({0:sum, 1:sum})
         tempX   =   sea_stats.loc[tempY.index, dtCols]
@@ -463,7 +465,7 @@ def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=None, minGames
         allS_p  =   ut_find_folders(repoPbP, True)
 
     # Get data
-    X,Y, X_all,POS_all,colNm=   get_training_data(allS_p, minGames=minGames)
+    X,Y, X_all,POS_all,PLD_all, colNm=   get_training_data(allS_p, minGames=minGames)
     """
     with open( path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p'), 'wb') as f:
         pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'colNm':colNm, 'POS_all':POS_all}, f)
@@ -477,14 +479,19 @@ def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=None, minGames
     """
 
     # --- PRE-PROCESS DATA
-    Y, X, POS_all, X_all =   ut_sanitize_matrix(Y, X), ut_sanitize_matrix(X), ut_sanitize_matrix(POS_all, X_all), ut_sanitize_matrix(X_all)
+    Y, X, POS_all, PLD_all, X_all =   ut_sanitize_matrix(Y, X), ut_sanitize_matrix(X), ut_sanitize_matrix(POS_all, X_all), ut_sanitize_matrix(PLD_all, X_all), ut_sanitize_matrix(X_all)
+    # --- KEEP >N GAMES
+    if minGames > 0 and minGames < 1:  # Fraction on the max
+        minGames = (np.max(PLD_all) / 5).astype('int')[0]
+    X_all       =   X_all[(PLD_all>=minGames).values]
+    POS_all     =   POS_all[(PLD_all>=minGames).values]
     X_all_S, Nrm=   do_normalize_data(X_all[(POS_all!='D').values])
     X_S, _      =   do_normalize_data(X, normalizer=Nrm)
     _, pca      =   do_reduce_data(X_all_S, nComp=18)
     X_S_P, _    =   do_reduce_data(X_S, pca=pca, nComp=18)
     # --- BUILD THE NETWORK
     nNodes  =   [X_S_P.shape[1], 15, Y.shape[1]]
-    CLS     =   ANN_classifier( deepcopy(nNodes) )
+    CLS     =   ANN_classifier(deepcopy(nNodes))
     # --- TRAIN THE NETWORK
     nIter   =   50
     CLS.ann_train_network(nIter, X_S_P, Y.values, svname=repoModel)
@@ -504,10 +511,7 @@ def do_ANN_classification(repoModel, dtCols, normalizer, pca, upto='2016-07-01',
     #annI, annT, _, _, _     =   do_process_data( DT[dtCols], pd.DataFrame(np.zeros([len(DT), 1])), pca=pca, mu=mu, sigma=sigma )
     # --- RELOAD THE NETWORK IMAGE
     CLS         =   ANN_classifier([DT_n_p.shape[1], 20, 2])
-    CLS.ann_reload_network(repoModel)
-    # --- CLASSIFY DATA
-    DTfeed      =   {CLS.annX:DT_n_p}
-    return DT, pd.DataFrame(DT_n_p, index=DT.index), CLS.sess.run(CLS.annY, feed_dict=DTfeed)
+    return DT, pd.DataFrame(DT_n_p, index=DT.index), CLS.ann_forward_pass(repoModel, DT_n_p)
 
 
 def do_clustering(data, classes, upto, root):
@@ -524,9 +528,9 @@ def do_clustering(data, classes, upto, root):
     torem       =   list(set(ross_id).intersection(selke_id))
     maxV        =   np.argmax(classes.iloc[torem].values, axis=1).astype(bool)
     selke_id    =   ut_difference(selke_id, list(compress(torem, maxV)))
-    selke_wgt   =   selke['WEIGHT'].values / np.max(selke['WEIGHT'].values)
+    selke_wgt   =   selke['WEIGHT_rank'].values / np.max(selke['WEIGHT_rank'].values)
     ross_id     =   ut_difference(ross_id, list(compress(torem, maxV != True)))
-    ross_wgt    =   ross['WEIGHT'].values / np.max(ross['WEIGHT'].values)
+    ross_wgt    =   ross['WEIGHT_rank'].values / np.max(ross['WEIGHT_rank'].values)
 
     # Get poorest ranked players
     seed        =   classes.min(axis=0)
@@ -589,10 +593,10 @@ def do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root):
         torem       =   list( set(ross_id).intersection(selke_id) )
         maxV        =   np.argmax(classes.iloc[torem].values, axis=1).astype(bool)
         selke_id    =   ut_difference( selke_id, list( compress(torem, maxV) ))
-        selke_wgt   =   selke.loc[data.iloc[selke_id].index]['WEIGHT'].values
+        selke_wgt   =   selke.loc[data.iloc[selke_id].index]['WEIGHT_rank'].values
         selke_wgt   =   selke_wgt/np.max(selke_wgt)
         ross_id     =   ut_difference( ross_id, list( compress(torem, maxV!=True) ))
-        ross_wgt    =   ross.loc[data.iloc[ross_id].index]['WEIGHT'].values
+        ross_wgt    =   ross.loc[data.iloc[ross_id].index]['WEIGHT_rank'].values
         ross_wgt    =   ross_wgt / np.max(ross_wgt)
         # Get poorest ranked players
         seed        =   classes.min(axis=0)
@@ -729,7 +733,7 @@ repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVS
 # === MAKE THE PLAYER CLASSIFICATION FRAMEWORK
 
 # Train automatic classifier - ANN
-normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel)     # Nrm is the normalizing terms for the raw player features
+normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, minGames=0.2)     # Nrm is the normalizing terms for the raw player features
 CLS.ann_display_accuracy()
 # Classify player data : MULTIPLE YEARS
 global_centers  =   do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root)
@@ -778,7 +782,7 @@ for iS in allS_p:
     CLS                     =   ANN_classifier( deepcopy(nNodes) )
     # --- TRAIN THE NETWORK
     nIter                   =   50
-    CLS.ann_train_network(nIter, X_S_P, Y.values, svname=repoModel)
+    CLS.ann_train_network(nIter, X_S_P, Y.values, svname=None)
     classification  =   pd.DataFrame( CLS.sess.run(CLS.annY, feed_dict={CLS.annX:X_S_P}), columns=['OFF', 'DEF'])
     CLS.ann_display_accuracy()   
     cccc    =   np.array([[0,1], [1,0], [0,0]])
@@ -810,30 +814,34 @@ for iS in allS_p:
     ALLchl.append(len(A)/len(X_all)*100)
     
     
-    # Display prediction accuracy
-    plt.figure()
-    plt.scatter( ALLchl, ALLacc)
-    plt.gca().set_xlim([np.min(ALLchl+ALLacc), np.max(ALLchl+ALLacc)])
-    plt.gca().set_ylim([np.min(ALLchl+ALLacc), np.max(ALLchl+ALLacc)])
-    plt.plot( range(np.max(ALLchl+ALLacc).astype('int')), range(np.max(ALLchl+ALLacc).astype('int')), color='red' )
-    plt.gca().set_xlabel('chance level')
-    plt.gca().set_ylabel('accuracy')
-    plt.gca().set_title('Prediction of Selke nominees')
-    [plt.text(x,y,z) for x,y,z in zip(ALLchl, ALLacc, allS_p)]
+# Display prediction accuracy
+plt.figure()
+plt.scatter( ALLchl, ALLacc)
+plt.gca().set_xlim([np.min(ALLchl+ALLacc), np.max(ALLchl+ALLacc)])
+plt.gca().set_ylim([np.min(ALLchl+ALLacc), np.max(ALLchl+ALLacc)])
+plt.plot( range(np.max(ALLchl+ALLacc).astype('int')), range(np.max(ALLchl+ALLacc).astype('int')), color='red' )
+plt.gca().set_xlabel('chance level')
+plt.gca().set_ylabel('accuracy')
+plt.gca().set_title('Prediction of Selke nominees')
+[plt.text(x,y,z) for x,y,z in zip(ALLchl, ALLacc, allS_p)]
 """
     
-
+""" 
 # ============
 # TEST - PREDICT N NOMINEES
 # ============
 # First get data for each year and save it
 allS_p      =   ut_find_folders(repoPbP, True)
 """
+
+"""
 for iS in allS_p:
     #shuffle(allS_p)
     #iS                      =   allS_p.pop(0)
     X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( [iS], minGames=0)
     pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'POS_all':POS_all, 'PLD_all':PLD_all, 'colNm':colNm}, open('/home/younesz/Desktop/varstest'+iS+'.p', 'wb') )
+"""
+
 """
 ACCm, ACCe  =   [], []
 CHLm, CHLe  =   [], []    
@@ -896,7 +904,7 @@ for Nnom in lNnom:
         B = pdCL.index.values[:Nnom]
         #print( 'prediction accuracy: %0.2f %%, chance level: %0.2f %%' %(len( list( set(A).intersection(B) ) )/ Nnom * 100, Nnom/len(X_all)*100) )
         ALLacc.append(len( list( set(A).intersection(B) ) )/ len(B) * 100)
-        ALLchl.append(len(A)/len(X_all)*100)
+        ALLchl.append(len(A)/gitlen(X_all)*100)
     
     print('Guess level: %i/%i done' %(Nnom, len(lNnom)) )
     ACCm.append( np.mean(ALLacc) )
@@ -904,21 +912,22 @@ for Nnom in lNnom:
     CHLm.append( np.mean(ALLchl) )
     CHLe.append( np.std(ALLchl) )
     
-"""    
+   
 # Display prediction accuracy
 N = len(lNnom)
 fig, ax = plt.subplots()
 ind = np.arange(N)    # the x locations for the groups
 width = 0.35         # the width of the bars
-p1 = ax.bar(ind, ACCm, width, color='r', bottom=0*cm, yerr=ACCe)
-p2 = ax.bar(ind + width, CHLm, width, color='y', bottom=0*cm, yerr=CHLe)
-ax.set_title('Scores by group and gender')
+p1 = ax.bar(ind, ACCm, width, color='r', bottom=0, yerr=ACCe)
+p2 = ax.bar(ind + width, CHLm, width, color='y', bottom=0, yerr=CHLe)
+ax.set_title('Selke nominees prediction accuracy')
 ax.set_xticks(ind + width / 2)
 ax.set_xticklabels(lNnom)
+ax.set_xlabel('Number of guesses (ordered)')
+ax.set_ylabel('Accuracy')
 ax.legend((p1[0], p2[0]), ('model prediction', 'chance level'))
 #ax.autoscale_view()
-plt.show()
-    
+plt.show()  
     
 """
 

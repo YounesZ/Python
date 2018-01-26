@@ -288,7 +288,7 @@ class Game:
             self.lineShifts     =   self.lineShifts[self.lineShifts['iceduration']>=20]
 
 
-    def pull_players_classes(self, model, classifier):
+    def pull_players_classes(self, model, classifier, nGames=30):
         # List concerned players
         all_pl  =   self.lineShifts['playersID'].values
         if len(all_pl) == 0:
@@ -301,7 +301,7 @@ class Game:
             return
         # Get raw player stats
         gcode   =   int( str(self.season)[:4]+'0'+str(self.gameId) )
-        DT, dtCols  =   pull_stats(self.repoPSt, self.repoPbP, uptocode=gcode, nGames=30, plNames=all_plN.values)
+        DT, dtCols  =   pull_stats(self.repoPSt, self.repoPbP, uptocode=gcode, nGames=nGames, plNames=all_plN.values)
         # --- Get player classes
         # pre-process data
         DT[dtCols]  =   ut_sanitize_matrix(DT[dtCols])
@@ -412,10 +412,11 @@ repoSave    =   None #path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/
 
 # LEARN LINE VALUES
 # =================
+"""
 HSS         =   HockeySS(repoPbP, repoPSt)
 HSS.list_all_games()
 HSS.pull_RL_data(repoModel, repoSave)
-"""HSS.teach_RL_agent()
+HSS.teach_RL_agent()
 
 
 
