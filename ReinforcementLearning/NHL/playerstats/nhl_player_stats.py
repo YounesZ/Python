@@ -102,9 +102,9 @@ class ANN_classifier():
             builder.add_meta_graph_and_variables(self.sess, [tag_constants.SERVING])
             builder.save()
             """
-            saver.save(sess, path.join(repoModel, 'MODEL_perceptron_1layer_10units_relu'))
+            saver.save(sess, path.join(svname, 'MODEL_perceptron_1layer_10units_relu'))
             pickle.dump({'trLoss':self.trLoss, 'tsLoss':self.tsLoss, 'trAcc':self.trAcc, 'tsAcc':self.tsAcc, 'batchSize':self.batchSize}, \
-                        open(path.join(repoModel, 'addedVariables.p'), 'wb') )
+                        open(path.join(svname, 'addedVariables.p'), 'wb') )
 
     def ann_display_accuracy(self):
         # Make figure
@@ -720,12 +720,12 @@ def do_assess_clustering_robustness(dtCols, normalizer, global_centers, pca, nGa
 # =========
 """
 root        =   '/home/younesz/Documents'
-root        =   '/Users/younes_zerouali/Documents/Stradigi/NHL_stats_SL'
+root        =   '/Users/younes_zerouali/Documents/Stradigi'
 repoPbP     =   path.join(root, 'Databases/Hockey/PlayByPlay')
 repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
 repoRaw     =   path.join(root, 'Databases/Hockey/PlayerStats/raw')
-repoCode    =   path.join(root, 'Code/Python')
-repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
+repoCode    =   path.join(root, 'NHL_stats_SL/Code/Python')
+repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification')
 
 
 
@@ -734,7 +734,7 @@ repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVS
 # === MAKE THE PLAYER CLASSIFICATION FRAMEWORK
 
 # Train automatic classifier - ANN
-normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, minGames=0.2)     # Nrm is the normalizing terms for the raw player features
+normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, minGames=-1)     # Nrm is the normalizing terms for the raw player features
 CLS.ann_display_accuracy()
 # Classify player data : MULTIPLE YEARS
 global_centers  =   do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root)
