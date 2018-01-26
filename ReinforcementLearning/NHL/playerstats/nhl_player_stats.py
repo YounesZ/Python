@@ -29,32 +29,33 @@ class ANN_classifier():
 
     def __init__(self, nNodes=[10,20,2]):
         # Launch the builder
-        nodes       =   deepcopy(nNodes)
-        nInputs     =   nodes.pop(0)
-        nOutputs    =   nodes.pop(-1)
-        nHidden     =   len(nodes)
-        self.ann_build_network(nInputs, nOutputs, nodes)
+        nodes           =   deepcopy(nNodes)
+        self.nInputs    =   nodes.pop(0)
+        self.nOutputs   =   nodes.pop(-1)
+        self.nNodes     =   nodes
 
-    def ann_build_network(self, nInputs, noutputs, nNodes):
+    def ann_train_network(self, nIter, annI, annT, svname=None):
+
+        # === FIRST: build the network
         # Architecture - 1 layer
-        self.annX   =   tf.placeholder(tf.float32, [None, nInputs], name='Input_to_the_network-player_features')
-        self.annY_  =   tf.placeholder(tf.float32, [None, 2], name='Ground_truth')
-        annW1       =   tf.Variable(tf.truncated_normal([nInputs, nNodes[0]], stddev=0.1), name='weights_inp_hid')
-        annB1       =   tf.Variable(tf.ones([1, nNodes[0]]) / 10, name='bias_inp_hid')
-        Y1          =   tf.add( tf.nn.relu(tf.matmul(self.annX, annW1)), annB1, name='hid_output')
-        annW2       =   tf.Variable(tf.truncated_normal([nNodes[0], noutputs], stddev=0.1), name='weights_hid_out')
-        annB2       =   tf.Variable(tf.ones([1, noutputs]) / 10, name='bias_hid_out')
-        self.annY   =   tf.add( tf.matmul(Y1, annW2), annB2, name='prediction' )
+        annX        =   tf.placeholder(tf.float32, [None, self.nInputs], name='Input_to_the_network-player_features')
+        annY_       =   tf.placeholder(tf.float32, [None, 2], name='Ground_truth')
+        annW1       =   tf.Variable(tf.truncated_normal([self.nInputs, self.nNodes[0]], stddev=0.1), name='weights_inp_hid')
+        annB1       =   tf.Variable(tf.ones([1, self.nNodes[0]]) / 10, name='bias_inp_hid')
+        Y1          =   tf.add(tf.nn.relu(tf.matmul(annX, annW1)), annB1, name='hid_output')
+        annW2       =   tf.Variable(tf.truncated_normal([self.nNodes[0], self.nOutputs], stddev=0.1), name='weights_hid_out')
+        annB2       =   tf.Variable(tf.ones([1, self.nOutputs]) / 10, name='bias_hid_out')
+        annY        =   tf.add(tf.matmul(Y1, annW2), annB2, name='prediction')
         # Init variables
         init        =   tf.global_variables_initializer()
         # Optimization
-        self.loss       =   tf.reduce_mean(tf.squared_difference(self.annY_, self.annY))
-        self.train_step =   tf.train.GradientDescentOptimizer(0.1).minimize(self.loss)
+        loss        =   tf.reduce_mean(tf.squared_difference(annY_, annY))
+        train_step  =   tf.train.GradientDescentOptimizer(0.1).minimize(loss)
         # Compute accuracy
-        is_correct      =   tf.equal(tf.argmax(self.annY, axis=1), tf.argmax(self.annY_, axis=1))
-        self.accuracy   =   tf.reduce_mean(tf.cast(is_correct, tf.float32))
+        is_correct  =   tf.equal(tf.argmax(annY, axis=1), tf.argmax(annY_, axis=1))
+        accuracy    =   tf.reduce_mean(tf.cast(is_correct, tf.float32))
 
-    def ann_train_network(self, nIter, annI, annT, svname=None):
+
         self.trLoss, self.tsLoss, self.trAcc, self.tsAcc, nIter = [], [], [], [], 50
         # Initialize the model saver
         #builder         =   SavedModelBuilder(svname)
@@ -62,9 +63,9 @@ class ANN_classifier():
         for iIt in range(nIter):
             # --- TRAIN ANN
             # Init instance
-            init        =   tf.global_variables_initializer()
-            self.sess   =   tf.Session()
-            self.sess.run(init)
+            init    =   tf.global_variables_initializer()
+            sess    =   tf.Session()
+            sess.run(init)
             # Split train/test data
             train_X, test_X, train_Y, test_Y = train_test_split(annI, annT, test_size=0.25)
             # Loop on data splits
@@ -74,21 +75,21 @@ class ANN_classifier():
             while np.sum(batchSize) + maxSize < train_X.shape[0]:
                 nSteps      +=  1
                 batchSize   =   np.floor( ((np.exp(range(nSteps)) - 1) / (np.exp(nSteps) - 1)) ** .05 * (maxSize - minSize)) + minSize
-            batchSize   =   np.append(batchSize, train_X.shape[0] - np.sum(batchSize)).astype(int)
+            batchSize       =   np.append(batchSize, train_X.shape[0] - np.sum(batchSize)).astype(int)
             trL, tsL, trA, tsA  =   [], [], [], []
             for ib in batchSize:
                 # Slice input and target
                 trInput, train_X    =   train_X[:ib, :], train_X[ib:, :]
                 trTarget, train_Y   =   train_Y[:ib, :], train_Y[ib:, :]
                 # Pass them through
-                dictDT  =   {self.annX: trInput, self.annY_: trTarget}
-                self.sess.run(self.train_step, feed_dict=dictDT)
-                trL.append(self.sess.run(self.loss, feed_dict=dictDT))
-                trA.append(self.sess.run(self.accuracy, feed_dict=dictDT))
+                dictDT  =   {annX: trInput, annY_: trTarget}
+                sess.run(train_step, feed_dict=dictDT)
+                trL.append(sess.run(loss, feed_dict=dictDT))
+                trA.append(sess.run(accuracy, feed_dict=dictDT))
                 # Assess accuracy
-                dictTS  =   {self.annX: test_X, self.annY_: test_Y}
-                tsL.append(self.sess.run(self.loss, feed_dict=dictTS))
-                tsA.append(self.sess.run(self.accuracy, feed_dict=dictTS))
+                dictTS  =   {annX: test_X, annY_: test_Y}
+                tsL.append(sess.run(loss, feed_dict=dictTS))
+                tsA.append(sess.run(accuracy, feed_dict=dictTS))
             # plt.figure(); plt.plot(fcnLoss)
             self.trLoss.append(trL)
             self.tsLoss.append(tsL)
@@ -101,7 +102,7 @@ class ANN_classifier():
             builder.add_meta_graph_and_variables(self.sess, [tag_constants.SERVING])
             builder.save()
             """
-            saver.save(self.sess, path.join(repoModel, 'MODEL_perceptron_1layer_10units_relu'))
+            saver.save(sess, path.join(repoModel, 'MODEL_perceptron_1layer_10units_relu'))
             pickle.dump({'trLoss':self.trLoss, 'tsLoss':self.tsLoss, 'trAcc':self.trAcc, 'tsAcc':self.tsAcc, 'batchSize':self.batchSize}, \
                         open(path.join(repoModel, 'addedVariables.p'), 'wb') )
 
@@ -129,21 +130,21 @@ class ANN_classifier():
         Ax2.set_xlim([min(self.batchSize), np.sum(self.batchSize)])
         Ax2.set_ylim([0.4, 1])
 
-    def ann_reload_network(self, repoModel):
+    def ann_forward_pass(self, repoModel, input_data):
         # Reload the graph and variables
-        self.sess   =   tf.Session()
+        sess        =   tf.Session()
         saver       =   tf.train.import_meta_graph( path.join(repoModel, path.basename(repoModel)+'.meta') )
-        saver.restore(self.sess, tf.train.latest_checkpoint(path.join(repoModel, './')))
+        saver.restore(sess, tf.train.latest_checkpoint(path.join(repoModel, './')))
         # Link TF variables to the classifier class
-        graph       =   self.sess.graph
-        self.annX   =   graph.get_tensor_by_name('Input_to_the_network-player_features:0')
+        graph       =   sess.graph
+        annX        =   graph.get_tensor_by_name('Input_to_the_network-player_features:0')
         """self.annY_  =   graph.get_tensor_by_name('Ground_truth:0')
         self.annW1  =   graph.get_tensor_by_name('weights_inp_hid:0')
         self.annB1  =   graph.get_tensor_by_name('bias_inp_hid:0')
         self.Y1     =   graph.get_operation_by_name('hid_output')
         self.annW2  =   graph.get_tensor_by_name('weights_hid_out:0')
         self.annB2  =   graph.get_tensor_by_name('bias_hid_out:0')"""
-        self.annY   =   graph.get_tensor_by_name('prediction:0')
+        annY        =   graph.get_tensor_by_name('prediction:0')
         # Restore additional variables
         VAR         =   pickle.load( open(path.join(repoModel, 'addedVariables.p'), 'rb') )
         self.trLoss =   VAR['trLoss']
@@ -151,6 +152,7 @@ class ANN_classifier():
         self.trAcc  =   VAR['trAcc']
         self.tsAcc  =   VAR['tsAcc']
         self.batchSize = VAR['batchSize']
+        return sess.run(annY, feed_dict={annX:input_data})
 
 
 def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', uptocode=None, nGames=82, plNames=None):
@@ -489,7 +491,7 @@ def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=None, minGames
     X_S_P, _    =   do_reduce_data(X_S, pca=pca, nComp=18)
     # --- BUILD THE NETWORK
     nNodes  =   [X_S_P.shape[1], 15, Y.shape[1]]
-    CLS     =   ANN_classifier( deepcopy(nNodes) )
+    CLS     =   ANN_classifier(deepcopy(nNodes))
     # --- TRAIN THE NETWORK
     nIter   =   50
     CLS.ann_train_network(nIter, X_S_P, Y.values, svname=repoModel)
@@ -509,10 +511,7 @@ def do_ANN_classification(repoModel, dtCols, normalizer, pca, upto='2016-07-01',
     #annI, annT, _, _, _     =   do_process_data( DT[dtCols], pd.DataFrame(np.zeros([len(DT), 1])), pca=pca, mu=mu, sigma=sigma )
     # --- RELOAD THE NETWORK IMAGE
     CLS         =   ANN_classifier([DT_n_p.shape[1], 20, 2])
-    CLS.ann_reload_network(repoModel)
-    # --- CLASSIFY DATA
-    DTfeed      =   {CLS.annX:DT_n_p}
-    return DT, pd.DataFrame(DT_n_p, index=DT.index), CLS.sess.run(CLS.annY, feed_dict=DTfeed)
+    return DT, pd.DataFrame(DT_n_p, index=DT.index), CLS.ann_forward_pass(repoModel, DT_n_p)
 
 
 def do_clustering(data, classes, upto, root):
@@ -905,7 +904,7 @@ for Nnom in lNnom:
         B = pdCL.index.values[:Nnom]
         #print( 'prediction accuracy: %0.2f %%, chance level: %0.2f %%' %(len( list( set(A).intersection(B) ) )/ Nnom * 100, Nnom/len(X_all)*100) )
         ALLacc.append(len( list( set(A).intersection(B) ) )/ len(B) * 100)
-        ALLchl.append(len(A)/len(X_all)*100)
+        ALLchl.append(len(A)/gitlen(X_all)*100)
     
     print('Guess level: %i/%i done' %(Nnom, len(lNnom)) )
     ACCm.append( np.mean(ALLacc) )
