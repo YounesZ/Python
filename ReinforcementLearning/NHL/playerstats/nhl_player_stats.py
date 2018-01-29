@@ -102,9 +102,9 @@ class ANN_classifier():
             builder.add_meta_graph_and_variables(self.sess, [tag_constants.SERVING])
             builder.save()
             """
-            saver.save(sess, path.join(repoModel, 'MODEL_perceptron_1layer_10units_relu'))
+            saver.save(sess, path.join(svname, 'MODEL_perceptron_1layer_10units_relu'))
             pickle.dump({'trLoss':self.trLoss, 'tsLoss':self.tsLoss, 'trAcc':self.trAcc, 'tsAcc':self.tsAcc, 'batchSize':self.batchSize}, \
-                        open(path.join(repoModel, 'addedVariables.p'), 'wb') )
+                        open(path.join(svname, 'addedVariables.p'), 'wb') )
 
     def ann_display_accuracy(self):
         # Make figure
@@ -361,7 +361,7 @@ def do_manual_classification(repoPSt, repoPbP, upto, nGames):
     return PLclass, PQuart_off.index
 
 
-def get_training_data(season, minGames=0):
+def get_training_data(repoPSt, repoPbP, season, minGames=0):
     X_train     =   pd.DataFrame()
     Y_train     =   pd.DataFrame()
     X_all       =   pd.DataFrame()
@@ -465,7 +465,7 @@ def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=None, minGames
         allS_p  =   ut_find_folders(repoPbP, True)
 
     # Get data
-    X,Y, X_all,POS_all,PLD_all, colNm=   get_training_data(allS_p, minGames=minGames)
+    X,Y, X_all,POS_all,PLD_all, colNm=   get_training_data(repoPSt, repoPbP, allS_p, minGames=minGames)
     """
     with open( path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p'), 'wb') as f:
         pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'colNm':colNm, 'POS_all':POS_all}, f)
@@ -623,7 +623,7 @@ def do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root):
         allCla  =   pd.concat((allCla, classes), axis=0)
         allCls  =   allCls + clusters
         allCtr  =   [list(x) for x in np.mean(np.array(all_centers),axis=0)]
-        #display_clustering(classes, clusters, centers, ross_id, selke_id)
+        display_clustering(classes, clusters, centers, ross_id, selke_id)
     #print('year: ', iy, 'cost: ', np.sum(cost))
     display_clustering(allCla, allCls, allCtr, allROS, allSLK)
 
@@ -718,22 +718,23 @@ def do_assess_clustering_robustness(dtCols, normalizer, global_centers, pca, nGa
 
 # LAUNCHER:
 # =========
+"""
 root        =   '/home/younesz/Documents'
-#root        =   '/Users/younes_zerouali/Documents/Stradigi'
+root        =   '/Users/younes_zerouali/Documents/Stradigi'
 repoPbP     =   path.join(root, 'Databases/Hockey/PlayByPlay')
 repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
 repoRaw     =   path.join(root, 'Databases/Hockey/PlayerStats/raw')
-repoCode    =   path.join(root, 'Code/Python')
-repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
+repoCode    =   path.join(root, 'NHL_stats_SL/Code/Python')
+repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification')
 
 
 
-"""
+
 # ============================================
 # === MAKE THE PLAYER CLASSIFICATION FRAMEWORK
 
 # Train automatic classifier - ANN
-normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, minGames=0.2)     # Nrm is the normalizing terms for the raw player features
+normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, minGames=-1)     # Nrm is the normalizing terms for the raw player features
 CLS.ann_display_accuracy()
 # Classify player data : MULTIPLE YEARS
 global_centers  =   do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root)
@@ -749,7 +750,7 @@ allS_p      =   ut_find_folders(repoPbP, True)
 for iS in allS_p:
     #shuffle(allS_p)
     #iS                      =   allS_p.pop(0)
-    X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( [iS], minGames=0)
+    X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( repoPSt, repoPbP, [iS], minGames=0)
     pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'POS_all':POS_all, 'PLD_all':PLD_all, 'colNm':colNm}, open('/home/younesz/Desktop/varstest'+iS+'.p', 'wb') )
     
     
@@ -838,7 +839,7 @@ allS_p      =   ut_find_folders(repoPbP, True)
 for iS in allS_p:
     #shuffle(allS_p)
     #iS                      =   allS_p.pop(0)
-    X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( [iS], minGames=0)
+    X,Y, X_all,POS_all,PLD_all,colNm=   get_training_data( repoPSt, repoPbP, [iS], minGames=0)
     pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'POS_all':POS_all, 'PLD_all':PLD_all, 'colNm':colNm}, open('/home/younesz/Desktop/varstest'+iS+'.p', 'wb') )
 """
 
