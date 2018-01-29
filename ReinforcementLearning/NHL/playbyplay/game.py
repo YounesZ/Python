@@ -239,7 +239,7 @@ class Game:
                 self.teams  =   [Line['hometeam'], Line['awayteam']]
             else:
                 curLine     =   np.sort(self.pull_offensive_players(Line, tmP))
-                self.teams  =   curLine[team+'team']
+                self.teams  =   Line[team+'team']
 
             # team of interest has changed?
             if len(prevDt)==0:
