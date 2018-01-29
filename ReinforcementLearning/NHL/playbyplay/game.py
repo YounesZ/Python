@@ -235,9 +235,11 @@ class Game:
             prevLine=   (np.ones([1,3])[0], np.ones([1,3])[0])
         for idL, Line in self.df_wc.iterrows():
             if team=='both':
-                curLine =   ( np.sort(self.pull_offensive_players(Line, 'h')), np.sort(self.pull_offensive_players(Line, 'a')) )
+                curLine     =   ( np.sort(self.pull_offensive_players(Line, 'h')), np.sort(self.pull_offensive_players(Line, 'a')) )
+                self.teams  =   [Line['hometeam'], Line['awayteam']]
             else:
-                curLine =   np.sort(self.pull_offensive_players(Line, tmP))
+                curLine     =   np.sort(self.pull_offensive_players(Line, tmP))
+                self.teams  =   curLine[team+'team']
 
             # team of interest has changed?
             if len(prevDt)==0:
@@ -299,6 +301,11 @@ class Game:
         if len(all_plN) == 0:
             self.player_classes = []
             return
+        # Get players' team
+        Hp      =   np.unique( np.concatenate([ x[0] for x in all_pl]) )
+        Ap      =   np.unique( np.concatenate([x[1] for x in all_pl]) )
+        #pTeam   =   [ np.where([x in Hp, x in Ap])[0] for x in all_plN.index.values]
+        pTeam   =   [ self.teams[0] if x in Hp else self.teams[1] for x in all_plN.index.values]
         # Get raw player stats
         gcode   =   int( str(self.season)[:4]+'0'+str(self.gameId) )
         DT, dtCols  =   pull_stats(self.repoPSt, self.repoPbP, uptocode=gcode, nGames=nGames, plNames=all_plN.values)
@@ -311,11 +318,13 @@ class Game:
         DTfeed      =   {classifier['annX']: DT_n_p}
         classif     =   classifier['sess'].run(classifier['annY'], feed_dict=DTfeed)
         # Get players class
-        pl_class    =   [np.argmin( np.sum( (classif[x,:] - np.array( model['global_centers'] ))**2, axis=1 ) ) for x in range(classif.shape[0])]
+        ctrLst      =   np.array( (model['global_centers']['selke'], model['global_centers']['ross'], model['global_centers']['poor']) )
+        pl_class    =   [np.argmin( np.sum( (classif[x,:] - ctrLst)**2, axis=1 ) ) for x in range(classif.shape[0])]
         pl_class    =   pd.DataFrame(pl_class, columns=['class'], index=all_plN.index.values)
         pl_class.loc[:, 'firstlast']    =   all_plN
         pl_class.loc[:, 'pred_ross']    =   classif[:,0]
         pl_class.loc[:, 'pred_selke']   =   classif[:,1]
+        pl_class.loc[:, 'team']         =   pTeam
         self.player_classes =   pl_class
 
 
