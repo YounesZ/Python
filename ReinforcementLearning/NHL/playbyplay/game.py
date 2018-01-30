@@ -1,16 +1,11 @@
 import pickle
 from copy import deepcopy
-
-# import matplotlib.pyplot as plt
-# from os import path
-
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from typing import Optional
-
+from typing import List, Tuple
+from os import path
 from ReinforcementLearning.NHL.playerstats.nhl_player_stats import pull_stats, do_normalize_data, do_reduce_data
-from Utils.programming.ut_find_folders import *
 from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
 
 
@@ -53,13 +48,14 @@ class Season:
 
 class Game:
 
-    def __init__(self, repoPbP, repoPSt, season: Season, gameId=None, gameQty=None):
+    def __init__(self, db_root: str, season: Season, gameId=None, gameQty=None):
         # Retrieve game info
         self.season =   season
         self.gameId =   gameId
-        self.repoPbP=   repoPbP
-        self.repoPSt=   repoPSt
-        dataPath    =   path.join(repoPbP, 'Season_%d%d' % (self.season.year_begin, self.season.year_end), 'converted_data.p')
+
+        self.repoPbP = path.join(db_root, 'PlayByPlay')
+        self.repoPSt = path.join(db_root, "PlayerStats", "player")
+        dataPath    =   path.join(self.repoPbP, 'Season_%d%d' % (self.season.year_begin, self.season.year_end), 'converted_data.p')
         dataFrames  =   pickle.load( open(dataPath, 'rb') )
         # Make sure to pick right season
         #dataFrame   =   dataFrame[ dataFrame.loc[:, 'season']==int(season)]
@@ -67,8 +63,8 @@ class Game:
         self.hd     =   dataFrames['playbyplay'].columns
         self.df     =   dataFrames['playbyplay']
         self.df_wc  =   dataFrames['playbyplay']       #Working copy
-        self.rf     =   dataFrames['roster']
-        # Fecth line shifts
+
+        # Fetch line shifts
         self.lineShifts     =   {}
         self.teams = None
         self.teams_label_for_shift = "" # 'home', 'away' or 'both'
@@ -76,12 +72,45 @@ class Game:
         if not gameId is None:
             self.df_wc  =   self.df[self.df['gcode']==gameId]
         self.player_classes = None # structure containing all player's classes (categories).
-
+        # let's keep the roster only for players that we are interested in:
+        self.rf     =   dataFrames['roster']
+        fields_with_ids = ['a1','a2','a3','a4','a5','a6','h1','h2','h3','h4','h5','h6','away.G', 'home.G']
+        all_sets = list(map(
+            lambda field_id: set(self.df_wc[field_id].unique().tolist()).difference({1}), # '1' is not a real id.
+            fields_with_ids))
+        all_ids_of_players = set.union(*all_sets)
+        self.rf = self.rf[self.rf['player.id'].isin(all_ids_of_players)]
 
     def get_game_ids(self):
-        # List all game numbers
-        gNums   =   np.unique(self.df['gcode'])
-        return gNums
+        """List all game numbers"""
+        return np.unique(self.df['gcode'])
+
+    def get_away_lines(self, accept_repeated=False) -> Tuple[pd.DataFrame, List[List[int]]]:
+        """
+        Calculates top lines used by opposing team. 
+        Each line returned contains the CATEGORY of each player.
+        """
+        teams_label_for_shift, teams, lineShifts = self.calculate_line_shifts(team='away', minduration=20)
+        df = lineShifts.groupby(by=lineShifts['playersID'].apply(tuple)).agg(
+            {'iceduration': sum}).sort_values(by=['iceduration'], ascending=False)
+
+        a_dict = df.to_dict()['iceduration']
+        sorted_tuples_and_secs = sorted(a_dict.items(), key=lambda x: x[1], reverse=True)
+        players_used = set()
+        lines_chosen = []
+        for line, secs in sorted_tuples_and_secs:
+            # is this line using players already present?
+            line_as_set = set(line)
+            if (not 1 in line_as_set) and (accept_repeated or (len(players_used.intersection(line_as_set)) == 0)):
+                lines_chosen.append(line)
+                players_used = players_used.union(line_as_set)
+                if len(lines_chosen) == 4:
+                    break # horrible, but effective
+        return (df, list(map(list, [np.sort(self.classes_of_line(a)) for a in lines_chosen]))) # TODO: not sure about the 'sort'. What is it for?
+
+    def classes_of_line(self, a: List[int]) -> List[int]:
+        """Returns classes of members of a line given their id's."""
+        return self.player_classes.loc[list(a)]["class"].values
 
 
     def pick_equalstrength(self):
@@ -117,20 +146,21 @@ class Game:
 
     def pull_offensive_players(self, dfRow, team='h'):
         # Get player IDs
-        pID     =   [dfRow[team+str(x)] for x in range(1,7)]
+        pID     =   set([dfRow[team+str(x)] for x in range(1,7)])
+        pID.discard(1) # '1' is not a true player ID.
+        pID     =   list(pID)
         # Check positions
         pPOS    =   [self.rf.loc[self.rf['player.id']==x, 'pos'] for x in pID]
         pOFF    =   [(x.values[0]=='R' or x.values[0]=='L' or x.values[0]=='C') for x in pPOS]
         return (list( np.array(pID)[pOFF] )+[1,1,1])[:3]
 
-
-    def calculate_line_shifts(self, team='home', minduration=None): # ->Tuple[ pd.DataFrame:
+    def calculate_line_shifts(self, team='home', minduration: int=20): # ->Tuple[ pd.DataFrame:
         """
         Calculates the line shifts and returns them on a proper structure.
         This calculation is purely functional: it does not change the state of this class.
         Args:
-            team: 
-            minduration: 
+            team: 'home', 'away', or 'both'
+            minduration: time in seconds.
 
         Returns:
 
@@ -221,7 +251,7 @@ class Game:
         return (team, teams, lineShifts)
 
 
-    def pull_line_shifts(self, team: str='home', minduration: Optional[int]=None):
+    def pull_line_shifts(self, team: str='home', minduration: int=20):
         self.teams_label_for_shift, self.teams, self.lineShifts = self.calculate_line_shifts(team, minduration)
 
     def pull_players_classes_from_repo_address(self, repoModel:str, number_of_games=30):
