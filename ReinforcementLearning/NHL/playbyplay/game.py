@@ -287,7 +287,7 @@ class Game:
         # Store
         self.lineShifts =   pd.DataFrame.from_dict(LINES)
         if not minduration is None:
-            self.lineShifts     =   self.lineShifts[self.lineShifts['iceduration']>=20]
+            self.lineShifts     =   self.lineShifts[self.lineShifts['iceduration']>=minduration]
 
 
     def pull_players_classes(self, model, classifier, nGames=30):
