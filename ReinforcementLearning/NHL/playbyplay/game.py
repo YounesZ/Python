@@ -138,44 +138,53 @@ class HockeySS:
 
 
 class Season:
+    """Encapsualtes all elements for a season."""
 
-    def __init__(self, year):
-        self.year   =   year
+    def __init__(self, year_begin: int):
+        self.year_begin = year_begin
+        self.year_end = self.year_begin + 1
 
+    # def __init__(self, year_encoding):
+    #     self.year_encoding   =   year_encoding # eg, 'Season_20122013'
 
     def list_game_ids(self, repoPbP, repoPSt):
         # Format year
-        iyear           =   self.year.replace('Season_', '')
+        iyear           =   '%d%d' % (self.year_begin, self.year_end) # self.year_encoding.replace('Season_', '')
         # Get data - long
         gc              =   Game(repoPbP, repoPSt, iyear)
         # Get game IDs
         self.games_id   =   gc.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
 
+    def __str__(self):
+        return "Season %d-%d" % (self.year_begin, self.year_end)
 
-def get_game_id(db_root: str, home_team_abbr: str, date_as_str: str) -> int:
-    """
-    let's convert game date to game code.
-    For example Montreal received Ottawa on march 13, 2013 =>
-        gameId = get_game_id(home_team_abbr='MTL', date_as_str='2013-03-13')
-    """
-    try:
-        gameInfo    =   pickle.load( open(path.join(db_root, 'gamesInfo.p'), 'rb') )
-        gameInfo    =   gameInfo[gameInfo['gameDate']==date_as_str][gameInfo['teamAbbrev']==home_team_abbr]
-        gameId      =   gameInfo['gameId']
-        gameId      =   int( gameId.values.astype('str')[0][5:] )
-        return gameId
-    except Exception as e:
-        raise IndexError("There was no game for '%s' on '%s'" % (home_team_abbr, date_as_str))
+
+    @classmethod
+    def get_game_id(cls, db_root: str, home_team_abbr: str, date_as_str: str) -> int:
+        """
+        let's convert game date to game code.
+        For example Montreal received Ottawa on march 13, 2013 =>
+            gameId = get_game_id(home_team_abbr='MTL', date_as_str='2013-03-13')
+        """
+        # TODO: make it fit with the class signature. For now it's pretty much standalone.
+        try:
+            gameInfo    =   pickle.load( open(path.join(db_root, 'gamesInfo.p'), 'rb') )
+            gameInfo    =   gameInfo[gameInfo['gameDate']==date_as_str][gameInfo['teamAbbrev']==home_team_abbr]
+            gameId      =   gameInfo['gameId']
+            gameId      =   int( gameId.values.astype('str')[0][5:] )
+            return gameId
+        except Exception as e:
+            raise IndexError("There was no game for '%s' on '%s'" % (home_team_abbr, date_as_str))
 
 class Game:
 
-    def __init__(self, repoPbP, repoPSt, season, gameId=None, gameQty=None):
+    def __init__(self, repoPbP, repoPSt, season: Season, gameId=None, gameQty=None):
         # Retrieve game info
         self.season =   season
         self.gameId =   gameId
         self.repoPbP=   repoPbP
         self.repoPSt=   repoPSt
-        dataPath    =   path.join(repoPbP, 'Season_'+str(season), 'converted_data.p')
+        dataPath    =   path.join(repoPbP, 'Season_%d%d' % (self.season.year_begin, self.season.year_end), 'converted_data.p')
         dataFrames  =   pickle.load( open(dataPath, 'rb') )
         # Make sure to pick right season
         #dataFrame   =   dataFrame[ dataFrame.loc[:, 'season']==int(season)]
@@ -354,7 +363,7 @@ class Game:
         Examples:
             repoModel = ... # here goes the directory where your model is saved.
             # Montreal received Ottawa on march 13, 2013
-            gameId = get_game_id(home_team_abbr='MTL', date_as_str='2013-03-13')
+            gameId = Season.get_game_id(home_team_abbr='MTL', date_as_str='2013-03-13')
             season      =   '20122013'
             mtlott      =   Game(repoPbP, repoPSt, season, gameId=gameId )
             #
@@ -409,7 +418,8 @@ class Game:
         #pTeam   =   [ np.where([x in Hp, x in Ap])[0] for x in all_plN.index.values]
         pTeam   =   [ teams[0] if x in Hp else teams[1] for x in all_plN.index.values]
         # Get raw player stats
-        gcode   =   int( str(self.season)[:4]+'0'+str(self.gameId) )
+        # gcode   =   int( str(self.season)[:4]+'0'+str(self.gameId) )
+        gcode   =   int( str(self.season.year_begin)+'0'+str(self.gameId) )
         DT, dtCols  =   pull_stats(self.repoPSt, self.repoPbP, uptocode=gcode, nGames=nGames, plNames=all_plN.values)
         # --- Get player classes
         # pre-process data
