@@ -131,20 +131,8 @@ class ANN_classifier():
         Ax2.set_ylim([0.4, 1])
 
     def ann_forward_pass(self, repoModel, input_data):
-        # Reload the graph and variables
-        sess        =   tf.Session()
-        saver       =   tf.train.import_meta_graph( path.join(repoModel, path.basename(repoModel)+'.meta') )
-        saver.restore(sess, tf.train.latest_checkpoint(path.join(repoModel, './')))
-        # Link TF variables to the classifier class
-        graph       =   sess.graph
-        annX        =   graph.get_tensor_by_name('Input_to_the_network-player_features:0')
-        """self.annY_  =   graph.get_tensor_by_name('Ground_truth:0')
-        self.annW1  =   graph.get_tensor_by_name('weights_inp_hid:0')
-        self.annB1  =   graph.get_tensor_by_name('bias_inp_hid:0')
-        self.Y1     =   graph.get_operation_by_name('hid_output')
-        self.annW2  =   graph.get_tensor_by_name('weights_hid_out:0')
-        self.annB2  =   graph.get_tensor_by_name('bias_hid_out:0')"""
-        annY        =   graph.get_tensor_by_name('prediction:0')
+        # Restore model
+        sess, annX, annY    =   self.ann_reload_model(repoModel)
         # Restore additional variables
         VAR         =   pickle.load( open(path.join(repoModel, 'addedVariables.p'), 'rb') )
         self.trLoss =   VAR['trLoss']
@@ -153,6 +141,23 @@ class ANN_classifier():
         self.tsAcc  =   VAR['tsAcc']
         self.batchSize = VAR['batchSize']
         return sess.run(annY, feed_dict={annX:input_data})
+
+    def ann_reload_model(self, repoModel):
+        # Reload the graph and variables
+        sess = tf.Session()
+        saver = tf.train.import_meta_graph(path.join(repoModel, path.basename(repoModel) + '.meta'))
+        saver.restore(sess, tf.train.latest_checkpoint(path.join(repoModel, './')))
+        # Link TF variables to the classifier class
+        graph = sess.graph
+        annX = graph.get_tensor_by_name('Input_to_the_network-player_features:0')
+        """self.annY_  =   graph.get_tensor_by_name('Ground_truth:0')
+        self.annW1  =   graph.get_tensor_by_name('weights_inp_hid:0')
+        self.annB1  =   graph.get_tensor_by_name('bias_inp_hid:0')
+        self.Y1     =   graph.get_operation_by_name('hid_output')
+        self.annW2  =   graph.get_tensor_by_name('weights_hid_out:0')
+        self.annB2  =   graph.get_tensor_by_name('bias_hid_out:0')"""
+        annY = graph.get_tensor_by_name('prediction:0')
+        return sess, annX, annY
 
 
 def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', uptocode=None, nGames=82, plNames=None):
