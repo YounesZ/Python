@@ -127,24 +127,24 @@ for iG in range(len(HSS.games_lst)):
     gameData.pull_players_classes(players_model, classifier)
 
     # Get game score
-    homeTeam = HSS.games_lst.iloc[iG]['hometeam']
-    goals = gameData.df[gameData.df['gcode'] == gameCode]
-    goals = goals[goals['etype'] == 'GOAL']['ev.team']
-    homeTeam = HSS.games_lst.iloc[iG]['hometeam']
-    goals = gameData.df[gameData.df['gcode'] == gameCode]
-    goals = goals[goals['etype'] == 'GOAL']['ev.team']
-    points = int((goals == homeTeam).sum() > (goals != homeTeam).sum()) * 2
+    homeTeam    =   HSS.games_lst.iloc[iG]['hometeam']
+    goals       =   gameData.df[gameData.df['gcode'] == gameCode]
+    goals       =   goals[goals['etype'] == 'GOAL']['ev.team']
+    homeTeam    =   HSS.games_lst.iloc[iG]['hometeam']
+    goals       =   gameData.df[gameData.df['gcode'] == gameCode]
+    goals       =   goals[goals['etype'] == 'GOAL']['ev.team']
+    points      =   int((goals == homeTeam).sum() > (goals != homeTeam).sum()) * 2
     if gameData.df[gameData.df['gcode'] == gameCode].iloc[-1]['period'] > 3:
-        points = np.maximum(1, points)
+        points  =   np.maximum(1, points)
 
     # Get state-space
-    playersCode = gameData.encode_line_players()
-    linesCode = np.array([[gameData.recode_line(linedict, a) for a in b] for b in playersCode])
-    perCode = gameData.recode_period(gameData.lineShifts['period'])
-    difCode = gameData.recode_differential(gameData.lineShifts['differential'])
+    playersCode =   gameData.encode_line_players()
+    linesCode   =   np.array([[gameData.recode_line(linedict, a) for a in b] for b in playersCode])
+    perCode     =   gameData.recode_period(gameData.lineShifts['period'])
+    difCode     =   gameData.recode_differential(gameData.lineShifts['differential'])
 
     # Get info for home team
-    qv_shifts = [Qvalues[w, x, y, z] for w, x, y, z in zip(perCode, difCode, linesCode[:, 1], linesCode[:, 0])]
+    qv_shifts   =   q[Qvalues[w, x, y, z] for w, x, y, z in zip(perCode, difCode, linesCode[:, 1], linesCode[:, 0])]
 
     # Append this game to the team's data
     seaInfo[homeTeam] = pd.concat((seaInfo[homeTeam], pd.DataFrame(

@@ -431,9 +431,9 @@ root        =   '/home/younesz/Documents'
 #root        =   '/Users/younes_zerouali/Documents/Stradigi'
 repoPbP     =   path.join(root, 'Databases/Hockey/PlayByPlay')
 repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
-repoCode    =   path.join(root, 'Code/Python')
+repoCode    =   path.join(root, 'Code/NHL_stats_SL')
 repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
-repoSave    =   None #path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data')
+repoSave    =   path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data')
 
 
 
