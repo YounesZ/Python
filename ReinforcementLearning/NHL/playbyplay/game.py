@@ -2,10 +2,12 @@ import pickle
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from sys import stdout
 from copy import deepcopy
 from random import shuffle
+from typing import Optional
+
 from Utils.programming.ut_find_folders import *
 from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
 from ReinforcementLearning.NHL.playbyplay.agent import Agent
@@ -150,6 +152,21 @@ class Season:
         self.games_id   =   gc.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
 
 
+def get_game_id(db_root: str, home_team_abbr: str, date_as_str: str) -> int:
+    """
+    let's convert game date to game code.
+    For example Montreal received Ottawa on march 13, 2013 =>
+        gameId = get_game_id(home_team_abbr='MTL', date_as_str='2013-03-13')
+    """
+    try:
+        gameInfo    =   pickle.load( open(path.join(db_root, 'gamesInfo.p'), 'rb') )
+        gameInfo    =   gameInfo[gameInfo['gameDate']==date_as_str][gameInfo['teamAbbrev']==home_team_abbr]
+        gameId      =   gameInfo['gameId']
+        gameId      =   int( gameId.values.astype('str')[0][5:] )
+        return gameId
+    except Exception as e:
+        raise IndexError("There was no game for '%s' on '%s'" % (home_team_abbr, date_as_str))
+
 class Game:
 
     def __init__(self, repoPbP, repoPSt, season, gameId=None, gameQty=None):
@@ -169,9 +186,12 @@ class Game:
         self.rf     =   dataFrames['roster']
         # Fecth line shifts
         self.lineShifts     =   {}
+        self.teams = None
+        self.teams_label_for_shift = "" # 'home', 'away' or 'both'
         # Filter for game Id
         if not gameId is None:
             self.df_wc  =   self.df[self.df['gcode']==gameId]
+        self.player_classes = None # structure containing all player's classes (categories).
 
 
     def get_game_ids(self):
@@ -220,13 +240,38 @@ class Game:
         return (list( np.array(pID)[pOFF] )+[1,1,1])[:3]
 
 
-    def pull_line_shifts(self, team='home', minduration=None):
+    def calculate_line_shifts(self, team='home', minduration=None): # ->Tuple[ pd.DataFrame:
+        """
+        Calculates the line shifts and returns them on a proper structure.
+        This calculation is purely functional: it does not change the state of this class.
+        Args:
+            team: 
+            minduration: 
+
+        Returns:
+
+        """
+
         # Pick the right team
         tmDict  =   {'home':'h', 'away':'a', 'both':'ha'}
         tmP     =   tmDict[team]
 
         # Make containers
-        LINES       =   {'playersID':[], 'onice':[0], 'office':[], 'iceduration':[], 'SHOT':[0], 'GOAL':[0], 'BLOCK':[0], 'MISS':[0], 'PENL':[0], 'equalstrength':[True], 'regulartime':[], 'period':[], 'differential':[]}
+        LINES       =   {
+            'playersID':[],
+            'onice':[0],
+            'office':[],
+            'iceduration':[],
+            'SHOT':[0],
+            'GOAL':[0],
+            'BLOCK':[0],
+            'MISS':[0],
+            'PENL':[0],
+            'equalstrength':[True],
+            'regulartime':[],
+            'period':[],
+            'differential':[]
+        }
         # Loop on all table entries
         prevDt      =   []
         prevLine    =   np.array([1, 1, 1])
@@ -236,10 +281,10 @@ class Game:
         for idL, Line in self.df_wc.iterrows():
             if team=='both':
                 curLine     =   ( np.sort(self.pull_offensive_players(Line, 'h')), np.sort(self.pull_offensive_players(Line, 'a')) )
-                self.teams  =   [Line['hometeam'], Line['awayteam']]
+                teams  =   [Line['hometeam'], Line['awayteam']]
             else:
                 curLine     =   np.sort(self.pull_offensive_players(Line, tmP))
-                self.teams  =   Line[team+'team']
+                teams  =   Line[team+'team']
 
             # team of interest has changed?
             if len(prevDt)==0:
@@ -284,15 +329,72 @@ class Game:
         LINES['regulartime'].append(prevDt['period']<4)
         LINES['differential'].append(np.sum(LINES['GOAL']))
 
-        # Store
-        self.lineShifts =   pd.DataFrame.from_dict(LINES)
+        # ok, now let's buid it:
+        lineShifts =   pd.DataFrame.from_dict(LINES)
         if not minduration is None:
-            self.lineShifts     =   self.lineShifts[self.lineShifts['iceduration']>=minduration]
+            lineShifts     =   lineShifts[lineShifts['iceduration']>=minduration]
+        # all done, then:
+        return (team, teams, lineShifts)
 
+
+    def pull_line_shifts(self, team: str='home', minduration: Optional[int]=None):
+        self.teams_label_for_shift, self.teams, self.lineShifts = self.calculate_line_shifts(team, minduration)
+
+    def pull_players_classes_from_repo_address(self, repoModel:str, number_of_games=30):
+        """
+        Calculates (dataframe with) all player's classes.
+        Updates the 'data for game' structure with it; also returns it.
+        Args:
+            repoModel: folder where the model is saved.
+            number_of_games: number of games we want to analyze.
+
+        Returns:
+            Player classes
+            
+        Examples:
+            repoModel = ... # here goes the directory where your model is saved.
+            # Montreal received Ottawa on march 13, 2013
+            gameId = get_game_id(home_team_abbr='MTL', date_as_str='2013-03-13')
+            season      =   '20122013'
+            mtlott      =   Game(repoPbP, repoPSt, season, gameId=gameId )
+            #
+            players_classes = get_players_classes(repoModel, mtlott, number_of_games=30)
+            # this is equivalent to ask 'mtlott' for the data; so:
+            assert players_classes.equals(mtlott.player_classes)
+        """
+        # Need to load the data pre-processing variables
+        preprocessing = pickle.load(open(path.join(repoModel, 'baseVariables.p'), 'rb'))
+
+        # Need to load the classification model (for players' predicted ranking on trophies voting lists)
+        classifier = {'sess': tf.Session(), 'annX': [], 'annY': []}
+        saver = tf.train.import_meta_graph(path.join(repoModel, path.basename(repoModel) + '.meta'))
+        graph = classifier['sess'].graph
+        classifier['annX'] = graph.get_tensor_by_name('Input_to_the_network-player_features:0')
+        classifier['annY'] = graph.get_tensor_by_name('prediction:0')
+        saver.restore(classifier['sess'], tf.train.latest_checkpoint(path.join(repoModel, './')))
+
+        self.pull_players_classes(preprocessing, classifier, nGames=number_of_games)
+        return self.player_classes
 
     def pull_players_classes(self, model, classifier, nGames=30):
+        """
+        Gets classes players represented in the shifts for this game.
+        Assumes that these shifts are specified (by a previous call to 'pull_line_shifts'
+        If the shifts are not specified throws an error.
+        Args:
+            model: 
+            classifier: 
+            nGames: 
+
+        Returns:
+            Player classes
+            
+
+        """
+
         # List concerned players
-        all_pl  =   self.lineShifts['playersID'].values
+        teams_label_for_shift, teams, all_line_shifts = self.calculate_line_shifts(team='both')
+        all_pl  =   all_line_shifts['playersID'].values
         if len(all_pl) == 0:
             self.player_classes = []
             return
@@ -305,7 +407,7 @@ class Game:
         Hp      =   np.unique( np.concatenate([ x[0] for x in all_pl]) )
         Ap      =   np.unique( np.concatenate([x[1] for x in all_pl]) )
         #pTeam   =   [ np.where([x in Hp, x in Ap])[0] for x in all_plN.index.values]
-        pTeam   =   [ self.teams[0] if x in Hp else self.teams[1] for x in all_plN.index.values]
+        pTeam   =   [ teams[0] if x in Hp else teams[1] for x in all_plN.index.values]
         # Get raw player stats
         gcode   =   int( str(self.season)[:4]+'0'+str(self.gameId) )
         DT, dtCols  =   pull_stats(self.repoPSt, self.repoPbP, uptocode=gcode, nGames=nGames, plNames=all_plN.values)
@@ -339,6 +441,8 @@ class Game:
 
 
     def encode_line_players(self):
+        assert self.teams_label_for_shift == 'both', \
+            "Encoding lines only possible when I have shift information of both teams (currently: '%s')." % (self.teams_label_for_shift)
         lComp   =   self.lineShifts['playersID']
         lineCode=   []
         for iR in lComp.index:
