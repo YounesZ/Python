@@ -114,7 +114,10 @@ class Game:
                 players_used = players_used.union(line_as_set)
                 if len(lines_chosen) == 4:
                     break # horrible, but effective
-        return (df, list(map(list, [np.sort(self.classes_of_line(a)) for a in lines_chosen]))) # TODO: not sure about the 'sort'. What is it for?
+        # Here the sort is to make sure that the conversion from player categories to line categories can be done
+        # without enumerating all possible combinations of the same players in the dictionary
+        # for example, lines [2,0,1], [1,2,0], [0,2,1] and [0,1,2] can be represented by a single line category in the dict
+        return (df, list(map(list, [np.sort(self.classes_of_line(a)) for a in lines_chosen])))
 
 
     def classes_of_line(self, a: List[int]) -> List[int]:
