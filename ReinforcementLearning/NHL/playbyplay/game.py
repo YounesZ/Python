@@ -13,15 +13,17 @@ class Season:
     """Encapsualtes all elements for a season."""
 
     def __init__(self, year_begin: int):
-        self.year_begin = year_begin
-        self.year_end = self.year_begin + 1
+        self.year_begin =   year_begin
+        self.year_end   =   self.year_begin + 1
 
     # def __init__(self, year_encoding):
     #     self.year_encoding   =   year_encoding # eg, 'Season_20122013'
 
-    def list_game_ids(self, repoPbP, repoPSt):
+    def list_game_ids(self, db_root):
+        self.repoPbP    =   path.join(db_root, 'PlayByPlay')
+        self.repoPSt    =   path.join(db_root, "PlayerStats", "player")
         # Get data - long
-        self.game_active=   Game(repoPbP, repoPSt, iyear)
+        self.game_active=   Game(db_root, self)
         # Get game IDs
         self.games_id   =   self.game_active.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
 
@@ -46,6 +48,7 @@ class Season:
         except Exception as e:
             raise IndexError("There was no game for '%s' on '%s'" % (home_team_abbr, date_as_str))
 
+
 class Game:
 
     def __init__(self, db_root: str, season: Season, gameId=None, gameQty=None):
@@ -60,15 +63,16 @@ class Game:
         # Make sure to pick right season
         #dataFrame   =   dataFrame[ dataFrame.loc[:, 'season']==int(season)]
         # Store frames
-	self.rf     =   dataFrames['roster']        
-	self.hd     =   dataFrames['playbyplay'].columns
+        self.rf     =   dataFrames['roster']
+        self.rf_wc  =   dataFrames['roster']
+        self.hd     =   dataFrames['playbyplay'].columns
         self.df     =   dataFrames['playbyplay']
         self.df_wc  =   dataFrames['playbyplay']       #Working copy
 
         # Fetch line shifts
-        self.player_classes = 	None # structure containing all player's classes (categories).
-	self.lineShifts     =   {}
-        self.teams = None
+        self.player_classes     = 	None # structure containing all player's classes (categories).
+        self.lineShifts         =   {}
+        self.teams              =   None
         self.teams_label_for_shift = "" # 'home', 'away' or 'both'
         # Filter for game Id
         self.switch_to_game(gameId)
@@ -76,17 +80,19 @@ class Game:
 
     def switch_to_game(self, gameId):
         if not gameId is None:
-            self.df_wc  =   self.df[self.df['gcode']==gameId]        
+            self.df_wc          =   self.df[self.df['gcode']==gameId]
             # let's keep the roster only for players that we are interested in:        
-            fields_with_ids = ['a1','a2','a3','a4','a5','a6','h1','h2','h3','h4','h5','h6','away.G', 'home.G']
-            all_sets = list(map(lambda field_id: set(self.df_wc[field_id].unique().tolist()).difference({1}), # '1' is not a real id.
-            fields_with_ids))
-            all_ids_of_players = set.union(*all_sets)
-            self.rf = self.rf[self.rf['player.id'].isin(all_ids_of_players)]
+            fields_with_ids     =   ['a1','a2','a3','a4','a5','a6','h1','h2','h3','h4','h5','h6','away.G', 'home.G']
+            all_sets            =   list(map(lambda field_id: set(self.df_wc[field_id].unique().tolist()).difference({1}), # '1' is not a real id.
+                                    fields_with_ids))
+            all_ids_of_players  =   set.union(*all_sets)
+            self.rf_wc          =   self.rf[self.rf['player.id'].isin(all_ids_of_players)]
+
 
     def get_game_ids(self):
         """List all game numbers"""
         return np.unique(self.df['gcode'])
+
 
     def get_away_lines(self, accept_repeated=False) -> Tuple[pd.DataFrame, List[List[int]]]:
         """
@@ -110,6 +116,7 @@ class Game:
                 if len(lines_chosen) == 4:
                     break # horrible, but effective
         return (df, list(map(list, [np.sort(self.classes_of_line(a)) for a in lines_chosen]))) # TODO: not sure about the 'sort'. What is it for?
+
 
     def classes_of_line(self, a: List[int]) -> List[int]:
         """Returns classes of members of a line given their id's."""
@@ -153,7 +160,7 @@ class Game:
         pID.discard(1) # '1' is not a true player ID.
         pID     =   list(pID)
         # Check positions
-        pPOS    =   [self.rf.loc[self.rf['player.id']==x, 'pos'] for x in pID]
+        pPOS    =   [self.rf_wc.loc[self.rf_wc['player.id']==x, 'pos'] for x in pID]
         pOFF    =   [(x.values[0]=='R' or x.values[0]=='L' or x.values[0]=='C') for x in pPOS]
         return (list( np.array(pID)[pOFF] )+[1,1,1])[:3]
 
@@ -316,7 +323,7 @@ class Game:
             self.player_classes = []
             return
         all_plC =   np.unique( np.concatenate(all_pl) )
-        all_plN = self.rf.set_index('player.id').loc[all_plC[all_plC > 1]]['firstlast'].drop_duplicates(keep='first')
+        all_plN = self.rf_wc.set_index('player.id').loc[all_plC[all_plC > 1]]['firstlast'].drop_duplicates(keep='first')
         if len(all_plN) == 0:
             self.player_classes = []
             return

@@ -14,18 +14,19 @@ from Utils.programming.ut_find_folders import ut_find_folders
 
 class HockeySS:
 
-    def __init__(self, repoPbP, repoPSt):
-        self.repoPbP    =   repoPbP
-        self.repoPSt    =   repoPSt
-        self.seasons    =   ut_find_folders(repoPbP, True)
+    def __init__(self, db_root):
+        self.db_root    =   db_root
+        self.repoPbP    =   path.join(db_root, 'PlayByPlay')
+        self.repoPSt    =   path.join(db_root, "PlayerStats", "player")
+        self.seasons    =   ut_find_folders(self.repoPbP, True)
 
 
     def list_all_games(self):
         # List games
         games_lst       =   pd.DataFrame()
         for iy in self.seasons:
-            iSea        =   Season(iy)
-            iSea.list_game_ids( self.repoPbP, self.repoPSt )
+            iSea        =   Season( int(iy.replace('Season_', '')[:4]) )
+            iSea.list_game_ids( self.db_root )
             games_lst   =   pd.concat( (games_lst, iSea.games_id), axis=0 )
         self.games_lst  =   games_lst
 
