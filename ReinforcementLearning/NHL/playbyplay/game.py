@@ -1,140 +1,12 @@
 import pickle
-import pandas as pd
-import numpy as np
-import tensorflow as tf
-# import matplotlib.pyplot as plt
-from sys import stdout
 from copy import deepcopy
-from random import shuffle
-from typing import Optional
-
-from Utils.programming.ut_find_folders import *
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from typing import List, Tuple
+from os import path
+from ReinforcementLearning.NHL.playerstats.nhl_player_stats import pull_stats, do_normalize_data, do_reduce_data
 from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
-from ReinforcementLearning.NHL.playbyplay.agent import Agent
-from ReinforcementLearning.NHL.playerstats.nhl_player_stats import pull_stats, do_normalize_data, do_reduce_data, ANN_classifier
-
-
-class HockeySS:
-
-    def __init__(self, repoPbP, repoPSt):
-        self.repoPbP    =   repoPbP
-        self.repoPSt    =   repoPSt
-        self.seasons    =   ut_find_folders(repoPbP, True)
-
-
-    def list_all_games(self):
-        # List games
-        games_lst       =   pd.DataFrame()
-        for iy in self.seasons:
-            iSea        =   Season(iy)
-            iSea.list_game_ids( self.repoPbP, self.repoPSt )
-            games_lst   =   pd.concat( (games_lst, iSea.games_id), axis=0 )
-        self.games_lst  =   games_lst
-
-
-    def pull_RL_data(self, repoModel, repoSave=None):
-        # Prepare players model: reload info
-        self.players_model  =   pickle.load(open(path.join(repoModel, 'baseVariables.p'), 'rb'))
-        self.classifier     =   {'sess':tf.Session(), 'annX':[], 'annY':[]}
-        saver               =   tf.train.import_meta_graph(path.join(repoModel, path.basename(repoModel) + '.meta'))
-        graph               =   self.classifier['sess'].graph
-        self.classifier['annX'] =   graph.get_tensor_by_name('Input_to_the_network-player_features:0')
-        self.classifier['annY'] =   graph.get_tensor_by_name('prediction:0')
-        saver.restore(self.classifier['sess'], tf.train.latest_checkpoint(path.join(repoModel, './')))
-        # Make lines dictionary
-        self.make_line_dictionary()
-        # List line shifts
-        RL_data     =   pd.DataFrame()
-        GAME_data   =   pd.DataFrame()
-        PLAYER_data =   pd.DataFrame()
-        count       =   0
-        allR        =   []
-        for iy,ic,ih,ia in zip(self.games_lst['season'].values,self.games_lst['gcode'].values,self.games_lst['hometeam'].values,self.games_lst['awayteam'].values):
-            # Extract state-space
-            iGame       =   Game(self.repoPbP, self.repoPSt, iy, ic)
-
-            # Check if some data was retrieved:
-            if len(iGame.df_wc)>0:
-                iGame.pull_line_shifts('both', minduration=20)
-                iGame.pick_regulartime()
-                iGame.pick_equalstrength()
-                iGame.pull_players_classes(self.players_model, self.classifier)
-                # Add game identifier data
-                iGame.lineShifts['season']      =   iy
-                iGame.lineShifts['gameCode']    =   ic
-                iGame.lineShifts['hometeam']    =   ih
-                iGame.lineShifts['awayteam']    =   ia
-                # Check if some data was retrieved:
-                if len(iGame.player_classes)>0:
-                    S, A, R, nS, nA, coded      =   iGame.build_statespace(self.line_dictionary)
-                    allR.append( np.sum(R) )
-                    # Concatenate data
-                    df_ic       =   np.transpose(np.reshape(np.concatenate((S, A, R)), [3, -1]))
-                    RL_data     =   pd.concat((RL_data, pd.DataFrame(df_ic, columns=['state', 'action', 'reward'])), axis=0)
-                    GAME_data   =   pd.concat((GAME_data, iGame.lineShifts[coded]), axis=0)
-                    # Players data
-                    plDT        =   iGame.player_classes
-                    plDT['season']  =   iy
-                    plDT['gameCode']=   ic
-                    PLAYER_data     =   pd.concat((PLAYER_data, plDT), axis=0)
-                    # Save data
-                    if not repoSave is None and count % 20 == 0:
-                        pickle.dump({'RL_data': RL_data, 'nStates': nS, 'nActions': nA}, open(path.join(repoSave, 'RL_teaching_data.p'), 'wb'))
-                        pickle.dump(GAME_data, open(path.join(repoSave, 'GAME_data.p'), 'wb'))
-                        pickle.dump(PLAYER_data, open(path.join(repoSave, 'PLAYER_data.p'), 'wb') )
-                else:
-                    print('*** EMPTY GAME ***')
-            else:
-                print('*** EMPTY GAME ***')
-
-            # Status bar
-            stdout.write('\r')
-            # the exact output you're looking for:
-            stdout.write("Game %i/%i - season %s game %s: [%-60s] %d%%, completed" % (count, len(self.games_lst), iy, ic, '=' * int(count / len(self.games_lst) * 60), 100 * count / len(self.games_lst)))
-            stdout.flush()
-            count   +=  1
-        self.RL_data        =   RL_data
-        self.state_size     =   nS
-        self.action_size    =   nA
-
-
-    def teach_RL_agent(self):
-        # Instantiate the agent
-        agent       =   Agent(self.state_size, self.action_size)
-        # --- TEACH THE AGENT
-        # List all samples
-        iSamples    =   list( range(self.RL_data.shape[0]) )
-        shuffle(iSamples)
-        count       =   0
-        # Loop on samples and teach
-        for iS in iSamples:
-            # Get new teaching example
-            S,A,R   =   self.RL_data.iloc[iS]['state'], self.RL_data.iloc[iS]['action'], self.RL_data.iloc[iS]['reward']
-            if iS==np.max(iSamples) or self.RL_data.iloc[iS+1].name==0:
-                Sp  =   []
-            else:
-                Sp  =   self.RL_data.iloc[iS + 1]['state']
-            # Do teaching
-            agent.agent_move(S,A,R,Sp)
-
-            count   +=  1
-            if not count % 100:
-                # Status bar
-                stdout.write('\r')
-                # the exact output you're looking for:
-                stdout.write("Move %i/%i : [%-60s] %d%%, completed" % (count, len(iSamples), '=' * int(count / len(iSamples) * 60), 100 * count / len(iSamples)))
-                stdout.flush()
-
-                self.action_value   =   np.reshape( agent.action_value, [3, 5, 10, 10] )
-                pickle.dump({'action_values':self.action_value}, open(path.join(repoSave, 'RL_action_values.p'), 'wb'))
-
-
-    def make_line_dictionary(self):
-        # Possible entries : [0,1,2]
-        self.line_dictionary    =   {(0,0,0):0, (0,0,1):1, (0,1,1):2, (1,1,1):3,\
-                                    (0,0,2):4, (0,2,2):5, (2,2,2):6, (0,1,2):7,\
-                                    (1,1,2):8, (1,2,2):9}
-
 
 
 class Season:
@@ -148,10 +20,8 @@ class Season:
     #     self.year_encoding   =   year_encoding # eg, 'Season_20122013'
 
     def list_game_ids(self, repoPbP, repoPSt):
-        # Format year
-        iyear           =   '%d%d' % (self.year_begin, self.year_end) # self.year_encoding.replace('Season_', '')
         # Get data - long
-        gc              =   Game(repoPbP, repoPSt, iyear)
+        gc              =   Game(repoPbP, repoPSt, self)
         # Get game IDs
         self.games_id   =   gc.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
 
@@ -178,13 +48,14 @@ class Season:
 
 class Game:
 
-    def __init__(self, repoPbP, repoPSt, season: Season, gameId=None, gameQty=None):
+    def __init__(self, db_root: str, season: Season, gameId=None, gameQty=None):
         # Retrieve game info
         self.season =   season
         self.gameId =   gameId
-        self.repoPbP=   repoPbP
-        self.repoPSt=   repoPSt
-        dataPath    =   path.join(repoPbP, 'Season_%d%d' % (self.season.year_begin, self.season.year_end), 'converted_data.p')
+
+        self.repoPbP = path.join(db_root, 'PlayByPlay')
+        self.repoPSt = path.join(db_root, "PlayerStats", "player")
+        dataPath    =   path.join(self.repoPbP, 'Season_%d%d' % (self.season.year_begin, self.season.year_end), 'converted_data.p')
         dataFrames  =   pickle.load( open(dataPath, 'rb') )
         # Make sure to pick right season
         #dataFrame   =   dataFrame[ dataFrame.loc[:, 'season']==int(season)]
@@ -192,8 +63,8 @@ class Game:
         self.hd     =   dataFrames['playbyplay'].columns
         self.df     =   dataFrames['playbyplay']
         self.df_wc  =   dataFrames['playbyplay']       #Working copy
-        self.rf     =   dataFrames['roster']
-        # Fecth line shifts
+
+        # Fetch line shifts
         self.lineShifts     =   {}
         self.teams = None
         self.teams_label_for_shift = "" # 'home', 'away' or 'both'
@@ -201,12 +72,45 @@ class Game:
         if not gameId is None:
             self.df_wc  =   self.df[self.df['gcode']==gameId]
         self.player_classes = None # structure containing all player's classes (categories).
-
+        # let's keep the roster only for players that we are interested in:
+        self.rf     =   dataFrames['roster']
+        fields_with_ids = ['a1','a2','a3','a4','a5','a6','h1','h2','h3','h4','h5','h6','away.G', 'home.G']
+        all_sets = list(map(
+            lambda field_id: set(self.df_wc[field_id].unique().tolist()).difference({1}), # '1' is not a real id.
+            fields_with_ids))
+        all_ids_of_players = set.union(*all_sets)
+        self.rf = self.rf[self.rf['player.id'].isin(all_ids_of_players)]
 
     def get_game_ids(self):
-        # List all game numbers
-        gNums   =   np.unique(self.df['gcode'])
-        return gNums
+        """List all game numbers"""
+        return np.unique(self.df['gcode'])
+
+    def get_away_lines(self, accept_repeated=False) -> Tuple[pd.DataFrame, List[List[int]]]:
+        """
+        Calculates top lines used by opposing team. 
+        Each line returned contains the CATEGORY of each player.
+        """
+        teams_label_for_shift, teams, lineShifts = self.calculate_line_shifts(team='away', minduration=20)
+        df = lineShifts.groupby(by=lineShifts['playersID'].apply(tuple)).agg(
+            {'iceduration': sum}).sort_values(by=['iceduration'], ascending=False)
+
+        a_dict = df.to_dict()['iceduration']
+        sorted_tuples_and_secs = sorted(a_dict.items(), key=lambda x: x[1], reverse=True)
+        players_used = set()
+        lines_chosen = []
+        for line, secs in sorted_tuples_and_secs:
+            # is this line using players already present?
+            line_as_set = set(line)
+            if (not 1 in line_as_set) and (accept_repeated or (len(players_used.intersection(line_as_set)) == 0)):
+                lines_chosen.append(line)
+                players_used = players_used.union(line_as_set)
+                if len(lines_chosen) == 4:
+                    break # horrible, but effective
+        return (df, list(map(list, [np.sort(self.classes_of_line(a)) for a in lines_chosen]))) # TODO: not sure about the 'sort'. What is it for?
+
+    def classes_of_line(self, a: List[int]) -> List[int]:
+        """Returns classes of members of a line given their id's."""
+        return self.player_classes.loc[list(a)]["class"].values
 
 
     def pick_equalstrength(self):
@@ -242,20 +146,21 @@ class Game:
 
     def pull_offensive_players(self, dfRow, team='h'):
         # Get player IDs
-        pID     =   [dfRow[team+str(x)] for x in range(1,7)]
+        pID     =   set([dfRow[team+str(x)] for x in range(1,7)])
+        pID.discard(1) # '1' is not a true player ID.
+        pID     =   list(pID)
         # Check positions
         pPOS    =   [self.rf.loc[self.rf['player.id']==x, 'pos'] for x in pID]
         pOFF    =   [(x.values[0]=='R' or x.values[0]=='L' or x.values[0]=='C') for x in pPOS]
         return (list( np.array(pID)[pOFF] )+[1,1,1])[:3]
 
-
-    def calculate_line_shifts(self, team='home', minduration=None): # ->Tuple[ pd.DataFrame:
+    def calculate_line_shifts(self, team='home', minduration: int=20): # ->Tuple[ pd.DataFrame:
         """
         Calculates the line shifts and returns them on a proper structure.
         This calculation is purely functional: it does not change the state of this class.
         Args:
-            team: 
-            minduration: 
+            team: 'home', 'away', or 'both'
+            minduration: time in seconds.
 
         Returns:
 
@@ -346,7 +251,7 @@ class Game:
         return (team, teams, lineShifts)
 
 
-    def pull_line_shifts(self, team: str='home', minduration: Optional[int]=None):
+    def pull_line_shifts(self, team: str='home', minduration: int=20):
         self.teams_label_for_shift, self.teams, self.lineShifts = self.calculate_line_shifts(team, minduration)
 
     def pull_players_classes_from_repo_address(self, repoModel:str, number_of_games=30):
