@@ -21,9 +21,9 @@ class Season:
 
     def list_game_ids(self, repoPbP, repoPSt):
         # Get data - long
-        gc              =   Game(repoPbP, repoPSt, self)
+        self.game_active=   Game(repoPbP, repoPSt, iyear)
         # Get game IDs
-        self.games_id   =   gc.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
+        self.games_id   =   self.game_active.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
 
     def __str__(self):
         return "Season %d-%d" % (self.year_begin, self.year_end)
@@ -60,26 +60,29 @@ class Game:
         # Make sure to pick right season
         #dataFrame   =   dataFrame[ dataFrame.loc[:, 'season']==int(season)]
         # Store frames
-        self.hd     =   dataFrames['playbyplay'].columns
+	self.rf     =   dataFrames['roster']        
+	self.hd     =   dataFrames['playbyplay'].columns
         self.df     =   dataFrames['playbyplay']
         self.df_wc  =   dataFrames['playbyplay']       #Working copy
 
         # Fetch line shifts
-        self.lineShifts     =   {}
+        self.player_classes = 	None # structure containing all player's classes (categories).
+	self.lineShifts     =   {}
         self.teams = None
         self.teams_label_for_shift = "" # 'home', 'away' or 'both'
         # Filter for game Id
+        self.switch_to_game(gameId)
+
+
+    def switch_to_game(self, gameId):
         if not gameId is None:
-            self.df_wc  =   self.df[self.df['gcode']==gameId]
-        self.player_classes = None # structure containing all player's classes (categories).
-        # let's keep the roster only for players that we are interested in:
-        self.rf     =   dataFrames['roster']
-        fields_with_ids = ['a1','a2','a3','a4','a5','a6','h1','h2','h3','h4','h5','h6','away.G', 'home.G']
-        all_sets = list(map(
-            lambda field_id: set(self.df_wc[field_id].unique().tolist()).difference({1}), # '1' is not a real id.
+            self.df_wc  =   self.df[self.df['gcode']==gameId]        
+            # let's keep the roster only for players that we are interested in:        
+            fields_with_ids = ['a1','a2','a3','a4','a5','a6','h1','h2','h3','h4','h5','h6','away.G', 'home.G']
+            all_sets = list(map(lambda field_id: set(self.df_wc[field_id].unique().tolist()).difference({1}), # '1' is not a real id.
             fields_with_ids))
-        all_ids_of_players = set.union(*all_sets)
-        self.rf = self.rf[self.rf['player.id'].isin(all_ids_of_players)]
+            all_ids_of_players = set.union(*all_sets)
+            self.rf = self.rf[self.rf['player.id'].isin(all_ids_of_players)]
 
     def get_game_ids(self):
         """List all game numbers"""
