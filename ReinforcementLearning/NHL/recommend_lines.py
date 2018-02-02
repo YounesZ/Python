@@ -24,7 +24,7 @@ from os import path
 
 import numpy as np
 
-from ReinforcementLearning.NHL.playbyplay.game import Season, Game
+from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Season, Game
 from ReinforcementLearning.NHL.player.player_type import PlayerType
 from ReinforcementLearning.NHL.lines.category import CategoryFetcher
 from ReinforcementLearning.NHL.lines.valuation import QValuesFetcherFromDict
@@ -36,7 +36,7 @@ def get_MTL_players(players_classes) -> Set[int]:
     return set(players_classes[players_classes["team"] == "MTL"].index)
 
 def do_it_together():
-    from ReinforcementLearning.NHL.playbyplay.state_space import HockeySS
+    from ReinforcementLearning.NHL.playbyplay.state_space_data import HockeySS
     """Initialization"""
     db_root = '/Users/luisd/dev/NHL_stats/data'
     repoCode = '/Users/luisd/dev/NHL_stats'
@@ -47,8 +47,8 @@ def do_it_together():
                                'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
 
     # Now lets get game data
-    season = Season(year_begin=2012)  # Season.from_year_begin(2012) # '20122013'
-    mtlott = Game(db_root, season, gameId=gameId)
+    season = Season(db_root=db_root, year_begin=2012)  # Season.from_year_begin(2012) # '20122013'
+    mtlott = season.pick_game(gameId)
 
     players_classes = mtlott.pull_players_classes_from_repo_address(True, True, 20, repoModel, number_of_games=30)
 
@@ -58,7 +58,7 @@ def do_it_together():
     # === Now we get the indices in the Q-values tables corresponding to lines
 
     # Line translation table
-    linedict  = HockeySS(repoPbP=mtlott.repoPbP, repoPSt=mtlott.repoPSt)
+    linedict  = HockeySS(db_root)
     linedict.make_line_dictionary()
     linedict  = linedict.line_dictionary
 
