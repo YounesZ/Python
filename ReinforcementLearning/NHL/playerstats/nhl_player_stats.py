@@ -18,128 +18,119 @@ from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
 from Utils.scraping.convert_raw import get_player_names
 from Utils.scraping.convert_trophies import to_pandas_selke, to_pandas_ross
 
+class PlayerStatsFetcher(object):
 
-def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', uptocode=None, nGames=82, plNames=None):
-    """
-    Gets stats of players.
-    Args:
-        repoPSt: repo of ...
-        repoPbP: repo of play-by-play data.
-        asof: date as string (YYYY-MM-DD) for beginning of the pulling of data.
-        upto: date as string (YYYY-MM-DD) for ending of the pulling of data.
-        uptocode: 
-        nGames: number of games to parse.
-        plNames: list of player names.
+    def __init__(self, repoPSt: str, repoPbP: str, do_data_cache: bool):
+        self.repoPSt = repoPSt
+        self.repoPbP = repoPbP
+        self.do_data_cache = do_data_cache
+        self.data_cache = {}
 
-    Returns:
+    def pull_stats(self, asof='2001-09-01', upto='2016-07-01', uptocode=None, nGames=82, plNames: List[str]=[]):
+        """
+        Gets stats of players.
+        Args:
+            repoPSt: repo of ...
+            repoPbP: repo of play-by-play data.
+            asof: date as string (YYYY-MM-DD) for beginning of the pulling of data.
+            upto: date as string (YYYY-MM-DD) for ending of the pulling of data.
+            uptocode: 
+            nGames: number of games to parse.
+            plNames: list of player names.
+    
+        Returns:
+    
+        """
 
-    """
+        def get_data_maybe_update_cache(file_name: str):
+            import datetime
+            entry_timestamp = datetime.datetime.now().timestamp()
+            if file_name in self.data_cache.keys():
+                players_data = self.data_cache[file_name]
+                # print("'get_data IN cache' took %.5f ms." % ((datetime.datetime.now().timestamp() - entry_timestamp) * 1000))
+            else:
+                with open(path.join(self.repoPSt, file_name), 'rb') as f:
+                    players_data  =   pickle.load(f)
+                if self.do_data_cache:
+                    self.data_cache[file_name] = players_data
+                # print("'get_data NOT IN cache' took %.5f ms." % ((datetime.datetime.now().timestamp() - entry_timestamp) * 1000))
+            return players_data
 
-    # Get player names
-    depickle        =   True
-    if plNames is None:
-        plNames     =   get_player_names(repoPbP)
-        # De-pickle all players
-        depickle    =   False
-        with open(path.join(repoPSt, 'all_players.p'), 'rb') as f:
-            all_pl  =   pickle.load(f)
-    count   =   0
-    # Prep
-    """
-    tobesum     =   ['gamesPlayed', 'goals', 'assists', 'points', 'plusMinus', 'penaltyMinutes', 'ppGoals', 'ppPoints', \
-                     'shGoals', 'shPoints', 'gameWinningGoals', 'otGoals', 'shots', 'shGoals', 'shAssists', 'shPoints', \
-                     'shShots', 'shHits', 'shBlockedShots', 'shMissedShots', 'shGiveaways', 'shTakeaways', 'shFaceoffsWon', \
-                     'shFaceoffsLost', 'hits', 'blockedShots', 'missedShots', 'giveaways', 'takeaways', 'faceoffs', \
-                     'faceoffsWon', 'faceoffsLost']
-    """
-    tobeavg     =   ['shootingPctg', 'shiftsPerGame', 'faceoffWinPctg', 'hitsPerGame', 'blockedShotsPerGame', 'missedShotsPerGame', 'shotsPerGame']
-    tobenorm_rs =   ['penaltyMinutes', 'assists', 'goals', 'gameWinningGoals', 'points', 'shots', 'otGoals', 'missedShots', 'hits', 'takeaways', 'faceoffsWon', 'blockedShots', 'faceoffsLost', 'giveaways', 'faceoffs']
-    tobenorm_pp =   ['ppPoints', 'ppGoals', 'ppShots', 'ppGiveaways', 'ppTakeaways', 'ppHits', 'ppFaceoffsWon', 'ppMissedShots', 'ppFaceoffsLost', 'ppTimeOnIce', 'ppAssists']
-    tobenorm_pk =   ['shGoals', 'shPoints', 'shMissedShots', 'shHits', 'shFaceoffsWon', 'shShots', 'shGiveaways', 'shFaceoffsLost', 'shBlockedShots', 'shTakeaways', 'shAssists']
-    columns     =   tobeavg + tobenorm_rs + tobenorm_pp + tobenorm_pk
 
-    # Initiate empty container
-    allStat     =   pd.DataFrame( columns = columns+['player', 'position', 'gmPl'] )
-    allPos      =   []
-    allGP       =   []
-    #tobeavg     =   ['goals', 'penaltyMinutes','gameWinningGoals', 'faceoffWinPctg', 'ppGoals', 'ppPoints', 'assists', 'shGoals', 'shootingPctg', 'shots', 'shPoints', 'points', 'plusMinus', 'otGoals', 'timeOnIcePerGame', 'shiftsPerGame', 'gamesPlayed', 'missedShotsPerGame', 'goalsPerGame', 'faceoffsLost', 'blockedShots', 'shotsPerGame', 'missedShots', 'hitsPerGame', 'hits', 'takeaways', 'blockedShotsPerGame', 'giveaways', 'faceoffsWon', 'faceoffs', 'shFaceoffsLost', 'shBlockedShots', 'shGiveaways', 'shMissedShots', 'shTakeaways', 'shFaceoffsWon', 'shShots', 'shAssists', 'shHits']
-    #nottobenorm =   list( set(list(tobeavg)).difference(tobenorm) )
+        # Get player names
+        depickle        =   True
+        if plNames is None:
+            plNames     =   get_player_names(self.repoPbP)
+            # De-pickle all players
+            depickle    =   False
+            all_pl = get_data_maybe_update_cache(file_name='all_players.p')
+        count   =   0
+        # Prep
+        tobeavg     =   ['shootingPctg', 'shiftsPerGame', 'faceoffWinPctg', 'hitsPerGame', 'blockedShotsPerGame', 'missedShotsPerGame', 'shotsPerGame']
+        tobenorm_rs =   ['penaltyMinutes', 'assists', 'goals', 'gameWinningGoals', 'points', 'shots', 'otGoals', 'missedShots', 'hits', 'takeaways', 'faceoffsWon', 'blockedShots', 'faceoffsLost', 'giveaways', 'faceoffs']
+        tobenorm_pp =   ['ppPoints', 'ppGoals', 'ppShots', 'ppGiveaways', 'ppTakeaways', 'ppHits', 'ppFaceoffsWon', 'ppMissedShots', 'ppFaceoffsLost', 'ppTimeOnIce', 'ppAssists']
+        tobenorm_pk =   ['shGoals', 'shPoints', 'shMissedShots', 'shHits', 'shFaceoffsWon', 'shShots', 'shGiveaways', 'shFaceoffsLost', 'shBlockedShots', 'shTakeaways', 'shAssists']
+        columns     =   tobeavg + tobenorm_rs + tobenorm_pp + tobenorm_pk
 
-    for pl in plNames:
-        # Load stats file
-        if depickle:
-            plStat      =   pickle.load( open( path.join(repoPSt, pl.replace(' ', '_')+'.p'), 'rb') )
-        else:
-            plStat      =   all_pl[pl]
-        # Sort table by date
-        plStat['date']  =   [x.split('T')[0] for x in list(plStat['gameDate'])]
-        plStat          =   plStat.sort_values(by='date', ascending=False)
-        # Get past games
-        newDF           =   pd.DataFrame(np.zeros([1, len(columns)]), columns=columns)
-        newDF['player'] =   pl
-        newDF['position']=  'U'
-        newDF['gmPl']   =   0
-        if len(plStat['date'])>0:
-            plStat      =   plStat[plStat['date']>=asof]
-            plStat      =   plStat[plStat['date']<=upto]
-            if not uptocode is None:
-                plStat  =   plStat[plStat['gameId']<uptocode]
-            # Reset indexing
-            plStat          =   plStat.reset_index()
-            #nottobeavg      =   list( set(list(plStat.columns)).difference(tobeavg) )
-            #nottobeavg      =   list( set(list(plStat.columns)).difference(tobesum).difference(tobeavg) )
-            # Select columns of interest
-            plStat          =   plStat.loc[0:nGames, :]
-            timeplayed_rs   =   deepcopy( plStat.loc[0:nGames, 'timeOnIcePerGame'] )
-            #timeplayed_pp   =   deepcopy(plStat.loc[0:nGames, 'ppTimeOnIce'])
-            #timeplayed_pk   =   deepcopy(plStat.loc[0:nGames, 'shTimeOnIce'])
-            # Remove games where the TOI was 0
-            plStat          =   plStat[timeplayed_rs>0]
-            #timeplayed_pp   =   timeplayed_pp[timeplayed_rs>0]
-            #timeplayed_pk   =   timeplayed_pk[timeplayed_rs>0]
-            #timeplayed_rs   =   timeplayed_rs[timeplayed_rs>0]
-            if len(plStat)>0:
-                # Init new dataframe
-                plStat      =   plStat.reset_index()
-                """
-                newDF       =   pd.DataFrame( np.zeros([1, len(columns)]), columns=columns)
-                # Normalize regular stats by time played
-                for iC in tobenorm_rs:
-                    newDF[iC]   =   ( plStat[iC].div(timeplayed_rs) * 3600 ).mean(axis=0)                    
-                # Normalize powerplay stats by time played
-                for iC in tobenorm_pp:
-                    newDF[iC]   =   ( plStat[iC][(timeplayed_pp > 0).values].div(timeplayed_pp[timeplayed_pp > 0]) * 3600).sum() / len(plStat)
-                    if newDF[iC].isnull().any(): newDF[iC] = 0
-                # Normalize penalty kill stats by time played
-                for iC in tobenorm_pk:
-                    newDF[iC]   =   ( plStat[iC][(timeplayed_pk > 0).values].div(timeplayed_pk[timeplayed_pk>0]) * 3600 ).sum()/len(plStat)                    
-                    if newDF[iC].isnull().any(): newDF[iC]    =   0
-                # Normalize by number of games played
-                for iC in columns:
-                    newDF[iC] = plStat[iC].sum(axis=0) / len(plStat)
-                # Average columns
-                newDF[tobeavg]  =   plStat[tobeavg].mean(axis=0).values
-                """
-                tbavg       =   plStat[tobeavg].sum(axis=0).values / len(plStat)
-                tbnrm_rs    =   plStat[tobenorm_rs].sum(axis=0).values / len(plStat)
-                tbnrm_pp    =   plStat[tobenorm_pp].sum(axis=0).values / len(plStat)
-                tbnrm_pk    =   plStat[tobenorm_pk].sum(axis=0).values / len(plStat)
-                allV        =   np.concatenate( (tbavg, tbnrm_rs, tbnrm_pp, tbnrm_pk) )
-                newDF       =   pd.DataFrame( np.reshape(allV, [1, len(columns)]), columns=columns)
-                newDF['player']     =   pl
-                newDF['position']   =  plStat.loc[0,'playerPositionCode']
-                newDF['gmPl']       =   np.sum(plStat['gamesPlayed'])
-        # Add to DB
-        allStat =   pd.concat( (allStat, newDF), axis=0, ignore_index=True )
+        # Initiate empty container
+        allStat     =   pd.DataFrame( columns = columns+['player', 'position', 'gmPl'] )
 
-        count+=1
-        if count % 500 == 0:
-            stdout.write('\r')
-            # the exact output you're looking for:
-            stdout.write("Player %i/%i - %s: [%-40s] %d%%, completed" % (count, len(plNames), pl, '=' * int(count / len(plNames) * 40), 100 * count / len(plNames)))
-            stdout.flush()
-    allStat     =   allStat.set_index('player')
-    return allStat, columns
+        import datetime
+        secs_begin_total = datetime.datetime.now().timestamp()
+        for pl in plNames:
+            entry_timestamp = datetime.datetime.now().timestamp()
+            # Load stats file
+            if depickle:
+                plStat = get_data_maybe_update_cache(file_name=pl.replace(' ', '_')+'.p')
+            else:
+                plStat      =   all_pl[pl]
+            # Sort table by date
+            plStat['date']  =   [x.split('T')[0] for x in list(plStat['gameDate'])]
+            plStat          =   plStat.sort_values(by='date', ascending=False)
+            # Get past games
+            newDF           =   pd.DataFrame(np.zeros([1, len(columns)]), columns=columns)
+            newDF['player'] =   pl
+            newDF['position']=  'U'
+            newDF['gmPl']   =   0
+            if len(plStat['date'])>0:
+                plStat      =   plStat[plStat['date']>=asof]
+                plStat      =   plStat[plStat['date']<=upto]
+                if not uptocode is None:
+                    plStat  =   plStat[plStat['gameId']<uptocode]
+                # Reset indexing
+                plStat          =   plStat.reset_index()
+                # Select columns of interest
+                plStat          =   plStat.loc[0:nGames, :]
+                # Remove games where the TOI was 0
+                plStat          =   plStat[plStat.loc[0:nGames, 'timeOnIcePerGame']>0]
+                if len(plStat)>0:
+                    # Init new dataframe
+                    dddd = datetime.datetime.now().timestamp()
+                    plStat      =   plStat.reset_index()
+                    tbavg       =   plStat[tobeavg].sum(axis=0).values / len(plStat)
+                    tbnrm_rs    =   plStat[tobenorm_rs].sum(axis=0).values / len(plStat)
+                    tbnrm_pp    =   plStat[tobenorm_pp].sum(axis=0).values / len(plStat)
+                    tbnrm_pk    =   plStat[tobenorm_pk].sum(axis=0).values / len(plStat)
+                    allV        =   np.concatenate( (tbavg, tbnrm_rs, tbnrm_pp, tbnrm_pk) )
+                    newDF       =   pd.DataFrame( np.reshape(allV, [1, len(columns)]), columns=columns)
+                    newDF['player']     =   pl
+                    newDF['position']   =  plStat.loc[0,'playerPositionCode']
+                    newDF['gmPl']       =   np.sum(plStat['gamesPlayed'])
+                    print("[%s] ********* CALCULATIONS took %.5f ms." % (pl, (datetime.datetime.now().timestamp() - dddd) * 1000))
+            # Add to DB
+            allStat =   pd.concat( (allStat, newDF), axis=0, ignore_index=True )
+            print("===================>>>> Player '%s' stats took %.5f secs." % (pl, datetime.datetime.now().timestamp() - entry_timestamp))
+
+            count+=1
+            if count % 500 == 0:
+                stdout.write('\r')
+                # the exact output you're looking for:
+                stdout.write("Player %i/%i - %s: [%-40s] %d%%, completed" % (count, len(plNames), pl, '=' * int(count / len(plNames) * 40), 100 * count / len(plNames)))
+                stdout.flush()
+
+        print("===================>>>> ALL Player stats took %.5f secs." % (datetime.datetime.now().timestamp() - secs_begin_total))
+        allStat     =   allStat.set_index('player')
+        return allStat, columns
 
 
 def to_quartiles(stats):
