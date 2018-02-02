@@ -1,5 +1,5 @@
 from ReinforcementLearning.NHL.playerstats.nhl_player_stats import *
-from ReinforcementLearning.NHL.playbyplay.game import *
+from ReinforcementLearning.NHL.playbyplay.playbyplay_data import *
 
 
 def get_game_id(home_team_abbr, date_as_str):
