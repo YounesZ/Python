@@ -2,6 +2,7 @@ import pickle
 import matplotlib.pyplot as plt
 from ReinforcementLearning.NHL.playerstats.nhl_player_stats import *
 from ReinforcementLearning.NHL.playbyplay.playbyplay_data import *
+from ReinforcementLearning.NHL.playbyplay.state_space_data import *
 
 # =======================
 # ==== FIRST SET POINTERS
@@ -33,17 +34,15 @@ for iS in seasons:
 
     print('\tAnalysing season %s (%i/%i): ' % (iS, seasons.index(iS) + 1, len(seasons)))
     # List all games
-    HSS     =   HockeySS(repoPbP, repoPSt)
-    HSS.list_all_games()
-    games   =   HSS.games_lst
-    iGame   =   Game(repoPbP, repoPSt, iS.replace('Season_', ''))
+    iSea    =   Season(db_root, int(iS.replace('Season_','')[:4]) )
+    games   =   iSea.games_id
 
     # Loop on games
     count   =   0
     for iG in games['gcode']:
 
         # pull data
-        iGame.switch_to_game(iG)
+        iGame   =   iSea.pick_game(iG)
         iGame.pull_line_shifts('both', minduration=20)
         allE =  len(iGame.lineShifts)
 
@@ -57,7 +56,6 @@ for iS in seasons:
 
         count += 1
         if count % 50 == 0:
-            stdout.write('\r\t')
             # the exact output you're looking for:
             stdout.write("Game %i/%i: [%-40s] %d%%, completed" % (
             count, len(games), '=' * int(count / len(games) * 40), 100 * count / len(games)))
