@@ -2,7 +2,7 @@ import pickle
 from copy import deepcopy
 from os import path
 
-import numpy
+import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 from sklearn.model_selection import train_test_split
