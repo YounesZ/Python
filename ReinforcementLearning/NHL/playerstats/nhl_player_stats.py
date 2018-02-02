@@ -19,7 +19,6 @@ from Utils.scraping.convert_raw import get_player_names
 from Utils.scraping.convert_trophies import to_pandas_selke, to_pandas_ross
 
 
-
 def pull_stats(repoPSt, repoPbP, asof='2001-09-01', upto='2016-07-01', uptocode=None, nGames=82, plNames=None):
     """
     Gets stats of players.
