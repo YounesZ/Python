@@ -234,7 +234,7 @@ class Game:
         return np.unique(self.df['gcode'])
     """
 
-    def get_away_lines(self, accept_repeated=False) -> Tuple[pd.DataFrame, List[List[int]]]:
+    def get_away_lines(self, accept_repeated=False) -> Tuple[pd.DataFrame, List[List[PlayerType]]]:
         """
         Calculates top lines used by opposing team. 
         Each line returned contains the CATEGORY of each player.
