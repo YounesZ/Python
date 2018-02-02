@@ -5,6 +5,7 @@ import pandas as pd
 import tensorflow as tf
 from typing import List, Tuple
 from os import path
+
 from ReinforcementLearning.NHL.playerstats.nhl_player_stats import pull_stats, do_normalize_data, do_reduce_data
 from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
 
@@ -26,9 +27,9 @@ class Season:
         self.repoPbP    =   path.join(self.db_root, 'PlayByPlay')
         self.repoPSt    =   path.join(self.db_root, "PlayerStats", "player")
         # Get data - long
-        self.games_data =   self.load_data()
+        self.load_data()
         # Get game IDs
-        self.games_id   =   self.game_active.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
+        self.games_id   =   self.dataFrames['playbyplay'].drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
 
     def load_data(self):
         dataPath        =   path.join(self.repoPbP, 'Season_%d%d' % (self.year_begin, self.year_end),'converted_data.p')
@@ -50,7 +51,7 @@ class Season:
         """
         # TODO: make it fit with the class signature. For now it's pretty much standalone.
         try:
-            gameInfo    =   pickle.load( open(path.join(db_root, 'gamesInfo.p'), 'rb') )
+            gameInfo    =   pickle.load( open(path.join(db_root, 'processed', 'gamesInfo.p'), 'rb') )
             gameInfo    =   gameInfo[gameInfo['gameDate']==date_as_str][gameInfo['teamAbbrev']==home_team_abbr]
             gameId      =   gameInfo['gameId']
             gameId      =   int( gameId.values.astype('str')[0][5:] )
@@ -67,7 +68,8 @@ class Game:
         self.gameId =   gameId
 
         # Get all player names
-        self.df_wc  =   season.dataFrames['playbyplay'][season.dataFrames['playbyplay']['gcode'] == gameId]
+        self.df     =   season.dataFrames['playbyplay']
+        self.df_wc  =   self.df[self.df['gcode'] == gameId]
         self.hd     =   self.df_wc.columns
 
         # let's keep the roster only for players that we are interested in:
@@ -75,7 +77,8 @@ class Game:
         all_sets        =   list(map(lambda field_id: set(self.df_wc[field_id].unique().tolist()).difference({1}),  # '1' is not a real id.
                             fields_with_ids))
         all_ids_of_players= set.union(*all_sets)
-        self.rf_wc      =   season.dataFrames['roster'][season.dataFrames['roster']['player.id'].isin(all_ids_of_players)]
+        self.rf         =   season.dataFrames['roster']
+        self.rf_wc      =   self.rf[self.rf['player.id'].isin(all_ids_of_players)]
 
         # Fetch line shifts
         self.player_classes     = 	None # structure containing all player's classes (categories).
@@ -331,7 +334,7 @@ class Game:
         # Get raw player stats
         # gcode   =   int( str(self.season)[:4]+'0'+str(self.gameId) )
         gcode   =   int( str(self.season.year_begin)+'0'+str(self.gameId) )
-        DT, dtCols  =   pull_stats(self.repoPSt, self.repoPbP, uptocode=gcode, nGames=nGames, plNames=all_plN.values)
+        DT, dtCols  =   pull_stats(self.season.repoPSt, self.season.repoPbP, uptocode=gcode, nGames=nGames, plNames=all_plN.values)
         # --- Get player classes
         # pre-process data
         DT[dtCols]  =   ut_sanitize_matrix(DT[dtCols])
@@ -439,7 +442,7 @@ repoPbP     =   path.join(root, 'Databases/Hockey/PlayByPlay')
 repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
 repoCode    =   path.join(root, 'Code/NHL_stats_SL')
 repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
-repoSave    =   path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data')
+repoSave    =   None #path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data')
 
 
 
@@ -447,12 +450,6 @@ repoSave    =   path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data')
 # LEARN LINE VALUES
 # =================
 """
-HSS         =   HockeySS(repoPbP, repoPSt)
-HSS.list_all_games()
-HSS.pull_RL_data(repoModel, repoSave)
-HSS.teach_RL_agent()
-
-
 
 # Instantiate class
 gc      =   Game(dataRep, season)    #20128, 20129, 20130, 20131, 20132, 20133, 20136, 20137, 20138, 20139, 20140, 20141]
