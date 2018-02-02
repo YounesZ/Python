@@ -1,6 +1,6 @@
 import unittest
 from os import path
-from ReinforcementLearning.NHL.playbyplay.game import Season, Game
+from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Season, Game
 
 class TestGame(unittest.TestCase):
     """Testing definitions of Game's."""

@@ -598,7 +598,7 @@ def do_assess_clustering_robustness(dtCols, normalizer, global_centers, pca, nGa
 # =========
 """
 root        =   '/home/younesz/Documents'
-root        =   '/Users/younes_zerouali/Documents/Stradigi'
+#root        =   '/Users/younes_zerouali/Documents/Stradigi'
 repoPbP     =   path.join(root, 'Databases/Hockey/PlayByPlay')
 repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
 repoRaw     =   path.join(root, 'Databases/Hockey/PlayerStats/raw')

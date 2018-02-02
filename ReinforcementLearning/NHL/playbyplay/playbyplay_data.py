@@ -5,6 +5,7 @@ import pandas as pd
 import tensorflow as tf
 from typing import List, Tuple
 from os import path
+
 from ReinforcementLearning.NHL.playerstats.nhl_player_stats import pull_stats, do_normalize_data, do_reduce_data
 from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
 
@@ -12,18 +13,30 @@ from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
 class Season:
     """Encapsualtes all elements for a season."""
 
-    def __init__(self, year_begin: int):
-        self.year_begin = year_begin
-        self.year_end = self.year_begin + 1
+    def __init__(self, db_root: str, year_begin: int):
+        self.db_root    =   db_root
+        self.year_begin =   year_begin
+        self.year_end   =   self.year_begin + 1
 
-    # def __init__(self, year_encoding):
+        # List games and load season data
+        self.list_game_ids()
+    #  def __init__(self, year_encoding):
     #     self.year_encoding   =   year_encoding # eg, 'Season_20122013'
 
-    def list_game_ids(self, repoPbP, repoPSt):
+    def list_game_ids(self):
+        self.repoPbP    =   path.join(self.db_root, 'PlayByPlay')
+        self.repoPSt    =   path.join(self.db_root, "PlayerStats", "player")
         # Get data - long
-        gc              =   Game(repoPbP, repoPSt, self)
+        self.load_data()
         # Get game IDs
-        self.games_id   =   gc.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
+        self.games_id   =   self.dataFrames['playbyplay'].drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
+
+    def load_data(self):
+        dataPath        =   path.join(self.repoPbP, 'Season_%d%d' % (self.year_begin, self.year_end),'converted_data.p')
+        self.dataFrames =   pickle.load(open(dataPath, 'rb'))
+
+    def pick_game(self, gameId):
+        return Game(self, gameId)
 
     def __str__(self):
         return "Season %d-%d" % (self.year_begin, self.year_end)
@@ -38,7 +51,7 @@ class Season:
         """
         # TODO: make it fit with the class signature. For now it's pretty much standalone.
         try:
-            gameInfo    =   pickle.load( open(path.join(db_root, 'gamesInfo.p'), 'rb') )
+            gameInfo    =   pickle.load( open(path.join(db_root, 'processed', 'gamesInfo.p'), 'rb') )
             gameInfo    =   gameInfo[gameInfo['gameDate']==date_as_str][gameInfo['teamAbbrev']==home_team_abbr]
             gameId      =   gameInfo['gameId']
             gameId      =   int( gameId.values.astype('str')[0][5:] )
@@ -46,44 +59,39 @@ class Season:
         except Exception as e:
             raise IndexError("There was no game for '%s' on '%s'" % (home_team_abbr, date_as_str))
 
+
 class Game:
 
-    def __init__(self, db_root: str, season: Season, gameId=None, gameQty=None):
+    def __init__(self, season: Season, gameId: int):
         # Retrieve game info
         self.season =   season
         self.gameId =   gameId
 
-        self.repoPbP = path.join(db_root, 'PlayByPlay')
-        self.repoPSt = path.join(db_root, "PlayerStats", "player")
-        dataPath    =   path.join(self.repoPbP, 'Season_%d%d' % (self.season.year_begin, self.season.year_end), 'converted_data.p')
-        dataFrames  =   pickle.load( open(dataPath, 'rb') )
-        # Make sure to pick right season
-        #dataFrame   =   dataFrame[ dataFrame.loc[:, 'season']==int(season)]
-        # Store frames
-        self.hd     =   dataFrames['playbyplay'].columns
-        self.df     =   dataFrames['playbyplay']
-        self.df_wc  =   dataFrames['playbyplay']       #Working copy
+        # Get all player names
+        self.df     =   season.dataFrames['playbyplay']
+        self.df_wc  =   self.df[self.df['gcode'] == gameId]
+        self.hd     =   self.df_wc.columns
+
+        # let's keep the roster only for players that we are interested in:
+        fields_with_ids =   ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'away.G', 'home.G']
+        all_sets        =   list(map(lambda field_id: set(self.df_wc[field_id].unique().tolist()).difference({1}),  # '1' is not a real id.
+                            fields_with_ids))
+        all_ids_of_players= set.union(*all_sets)
+        self.rf         =   season.dataFrames['roster']
+        self.rf_wc      =   self.rf[self.rf['player.id'].isin(all_ids_of_players)]
 
         # Fetch line shifts
-        self.lineShifts     =   {}
-        self.teams = None
+        self.player_classes     = 	None # structure containing all player's classes (categories).
+        self.lineShifts         =   {}
+        self.teams              =   None
         self.teams_label_for_shift = "" # 'home', 'away' or 'both'
-        # Filter for game Id
-        if not gameId is None:
-            self.df_wc  =   self.df[self.df['gcode']==gameId]
-        self.player_classes = None # structure containing all player's classes (categories).
-        # let's keep the roster only for players that we are interested in:
-        self.rf     =   dataFrames['roster']
-        fields_with_ids = ['a1','a2','a3','a4','a5','a6','h1','h2','h3','h4','h5','h6','away.G', 'home.G']
-        all_sets = list(map(
-            lambda field_id: set(self.df_wc[field_id].unique().tolist()).difference({1}), # '1' is not a real id.
-            fields_with_ids))
-        all_ids_of_players = set.union(*all_sets)
-        self.rf = self.rf[self.rf['player.id'].isin(all_ids_of_players)]
 
+    # This is deprecated: this functionality is now Season()'s job
+    """
     def get_game_ids(self):
-        """List all game numbers"""
+        "List all game numbers"
         return np.unique(self.df['gcode'])
+    """
 
     def get_away_lines(self, accept_repeated=False) -> Tuple[pd.DataFrame, List[List[int]]]:
         """
@@ -107,6 +115,7 @@ class Game:
                 if len(lines_chosen) == 4:
                     break # horrible, but effective
         return (df, list(map(list, [np.sort(self.classes_of_line(a)) for a in lines_chosen]))) # TODO: not sure about the 'sort'. What is it for?
+
 
     def classes_of_line(self, a: List[int]) -> List[int]:
         """Returns classes of members of a line given their id's."""
@@ -150,7 +159,7 @@ class Game:
         pID.discard(1) # '1' is not a true player ID.
         pID     =   list(pID)
         # Check positions
-        pPOS    =   [self.rf.loc[self.rf['player.id']==x, 'pos'] for x in pID]
+        pPOS    =   [self.rf_wc.loc[self.rf_wc['player.id']==x, 'pos'] for x in pID]
         pOFF    =   [(x.values[0]=='R' or x.values[0]=='L' or x.values[0]=='C') for x in pPOS]
         return (list( np.array(pID)[pOFF] )+[1,1,1])[:3]
 
@@ -313,7 +322,7 @@ class Game:
             self.player_classes = []
             return
         all_plC =   np.unique( np.concatenate(all_pl) )
-        all_plN = self.rf.set_index('player.id').loc[all_plC[all_plC > 1]]['firstlast'].drop_duplicates(keep='first')
+        all_plN = self.rf_wc.set_index('player.id').loc[all_plC[all_plC > 1]]['firstlast'].drop_duplicates(keep='first')
         if len(all_plN) == 0:
             self.player_classes = []
             return
@@ -325,7 +334,7 @@ class Game:
         # Get raw player stats
         # gcode   =   int( str(self.season)[:4]+'0'+str(self.gameId) )
         gcode   =   int( str(self.season.year_begin)+'0'+str(self.gameId) )
-        DT, dtCols  =   pull_stats(self.repoPSt, self.repoPbP, uptocode=gcode, nGames=nGames, plNames=all_plN.values)
+        DT, dtCols  =   pull_stats(self.season.repoPSt, self.season.repoPbP, uptocode=gcode, nGames=nGames, plNames=all_plN.values)
         # --- Get player classes
         # pre-process data
         DT[dtCols]  =   ut_sanitize_matrix(DT[dtCols])
@@ -431,7 +440,7 @@ root        =   '/home/younesz/Documents'
 #root        =   '/Users/younes_zerouali/Documents/Stradigi'
 repoPbP     =   path.join(root, 'Databases/Hockey/PlayByPlay')
 repoPSt     =   path.join(root, 'Databases/Hockey/PlayerStats/player')
-repoCode    =   path.join(root, 'Code/Python')
+repoCode    =   path.join(root, 'Code/NHL_stats_SL')
 repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
 repoSave    =   None #path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data')
 
@@ -441,12 +450,6 @@ repoSave    =   None #path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/
 # LEARN LINE VALUES
 # =================
 """
-HSS         =   HockeySS(repoPbP, repoPSt)
-HSS.list_all_games()
-HSS.pull_RL_data(repoModel, repoSave)
-HSS.teach_RL_agent()
-
-
 
 # Instantiate class
 gc      =   Game(dataRep, season)    #20128, 20129, 20130, 20131, 20132, 20133, 20136, 20137, 20138, 20139, 20140, 20141]

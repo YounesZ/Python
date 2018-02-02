@@ -2,7 +2,7 @@ import pickle
 from copy import deepcopy
 from os import path
 
-import numpy
+import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -114,25 +114,30 @@ class ANN_classifier():
         Ax2.set_ylim([0.4, 1])
 
     def ann_forward_pass(self, repoModel, input_data):
+        # Restore model
+        sess, annX, annY = self.ann_reload_model(repoModel)
+        # Restore additional variables
+        VAR = pickle.load(open(path.join(repoModel, 'addedVariables.p'), 'rb'))
+        self.trLoss = VAR['trLoss']
+        self.tsLoss = VAR['tsLoss']
+        self.trAcc = VAR['trAcc']
+        self.tsAcc = VAR['tsAcc']
+        self.batchSize = VAR['batchSize']
+        return sess.run(annY, feed_dict={annX: input_data})
+
+    def ann_reload_model(self, repoModel):
         # Reload the graph and variables
-        sess        =   tf.Session()
-        saver       =   tf.train.import_meta_graph( path.join(repoModel, path.basename(repoModel)+'.meta') )
+        sess = tf.Session()
+        saver = tf.train.import_meta_graph(path.join(repoModel, path.basename(repoModel) + '.meta'))
         saver.restore(sess, tf.train.latest_checkpoint(path.join(repoModel, './')))
         # Link TF variables to the classifier class
-        graph       =   sess.graph
-        annX        =   graph.get_tensor_by_name('Input_to_the_network-player_features:0')
+        graph = sess.graph
+        annX = graph.get_tensor_by_name('Input_to_the_network-player_features:0')
         """self.annY_  =   graph.get_tensor_by_name('Ground_truth:0')
         self.annW1  =   graph.get_tensor_by_name('weights_inp_hid:0')
         self.annB1  =   graph.get_tensor_by_name('bias_inp_hid:0')
         self.Y1     =   graph.get_operation_by_name('hid_output')
         self.annW2  =   graph.get_tensor_by_name('weights_hid_out:0')
         self.annB2  =   graph.get_tensor_by_name('bias_hid_out:0')"""
-        annY        =   graph.get_tensor_by_name('prediction:0')
-        # Restore additional variables
-        VAR         =   pickle.load( open(path.join(repoModel, 'addedVariables.p'), 'rb') )
-        self.trLoss =   VAR['trLoss']
-        self.tsLoss =   VAR['tsLoss']
-        self.trAcc  =   VAR['trAcc']
-        self.tsAcc  =   VAR['tsAcc']
-        self.batchSize = VAR['batchSize']
-        return sess.run(annY, feed_dict={annX:input_data})
+        annY = graph.get_tensor_by_name('prediction:0')
+        return sess, annX, annY
