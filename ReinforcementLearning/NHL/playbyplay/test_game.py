@@ -20,11 +20,7 @@ class TestGame(unittest.TestCase):
         self.mtlott = Game(self.db_root, self.season, gameId=gameId)
 
     def test1(self):
-        # ==== Second the players data
-
         # Visualize all player's classes: 0=def, 1=off, 2=neutral
-        # mtlott.pull_line_shifts(team='both')
         players_classes = self.mtlott.pull_players_classes_from_repo_address(self.repoModel, number_of_games=30)
         self.assertTrue(players_classes.equals(self.mtlott.player_classes))
-        # self.mtlott.player_classes
 
