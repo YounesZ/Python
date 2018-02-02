@@ -2,7 +2,6 @@ from ReinforcementLearning.NHL.player.player_type import PlayerType
 
 
 def get_class_of_player_by_id(data_for_game, player_id: int) -> PlayerType:
-    "0=def, 1=off, 2=neutral"
     try:
         return PlayerType.from_int(int(data_for_game.player_classes[data_for_game.player_classes.index == player_id]["class"]))
     except:
