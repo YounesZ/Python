@@ -80,8 +80,6 @@ def do_it_together():
     lineShifts = mtlott.lineShifts.as_df(team='both', equal_strength=mtlott.shifts_equal_strength,
                                        regular_time=mtlott.shifts_regular_time, min_duration=20)
 
-    # lineShifts = mtlott.lineShifts.as_df(team='away', equal_strength=mtlott.shifts_equal_strength,
-    #                                    regular_time=mtlott.shifts_regular_time, min_duration=20)
     plList = list(mtlott.player_classes.loc[lineShifts['playersID'].iloc[iShift][0]]['firstlast'].values) + \
              list(mtlott.player_classes.loc[lineShifts['playersID'].iloc[iShift][1]]['firstlast'].values)
     diff = mtlott.recode_differential(lineShifts.iloc[iShift].differential)
@@ -113,7 +111,7 @@ def do_it_together():
 
     home_lines_rec = line_rec.recommend_lines_maximize_average(
                                     home_team_players_ids=get_MTL_players(players_classes),
-                                    away_team_lines = away_lines)
+                                    away_team_lines = away_lines, examine_max_first_lines=2)
     print(home_lines_rec)
 
 if __name__ == '__main__':
@@ -121,7 +119,9 @@ if __name__ == '__main__':
     cProfile.run('do_it_together()', '/tmp/restats')
     import pstats
 
-    p = pstats.Stats('/tmp/restats')
-    p.sort_stats('cumulative').print_stats(10)
+    see_top = 25
 
-    p.sort_stats('time').print_stats(10)
+    p = pstats.Stats('/tmp/restats')
+    p.sort_stats('cumulative').print_stats(see_top)
+
+    p.sort_stats('time').print_stats(see_top)
