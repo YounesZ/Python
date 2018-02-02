@@ -1,5 +1,5 @@
 import itertools
-from typing import List, Callable, Set
+from typing import List, Callable, Set, Optional
 
 from ReinforcementLearning.NHL.player.player_type import PlayerType
 from ReinforcementLearning.NHL.lines.category import CategoryFetcher
@@ -16,7 +16,8 @@ class LineRecommender(object):
             self,
             home_team_players_ids: Set[int],
             away_team_lines: List[List[PlayerType]],
-            comb_q_values: Callable[[List[float]], float]) -> List[List[int]]:
+            comb_q_values: Callable[[List[float]], float],
+            examine_max_first_lines: Optional[int] = None) -> List[List[int]]:
         """
         Builds optimal lines for home team.
         Args:
@@ -27,6 +28,9 @@ class LineRecommender(object):
         Returns:
 
         """
+        def cats_from_ids(home_line_1_ids: List[int]) -> List[PlayerType]:
+            return list(map(self.player_category_fetcher.category_of_player, home_line_1_ids))
+
         import datetime
         assert len(home_team_players_ids) == len(set(home_team_players_ids)), "There are repeated ids in the home team"
         assert len(away_team_lines) == 4, "I need a formation (ie, 4 lines) for away team"
@@ -39,19 +43,19 @@ class LineRecommender(object):
         entry_timestamp = datetime.datetime.now().timestamp()
         for home_line_1_ids in itertools.combinations(home_team_players_ids, 3):
             best_formation_found = False
+            home_line_1 = cats_from_ids(home_line_1_ids)
             for home_line_2_ids in itertools.combinations(home_team_players_ids -  set(home_line_1_ids), 3):
+                home_line_2 = cats_from_ids(home_line_2_ids)
                 for home_line_3_ids in itertools.combinations(
                                         home_team_players_ids - set(home_line_1_ids) - set(home_line_2_ids), 3):
+                    home_line_3 = cats_from_ids(home_line_3_ids)
                     for home_line_4_ids in itertools.combinations(
                                         home_team_players_ids - set(home_line_1_ids) - set(home_line_2_ids) - set(home_line_3_ids), 3):
                         home_formation = [home_line_1_ids, home_line_2_ids, home_line_3_ids, home_line_4_ids]
 
                         # print(home_formation)
                         # get lines with CATEGORY of players
-                        home_line_1 = list(map(self.player_category_fetcher.category_of_player, home_line_1_ids))
-                        home_line_2 = list(map(self.player_category_fetcher.category_of_player, home_line_2_ids))
-                        home_line_3 = list(map(self.player_category_fetcher.category_of_player, home_line_3_ids))
-                        home_line_4 = list(map(self.player_category_fetcher.category_of_player, home_line_4_ids))
+                        home_line_4 = cats_from_ids(home_line_4_ids)
                         # ok, then:
                         qs = [self.q_values_fetcher.get(home_line_1, away_line_1),
                               self.q_values_fetcher.get(home_line_2, away_line_2),
@@ -67,11 +71,14 @@ class LineRecommender(object):
 
 
             how_many_first_lines_tried += 1
-            if best_formation_found:
-                time_it_took = datetime.datetime.now().timestamp() - entry_timestamp
-                time_per_cycle = time_it_took / how_many_first_lines_tried
-                print("=======> Took %.2f secs. to look at %d first-lines; I think we have around %.2f secs. to go" % (
-                time_it_took, how_many_first_lines_tried, (220 - how_many_first_lines_tried) * time_per_cycle))
+            # if best_formation_found:
+            time_it_took = datetime.datetime.now().timestamp() - entry_timestamp
+            time_per_cycle = time_it_took / how_many_first_lines_tried
+            print("=======> Took %.2f secs. to look at %d first-lines; I think we have around %.2f secs. to go" % (
+            time_it_took, how_many_first_lines_tried, (220 - how_many_first_lines_tried) * time_per_cycle))
+            if examine_max_first_lines is not None and (how_many_first_lines_tried >= examine_max_first_lines):
+                print("Examined enough. Breaking away.")
+                break
 
         print("ALL DONE!!!!!!")
         print("================================")
@@ -82,14 +89,16 @@ class LineRecommender(object):
     def recommend_lines_maximize_average(
             self,
             home_team_players_ids: Set[int],
-            away_team_lines: List[List[PlayerType]]) -> List[List[int]]:
-        return self.recommend_lines(home_team_players_ids, away_team_lines, comb_q_values=(lambda a_list: sum(a_list) / len(a_list)))
+            away_team_lines: List[List[PlayerType]],
+            examine_max_first_lines: Optional[int] = None) -> List[List[int]]:
+        return self.recommend_lines(home_team_players_ids, away_team_lines, comb_q_values=(lambda a_list: sum(a_list) / len(a_list)), examine_max_first_lines=examine_max_first_lines)
 
     def recommend_lines_maximize_max(
             self,
             home_team_players_ids: Set[int],
-            away_team_lines: List[List[PlayerType]]) -> List[List[int]]:
-        return self.recommend_lines(home_team_players_ids, away_team_lines, comb_q_values=(lambda a_list: max(a_list)))
+            away_team_lines: List[List[PlayerType]],
+            examine_max_first_lines: Optional[int] = None) -> List[List[int]]:
+        return self.recommend_lines(home_team_players_ids, away_team_lines, comb_q_values=(lambda a_list: max(a_list)), examine_max_first_lines=examine_max_first_lines)
 # ###########################################################################################
 # ###########################################################################################
 # ###########################################################################################
