@@ -12,20 +12,30 @@ from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
 class Season:
     """Encapsualtes all elements for a season."""
 
-    def __init__(self, year_begin: int):
+    def __init__(self, db_root: str, year_begin: int):
+        self.db_root    =   db_root
         self.year_begin =   year_begin
         self.year_end   =   self.year_begin + 1
 
-    # def __init__(self, year_encoding):
+        # List games and load season data
+        self.list_game_ids()
+    #  def __init__(self, year_encoding):
     #     self.year_encoding   =   year_encoding # eg, 'Season_20122013'
 
-    def list_game_ids(self, db_root):
-        self.repoPbP    =   path.join(db_root, 'PlayByPlay')
-        self.repoPSt    =   path.join(db_root, "PlayerStats", "player")
+    def list_game_ids(self):
+        self.repoPbP    =   path.join(self.db_root, 'PlayByPlay')
+        self.repoPSt    =   path.join(self.db_root, "PlayerStats", "player")
         # Get data - long
-        self.game_active=   Game(db_root, self)
+        self.games_data =   self.load_data()
         # Get game IDs
         self.games_id   =   self.game_active.df.drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
+
+    def load_data(self):
+        dataPath        =   path.join(self.repoPbP, 'Season_%d%d' % (self.year_begin, self.year_end),'converted_data.p')
+        self.dataFrames =   pickle.load(open(dataPath, 'rb'))
+
+    def pick_game(self, gameId):
+        return Game(self, gameId)
 
     def __str__(self):
         return "Season %d-%d" % (self.year_begin, self.year_end)
@@ -51,48 +61,34 @@ class Season:
 
 class Game:
 
-    def __init__(self, db_root: str, season: Season, gameId=None, gameQty=None):
+    def __init__(self, season: Season, gameId: int):
         # Retrieve game info
         self.season =   season
         self.gameId =   gameId
 
-        self.repoPbP = path.join(db_root, 'PlayByPlay')
-        self.repoPSt = path.join(db_root, "PlayerStats", "player")
-        dataPath    =   path.join(self.repoPbP, 'Season_%d%d' % (self.season.year_begin, self.season.year_end), 'converted_data.p')
-        dataFrames  =   pickle.load( open(dataPath, 'rb') )
-        # Make sure to pick right season
-        #dataFrame   =   dataFrame[ dataFrame.loc[:, 'season']==int(season)]
-        # Store frames
-        self.rf     =   dataFrames['roster']
-        self.rf_wc  =   dataFrames['roster']
-        self.hd     =   dataFrames['playbyplay'].columns
-        self.df     =   dataFrames['playbyplay']
-        self.df_wc  =   dataFrames['playbyplay']       #Working copy
+        # Get all player names
+        self.df_wc  =   season.dataFrames['playbyplay'][season.dataFrames['playbyplay']['gcode'] == gameId]
+        self.hd     =   self.df_wc.columns
+
+        # let's keep the roster only for players that we are interested in:
+        fields_with_ids =   ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'away.G', 'home.G']
+        all_sets        =   list(map(lambda field_id: set(self.df_wc[field_id].unique().tolist()).difference({1}),  # '1' is not a real id.
+                            fields_with_ids))
+        all_ids_of_players= set.union(*all_sets)
+        self.rf_wc      =   season.dataFrames['roster'][season.dataFrames['roster']['player.id'].isin(all_ids_of_players)]
 
         # Fetch line shifts
         self.player_classes     = 	None # structure containing all player's classes (categories).
         self.lineShifts         =   {}
         self.teams              =   None
         self.teams_label_for_shift = "" # 'home', 'away' or 'both'
-        # Filter for game Id
-        self.switch_to_game(gameId)
 
-
-    def switch_to_game(self, gameId):
-        if not gameId is None:
-            self.df_wc          =   self.df[self.df['gcode']==gameId]
-            # let's keep the roster only for players that we are interested in:        
-            fields_with_ids     =   ['a1','a2','a3','a4','a5','a6','h1','h2','h3','h4','h5','h6','away.G', 'home.G']
-            all_sets            =   list(map(lambda field_id: set(self.df_wc[field_id].unique().tolist()).difference({1}), # '1' is not a real id.
-                                    fields_with_ids))
-            all_ids_of_players  =   set.union(*all_sets)
-            self.rf_wc          =   self.rf[self.rf['player.id'].isin(all_ids_of_players)]
-
-
+    # This is deprecated: this functionality is now Season()'s job
+    """
     def get_game_ids(self):
-        """List all game numbers"""
+        "List all game numbers"
         return np.unique(self.df['gcode'])
-
+    """
 
     def get_away_lines(self, accept_repeated=False) -> Tuple[pd.DataFrame, List[List[int]]]:
         """
