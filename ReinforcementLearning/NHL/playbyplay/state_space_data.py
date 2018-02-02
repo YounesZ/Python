@@ -8,7 +8,7 @@ import pandas as pd
 import tensorflow as tf
 
 from ReinforcementLearning.NHL.playbyplay.agent import Agent
-from ReinforcementLearning.NHL.playbyplay.game import Game, repoSave, Season
+from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game, repoSave, Season
 from Utils.programming.ut_find_folders import ut_find_folders
 
 
