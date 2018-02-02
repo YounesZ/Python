@@ -1,7 +1,7 @@
 import pickle
 import matplotlib.pyplot as plt
 from ReinforcementLearning.NHL.playerstats.nhl_player_stats import *
-from ReinforcementLearning.NHL.playbyplay.game import *
+from ReinforcementLearning.NHL.playbyplay.playbyplay_data import *
 
 # =======================
 # ==== FIRST SET POINTERS
