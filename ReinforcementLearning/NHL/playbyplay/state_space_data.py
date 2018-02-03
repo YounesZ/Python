@@ -107,7 +107,7 @@ class HockeySS:
         self.action_size    =   nA
 
 
-    def teach_RL_agent(self):
+    def teach_RL_agent(self, repoSave):
         # Instantiate the agent
         agent       =   Agent(self.state_size, self.action_size)
         # --- TEACH THE AGENT
@@ -134,8 +134,9 @@ class HockeySS:
                 stdout.write("Move %i/%i : [%-60s] %d%%, completed" % (count, len(iSamples), '=' * int(count / len(iSamples) * 60), 100 * count / len(iSamples)))
                 stdout.flush()
 
-                self.action_value   =   np.reshape( agent.action_value, [3, 5, 10, 10] )
-                pickle.dump({'action_values':self.action_value}, open(path.join(repoSave, 'RL_action_values.p'), 'wb'))
+                if not repoSave is None:
+                    self.action_value   =   np.reshape( agent.action_value, [3, 5, 10, 10] )
+                    pickle.dump({'action_values':self.action_value}, open(path.join(repoSave, 'RL_action_values.p'), 'wb'))
 
 
     def make_line_dictionary(self):
@@ -163,6 +164,6 @@ repoSave    =   None #path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/
 HSS         =   HockeySS(db_root)
 HSS.list_all_games()
 HSS.pull_RL_data(repoModel, repoSave)
-HSS.teach_RL_agent()
+HSS.teach_RL_agent(repoSave)
 
 """

@@ -442,7 +442,7 @@ def get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto='2016-07-01
     return fwd_dt, fwd_cl
 
 
-def do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root):
+def do_clustering_multiyear(repoModel, repoPbP, dtCols, normalizer, pca, root):
     # Make constraints
     allS_p      =   ut_find_folders(repoPbP, True)
     years       =   [[x.split('_')[1][:4], x.split('_')[1][4:]] for x in allS_p]
@@ -615,7 +615,7 @@ repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVS
 normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, minGames=-1)     # Nrm is the normalizing terms for the raw player features
 CLS.ann_display_accuracy()
 # Classify player data : MULTIPLE YEARS
-global_centers  =   do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root)
+global_centers  =   do_clustering_multiyear(repoModel,repoPbP, dtCols, normalizer, pca, root)
 # ============================================
 """
 
