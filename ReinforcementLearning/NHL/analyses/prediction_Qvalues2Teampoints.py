@@ -41,27 +41,26 @@ def get_players_classes(repoModel, data_for_game, preprocessing, classifier, num
 
 
 # ==== NEXT     :   SET POINTERS
-root        =   '/home/younesz/Documents'
+root        =   '/Users/younes_zerouali/Documents/Stradigi'
 root_db     =   path.join(root, 'Databases', 'Hockey')
 repoPSt     =   path.join(root_db, 'PlayerStats/player')
 repoPbP     =   path.join(root_db, 'PlayByPlay')
 repoCode    =   path.join(root, 'Code', 'NHL_stats_SL')
-repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification')
+repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
 
 """
 # ==== NEXT     :   LOOP ON SEASONS, LEAVE-ONE-OUT
-seasons     =   ut_find_folders( path.join(root_db, 'PlayByPlay') )
+seasons     =   ut_find_folders( path.join(root_db, 'PlayByPlay'), True )
 for iSea in seasons:
 
     # == step1: Train the model for players classification
     # Compute the model
     keep_seasons                =   list( set(seasons).difference(iSea) )
     normalizer, pca, dtCols, _  =   do_ANN_training( repoPSt, repoPbP, repoCode, repoModel, allS_p=keep_seasons)
-    global_centers              =   do_clustering_multiyear(repoModel, repoPbP, dtCols, normalizer, pca, root)
+    global_centers              =   do_clustering_multiyear(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, root)
     # Make sure the model is backed up for future use
-    src = path.join(repoModel, 'MODEL_perceptron_1layer_10units_relu')
     dst = path.join(repoModel, 'MODELS', 'MODEL_perceptron_1layer_10units_relu_LOO_'+iSea)
-    ut_clone_directory(src, dst)
+    ut_clone_directory(repoModel, dst)
 
     # == step2: Learn Q-table for the computed model
     # Compute Q-table
@@ -135,7 +134,6 @@ for iSea in seasons:
             stdout.write("Game %i/%i: [%-40s] %d%%, completed" % (
             count, len(HSS.games_lst), '=' * int(count / len(HSS.games_lst) * 40), 100 * count / len(HSS.games_lst)))
             stdout.flush()
-
 
 
 """
