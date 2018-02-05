@@ -31,7 +31,7 @@ class HockeySS:
         self.games_lst  =   games_lst
 
 
-    def pull_RL_data(self, repoModel, repoSave=None):
+    def pull_RL_data(self, repoModel, repoSave=None, verbose=0, fetcher='default'):
         # Prepare players model: reload info
         CLS                 =   ANN_classifier()
         sess, annX, annY    =   CLS.ann_reload_model(repoModel)
@@ -63,23 +63,22 @@ class HockeySS:
 
                 # Check if some data was retrieved:
                 if len(iGame.df_wc)>0:
-                    iGame.pull_line_shifts('both', minduration=20)
-                    iGame.pick_regulartime()
-                    iGame.pick_equalstrength()
-                    iGame.pull_players_classes(self.players_model, {'annX':annX, 'annY':annY, 'sess':sess})
-                    # Add game identifier data
-                    iGame.lineShifts['season']      =   iy
-                    iGame.lineShifts['gameCode']    =   ic
-                    iGame.lineShifts['hometeam']    =   ih
-                    iGame.lineShifts['awayteam']    =   ia
+                    lineSHFT    =   iGame.pull_players_classes(True, True, 20, self.players_model, self.classifier, nGames=30, stats_fetcher=fetcher)
+
                     # Check if some data was retrieved:
                     if len(iGame.player_classes)>0:
-                        S, A, R, nS, nA, coded      =   iGame.build_statespace(self.line_dictionary)
+                        # Add game identifier data
+                        lineSHFT['season']      =   iy
+                        lineSHFT['gameCode']    =   ic
+                        lineSHFT['hometeam']    =   ih
+                        lineSHFT['awayteam']    =   ia
+
+                        S, A, R, nS, nA, coded  =   iGame.build_statespace(self.line_dictionary)
                         allR.append( np.sum(R) )
                         # Concatenate data
                         df_ic       =   np.transpose(np.reshape(np.concatenate((S, A, R)), [3, -1]))
                         RL_data     =   pd.concat((RL_data, pd.DataFrame(df_ic, columns=['state', 'action', 'reward'])), axis=0)
-                        GAME_data   =   pd.concat((GAME_data, iGame.lineShifts[coded]), axis=0)
+                        GAME_data   =   pd.concat((GAME_data, lineSHFT[coded]), axis=0)
                         # Players data
                         plDT        =   iGame.player_classes
                         plDT['season']  =   iy
@@ -90,17 +89,18 @@ class HockeySS:
                             pickle.dump({'RL_data': RL_data, 'nStates': nS, 'nActions': nA}, open(path.join(repoSave, 'RL_teaching_data.p'), 'wb'))
                             pickle.dump(GAME_data, open(path.join(repoSave, 'GAME_data.p'), 'wb'))
                             pickle.dump(PLAYER_data, open(path.join(repoSave, 'PLAYER_data.p'), 'wb') )
-                    else:
+                    elif verbose>0:
                         print('*** EMPTY GAME ***')
-                else:
+                elif verbose>0:
                     print('*** EMPTY GAME ***')
 
                 # Status bar
-                stdout.write('\r')
-                # the exact output you're looking for:
-                stdout.write("Game %i/%i - season %s game %s: [%-60s] %d%%, completed" % (count, len(self.games_lst), iy, ic, '=' * int(count / len(self.games_lst) * 60), 100 * count / len(self.games_lst)))
-                stdout.flush()
-                count   +=  1
+                if verbose>0:
+                    stdout.write('\r')
+                    # the exact output you're looking for:
+                    stdout.write("Game %i/%i - season %s game %s: [%-60s] %d%%, completed" % (count, len(self.games_lst), iy, ic, '=' * int(count / len(self.games_lst) * 60), 100 * count / len(self.games_lst)))
+                    stdout.flush()
+                    count   +=  1
 
         self.RL_data        =   RL_data
         self.state_size     =   nS
@@ -167,3 +167,4 @@ HSS.pull_RL_data(repoModel, repoSave)
 HSS.teach_RL_agent(repoSave)
 
 """
+

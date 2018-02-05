@@ -52,17 +52,20 @@ repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVS
 """
 # ==== NEXT     :   LOOP ON SEASONS, LEAVE-ONE-OUT
 seasons     =   ut_find_folders( path.join(root_db, 'PlayByPlay'), True )
+print('*** LAUNCHED predictive analysis\n')
 for iSea in seasons:
 
+    print('\t%s (%i/%i), ' %(iSea, seasons.index(iSea)+1, len(seasons)))    
     # == step1: Train the model for players classification
     # Compute the model
     keep_seasons                =   list( set(seasons).difference(iSea) )
     normalizer, pca, dtCols, _  =   do_ANN_training( repoPSt, repoPbP, repoCode, repoModel, allS_p=keep_seasons)
     global_centers              =   do_clustering_multiyear(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, root)
     # Make sure the model is backed up for future use
-    dst = path.join(repoModel, 'MODELS', 'MODEL_perceptron_1layer_10units_relu_LOO_'+iSea)
+    dst = path.join(repoModel.replace(path.basename(repoModel), ''), 'MODELS', 'MODEL_perceptron_1layer_10units_relu_LOO_'+iSea)
     ut_clone_directory(repoModel, dst)
-
+    print('model trained, ')
+    
     # == step2: Learn Q-table for the computed model
     # Compute Q-table
     repoSave    =   path.join(root_db, 'processed')
@@ -78,7 +81,8 @@ for iSea in seasons:
     if not path.exists(dirname):
         makedirs(dirname)
     [copyfile( path.join(repoSave, x), dirname ) for x in lsFiles]
-
+    print('Qtable learned, ')
+    
     # == step3: predict nb of points (gamewise)
     # Setup var names
     Qvalues         =   HSS.RL_action_values
@@ -135,6 +139,7 @@ for iSea in seasons:
             stdout.write("Game %i/%i: [%-40s] %d%%, completed" % (
             count, len(HSS.games_lst), '=' * int(count / len(HSS.games_lst) * 40), 100 * count / len(HSS.games_lst)))
             stdout.flush()
-
+    print('prediction completed.\n')
+    
 
 """

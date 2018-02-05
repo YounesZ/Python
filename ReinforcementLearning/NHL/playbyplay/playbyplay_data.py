@@ -68,14 +68,14 @@ class LineShifts(object):
     """Encapsulates queries done to determine line shifts."""
 
     def __init__(self, game):
-        self.__lineShifts = None # TODO: call this 'data'
-        self.equal_strength = True
-        self.regular_time = True
-        self.min_duration = 0 # minimum number of seconds for which we want to consider shifts.
-        self.team = 'both' # 'home', 'away' or 'both'
+        self.__lineShifts   =   None # TODO: call this 'data'
+        self.equal_strength =   True
+        self.regular_time   =   True
+        self.min_duration   =   0 # minimum number of seconds for which we want to consider shifts.
+        self.team   =   'both' # 'home', 'away' or 'both'
         # Pick the right team
-        team = 'both'
-        tmP = {'home': 'h', 'away': 'a', 'both': 'ha'}[team]
+        team        =   'both'
+        tmP         =   {'home': 'h', 'away': 'a', 'both': 'ha'}[team]
 
         # Make containers
         LINES = {
@@ -96,14 +96,14 @@ class LineShifts(object):
             'differential': []
         }
         # Loop on all table entries
-        prevDt = []
-        prev_home_line = prev_away_line = np.ones([1, 3])[0]
+        prevDt          =   []
+        prev_home_line  =   prev_away_line = np.ones([1, 3])[0]
         # prevLine = (np.ones([1, 3])[0], np.ones([1, 3])[0]) if team == 'both' else np.array([1, 1, 1])
-        evTypes = ['GOAL', 'SHOT', 'PENL', 'BLOCK', 'MISS']
+        evTypes         =   ['GOAL', 'SHOT', 'PENL', 'BLOCK', 'MISS']
         for idL, Line in game.df_wc.iterrows():
-            home_line = np.sort(game.pull_offensive_players(Line, 'h'))
-            away_line = np.sort(game.pull_offensive_players(Line, 'a'))
-            self.teams = [Line['hometeam'], Line['awayteam']]
+            home_line   =   np.sort(game.pull_offensive_players(Line, 'h'))
+            away_line   =   np.sort(game.pull_offensive_players(Line, 'a'))
+            self.teams  =   [Line['hometeam'], Line['awayteam']]
             # curLine = (home_line, away_line)
             # if team == 'both':
             #     curLine = (home_line, away_line)
@@ -114,10 +114,10 @@ class LineShifts(object):
 
             # team of interest has changed?
             if len(prevDt) == 0:
-                prevDt = Line
-                thch = False
+                prevDt  =   Line
+                thch    =   False
             else:
-                thch = not (prev_home_line == home_line).all() or not (prev_away_line == away_line).all()
+                thch    =   not (prev_home_line == home_line).all() or not (prev_away_line == away_line).all()
             # elif team == 'both':
             #     thch = not (prevLine[0] == curLine[0]).all() or not (prevLine[1] == curLine[1]).all()
             # else:
@@ -142,13 +142,13 @@ class LineShifts(object):
                 LINES['BLOCK'].append(0)
                 LINES['MISS'].append(0)
             if any([x == Line['etype'] for x in evTypes]):
-                sign = int(Line['hometeam'] == Line['ev.team']) * 2 - 1
+                sign    =   int(Line['hometeam'] == Line['ev.team']) * 2 - 1
                 LINES[Line['etype']][-1] += sign
                 if Line['etype'] == 'GOAL':
                     LINES['SHOT'][-1] += sign
             if Line['etype'] == 'PENL':
                 LINES['equalstrength'][-1] = False
-            prevDt = deepcopy(Line)
+            prevDt      =   deepcopy(Line)
             prev_home_line = deepcopy(home_line)
             prev_away_line = deepcopy(away_line)
             # prevLine = deepcopy(curLine)
@@ -179,7 +179,8 @@ class LineShifts(object):
             df = df[df['iceduration'] >= min_duration]
         # for which team(s).
         if team == 'both':
-            print(df.columns.names)
+            pass
+            #print(df.columns.names)
             # df = df.drop(columns=['home_line', 'away_line']) # TODO: see https://github.com/pandas-dev/pandas/issues/19078
         elif team == 'home':
             # df = df.drop(columns=['playersID']) # TODO: see https://github.com/pandas-dev/pandas/issues/19078
@@ -218,14 +219,14 @@ class Game:
 
         # Fetch line shifts
         self.player_classes     = 	None # structure containing all player's classes (categories).
-        self.stats_fetcher = PlayerStatsFetcher(repoPSt=season.repoPSt, repoPbP=season.repoPbP, do_data_cache=True)
+        self.stats_fetcher      =   PlayerStatsFetcher(repoPSt=season.repoPSt, repoPbP=season.repoPbP, do_data_cache=True)
         # let's keep the roster only for players that we are interested in:
         # Fetch line shifts
-        self.shifts_equal_strength = True
-        self.shifts_regular_time = True
-        self.lineShifts     =   LineShifts(self)
-        self.teams = None
-        self.teams_label_for_shift = "" # 'home', 'away' or 'both'
+        self.shifts_equal_strength  =   True
+        self.shifts_regular_time    =   True
+        self.lineShifts             =   LineShifts(self)
+        self.teams                  =   None
+        self.teams_label_for_shift  =   "" # 'home', 'away' or 'both'
 
     # This is deprecated: this functionality is now Season()'s job
     """
@@ -332,8 +333,11 @@ class Game:
                                                      regular_time=True, min_duration=20, model=preprocessing, classifier=classifier, nGames=number_of_games)
         return self.player_classes
 
-    def pull_players_classes(self, equal_strength: bool,
-                                                     regular_time: bool, min_duration: int, model, classifier, nGames=30):
+    def pull_players_classes(self,  equal_strength: bool,
+                                    regular_time: bool,
+                                    min_duration: int,
+                                    model, classifier, nGames=30,
+                                    stats_fetcher='default'):
         """
         Gets classes players represented in the shifts for this game.
         Assumes that these shifts are specified (by a previous call to 'pull_line_shifts'
@@ -368,8 +372,11 @@ class Game:
         pTeam   =   [ self.lineShifts.teams[0] if x in Hp else self.lineShifts.teams[1] for x in all_plN.index.values]
         # Get raw player stats
         # gcode   =   int( str(self.season)[:4]+'0'+str(self.gameId) )
-        gcode   =   int( str(self.season.year_begin)+'0'+str(self.gameId) )
-        DT, dtCols  =   self.stats_fetcher.pull_stats(uptocode=gcode, nGames=nGames, plNames=all_plN.values)
+        gcode       =   int( str(self.season.year_begin)+'0'+str(self.gameId) )
+        if stats_fetcher=='default':
+            DT, dtCols  =   self.stats_fetcher.pull_stats(uptocode=gcode, nGames=nGames, plNames=all_plN.values)
+        else:
+            DT, dtCols  =   stats_fetcher.pull_stats(uptocode=gcode, nGames=nGames, plNames=all_plN.values)
         # --- Get player classes
         # pre-process data
         DT[dtCols]  =   ut_sanitize_matrix(DT[dtCols])
@@ -387,6 +394,7 @@ class Game:
         pl_class.loc[:, 'pred_selke']   =   classif[:,1]
         pl_class.loc[:, 'team']         =   pTeam
         self.player_classes =   pl_class
+        return all_line_shifts
 
 
     def recode_line(self, lineDict, line):
@@ -400,9 +408,9 @@ class Game:
 
 
     def encode_line_players(self):
-        lineShifts = self.lineShifts.as_df(team='both', equal_strength=self.shifts_equal_strength, regular_time=self.shifts_regular_time, min_duration=20)
-        lComp   =   lineShifts['playersID']
-        lineCode=   []
+        lineShifts  =   self.lineShifts.as_df(team='both', equal_strength=self.shifts_equal_strength, regular_time=self.shifts_regular_time, min_duration=20)
+        lComp       =   lineShifts['playersID']
+        lineCode    =   []
         for iR in lComp.index:
             row     =   lComp.loc[iR]
             nrow    =   []
@@ -440,20 +448,20 @@ class Game:
     def build_statespace(self, lineDict):
         # --- States
         # Encode line compositions
-        lCode   =   self.encode_line_players()
-        lComp   =   np.array( [[self.recode_line(lineDict, a) for a in b] for b in lCode] )
+        lCode           =   self.encode_line_players()
+        lComp           =   np.array( [[self.recode_line(lineDict, a) for a in b] for b in lCode] )
         # Remove -1
-        remL    =   ~(lComp==-1).any(axis=1)
-        lComp   =   lComp[remL,:]
-        state1  =   lComp[:,0] # opposing line composition
-        lineShifts = self.lineShifts.as_df(team='both', equal_strength=self.shifts_equal_strength, regular_time=self.shifts_regular_time, min_duration=20)
-        state2  =   self.recode_differential(lineShifts['differential'][remL].values)  # differential
-        state3  =   self.recode_period(lineShifts['period'][remL].values )    # period
+        remL            =   ~(lComp==-1).any(axis=1)
+        lComp           =   lComp[remL,:]
+        state1          =   lComp[:,0] # opposing line composition
+        lineShifts      =   self.lineShifts.as_df(team='both', equal_strength=self.shifts_equal_strength, regular_time=self.shifts_regular_time, min_duration=20)
+        state2          =   self.recode_differential(lineShifts['differential'][remL].values)  # differential
+        state3          =   self.recode_period(lineShifts['period'][remL].values )    # period
         state, nstates  =   self.recode_states( state1, state2, state3 )
         # Actions
         action, nactions=   lComp[:,1], len(lineDict)
         # Reward
-        reward  =   self.recode_reward(lineShifts[remL])
+        reward          =   self.recode_reward(lineShifts[remL])
         return state, action, reward, nstates, nactions, remL
 
 
