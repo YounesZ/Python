@@ -59,12 +59,12 @@ class PlayerStatsFetcher(object):
 
         # Get player names
         depickle        =   True
-        if plNames is None:
+        if len(plNames)==0:
             plNames     =   get_player_names(self.repoPbP)
             # De-pickle all players
             depickle    =   False
-            all_pl = get_data_maybe_update_cache(file_name='all_players.p')
-        count   =   0
+            all_pl      =   get_data_maybe_update_cache(file_name='all_players.p')
+        count       =   0
         # Prep
         tobeavg     =   ['shootingPctg', 'shiftsPerGame', 'faceoffWinPctg', 'hitsPerGame', 'blockedShotsPerGame', 'missedShotsPerGame', 'shotsPerGame']
         tobenorm_rs =   ['penaltyMinutes', 'assists', 'goals', 'gameWinningGoals', 'points', 'shots', 'otGoals', 'missedShots', 'hits', 'takeaways', 'faceoffsWon', 'blockedShots', 'faceoffsLost', 'giveaways', 'faceoffs']
@@ -243,7 +243,8 @@ def get_training_data(repoPSt, repoPbP, season, minGames=0):
         sea_strt=   sea_name[:4] + '-09-01'
         sea_end =   sea_name[-4:] + '-07-01'
         # Pull stats
-        sea_stats, dtCols   =   pull_stats(repoPSt, repoPbP, asof=sea_strt, upto=sea_end)
+        plFetch             =   PlayerStatsFetcher(repoPSt, repoPbP, False)
+        sea_stats, dtCols   =   plFetch.pull_stats(asof=sea_strt, upto=sea_end)
         sea_stats           =   sea_stats[sea_stats['gmPl']>=minGames]
         # Pull Selke and Ross nominees for that season
         with open(path.join(repoPSt.replace('player', 'raw'), sea_name, 'trophy_nominees.p'), 'rb') as f:
@@ -369,9 +370,10 @@ def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=None, minGames
     return Nrm, pca, colNm, CLS
 
 
-def do_ANN_classification(repoModel, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80, minGames=0):
+def do_ANN_classification(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80, minGames=0):
     # --- RETRIEVE DATA
-    DT, _       =   pull_stats(repoPSt, repoPbP, upto=upto, asof=asof, nGames=nGames)     #   sea_pos,
+    plFetcher   =   PlayerStatsFetcher(repoPSt, repoPbP, True)
+    DT, _       =   plFetcher.pull_stats(upto=upto, asof=asof, nGames=nGames)     #   sea_pos,
     DT          =   DT[DT['gmPl']>=minGames]
     # --- PRE-PROCESS DATA
     DT[dtCols]  =   ut_sanitize_matrix(DT[dtCols])
@@ -421,8 +423,8 @@ def do_clustering(data, classes, upto, root):
     return clusters, centers, selke_id, ross_id
 
 
-def get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80, minGames=1):
-    DT, DT_n, pCl   =   do_ANN_classification(repoModel, dtCols, normalizer, pca, upto=upto, asof=asof, nGames=nGames, minGames=minGames)
+def get_data_for_clustering(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80, minGames=1):
+    DT, DT_n, pCl   =   do_ANN_classification(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, upto=upto, asof=asof, nGames=nGames, minGames=minGames)
     pCl         =   pd.DataFrame(pCl, index=DT.index, columns=['OFF', 'DEF'])
     # Filter players - keep forwards only
     isForward   =   [x != 'D' for x in DT['position'].values]
@@ -433,7 +435,7 @@ def get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto='2016-07-01
     return fwd_dt, fwd_cl
 
 
-def do_clustering_multiyear(repoModel, repoPbP, dtCols, normalizer, pca, root):
+def do_clustering_multiyear(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, root):
     # Make constraints
     allS_p      =   ut_find_folders(repoPbP, True)
     years       =   [[x.split('_')[1][:4], x.split('_')[1][4:]] for x in allS_p]
@@ -449,7 +451,7 @@ def do_clustering_multiyear(repoModel, repoPbP, dtCols, normalizer, pca, root):
     all_centers =   []
     for iy in years:
         # Get data
-        data, classes   =   get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto=iy[1]+'-07-01', asof=iy[0]+'-09-01', nGames=81)
+        data, classes   =   get_data_for_clustering(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, upto=iy[1]+'-07-01', asof=iy[0]+'-09-01', nGames=81)
         # Get trophy nominees
         selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + ''.join(iy) + '/trophy_selke_nominees.csv') )
         selke       =   selke[~selke.index.duplicated(keep='first')]
@@ -606,7 +608,7 @@ repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVS
 normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, minGames=-1)     # Nrm is the normalizing terms for the raw player features
 CLS.ann_display_accuracy()
 # Classify player data : MULTIPLE YEARS
-global_centers  =   do_clustering_multiyear(repoModel,repoPbP, dtCols, normalizer, pca, root)
+global_centers  =   do_clustering_multiyear(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, root)
 # ============================================
 """
 
