@@ -5,6 +5,9 @@ from os import path
 
 def ut_clone_directory(src, dst):
 
+    if path.exists(dst):
+        shutil.rmtree(dst)
+
     try:
         shutil.copytree(src, dst)
     except OSError as e:
