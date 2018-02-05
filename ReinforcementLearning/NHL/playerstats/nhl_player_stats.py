@@ -26,7 +26,7 @@ class PlayerStatsFetcher(object):
         self.do_data_cache = do_data_cache
         self.data_cache = {}
 
-    def pull_stats(self, asof='2001-09-01', upto='2016-07-01', uptocode=None, nGames=82, plNames: List[str]=[]):
+    def pull_stats(self, asof='2001-09-01', upto='2016-07-01', uptocode=None, nGames=82, plNames: List[str]=[], verbose=False):
         """
         Gets stats of players.
         Args:
@@ -119,7 +119,8 @@ class PlayerStatsFetcher(object):
                     print("[%s] ********* CALCULATIONS took %.5f ms." % (pl, (datetime.datetime.now().timestamp() - dddd) * 1000))
             # Add to DB
             allStat =   pd.concat( (allStat, newDF), axis=0, ignore_index=True )
-            print("===================>>>> Player '%s' stats took %.5f secs." % (pl, datetime.datetime.now().timestamp() - entry_timestamp))
+            if verbose:
+                print("===================>>>> Player '%s' stats took %.5f secs." % (pl, datetime.datetime.now().timestamp() - entry_timestamp))
 
             count+=1
             if count % 500 == 0:
@@ -128,7 +129,8 @@ class PlayerStatsFetcher(object):
                 stdout.write("Player %i/%i - %s: [%-40s] %d%%, completed" % (count, len(plNames), pl, '=' * int(count / len(plNames) * 40), 100 * count / len(plNames)))
                 stdout.flush()
 
-        print("===================>>>> ALL Player stats took %.5f secs." % (datetime.datetime.now().timestamp() - secs_begin_total))
+        if verbose:
+            print("===================>>>> ALL Player stats took %.5f secs." % (datetime.datetime.now().timestamp() - secs_begin_total))
         allStat     =   allStat.set_index('player')
         return allStat, columns
 

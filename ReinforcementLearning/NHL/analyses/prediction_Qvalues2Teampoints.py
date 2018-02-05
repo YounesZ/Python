@@ -42,6 +42,7 @@ def get_players_classes(repoModel, data_for_game, preprocessing, classifier, num
 
 # ==== NEXT     :   SET POINTERS
 root        =   '/Users/younes_zerouali/Documents/Stradigi'
+root        =   '/home/younesz/Documents'
 root_db     =   path.join(root, 'Databases', 'Hockey')
 repoPSt     =   path.join(root_db, 'PlayerStats/player')
 repoPbP     =   path.join(root_db, 'PlayByPlay')
