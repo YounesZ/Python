@@ -435,7 +435,7 @@ def get_data_for_clustering(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca
     return fwd_dt, fwd_cl
 
 
-def do_clustering_multiyear(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, root):
+def do_clustering_multiyear(repoModel, repoPbP, dtCols, normalizer, pca, root):
     # Make constraints
     allS_p      =   ut_find_folders(repoPbP, True)
     years       =   [[x.split('_')[1][:4], x.split('_')[1][4:]] for x in allS_p]
