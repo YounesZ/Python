@@ -21,12 +21,34 @@ from Utils.scraping.convert_trophies import to_pandas_selke, to_pandas_ross
 class PlayerStatsFetcher(object):
 
     def __init__(self, repoPSt: str, repoPbP: str, do_data_cache: bool):
-        self.repoPSt = repoPSt
-        self.repoPbP = repoPbP
-        self.do_data_cache = do_data_cache
-        self.data_cache = {}
+        self.repoPSt        =   repoPSt
+        self.repoPbP        =   repoPbP
+        self.do_data_cache  =   do_data_cache
+        self.data_cache     =   {}
 
-    def pull_stats(self, asof='2001-09-01', upto='2016-07-01', uptocode=None, nGames=82, plNames: List[str]=[]):
+    def pull_raw(self, plNames: List[str]=['all_players']):
+
+        def get_data_maybe_update_cache(file_name: str):
+            import datetime
+            entry_timestamp = datetime.datetime.now().timestamp()
+            if file_name in self.data_cache.keys():
+                players_data = self.data_cache[file_name]
+                # print("'get_data IN cache' took %.5f ms." % ((datetime.datetime.now().timestamp() - entry_timestamp) * 1000))
+            else:
+                with open(path.join(self.repoPSt, file_name), 'rb') as f:
+                    players_data = pickle.load(f)
+                if self.do_data_cache:
+                    self.data_cache[file_name] = players_data
+                    # print("'get_data NOT IN cache' took %.5f ms." % ((datetime.datetime.now().timestamp() - entry_timestamp) * 1000))
+            return players_data
+
+        if 'all_players' in plNames:
+            return get_data_maybe_update_cache('all_players.p')
+        else:
+            return {x:get_data_maybe_update_cache(x.replace(' ', '_')+'.p') for x in plNames}
+
+
+    def pull_stats(self, asof='2001-09-01', upto='2016-07-01', uptocode=None, nGames=82, plNames: List[str]=[], verbose=0):
         """
         Gets stats of players.
         Args:
@@ -56,15 +78,12 @@ class PlayerStatsFetcher(object):
                 # print("'get_data NOT IN cache' took %.5f ms." % ((datetime.datetime.now().timestamp() - entry_timestamp) * 1000))
             return players_data
 
-
         # Get player names
-        depickle        =   True
-        if plNames is None:
-            plNames     =   get_player_names(self.repoPbP)
-            # De-pickle all players
-            depickle    =   False
-            all_pl = get_data_maybe_update_cache(file_name='all_players.p')
-        count   =   0
+        if len(plNames)==0:
+            plNames =   get_player_names(self.repoPbP)
+        all_pl      =   get_data_maybe_update_cache(file_name='all_players.p')
+
+        count       =   0
         # Prep
         tobeavg     =   ['shootingPctg', 'shiftsPerGame', 'faceoffWinPctg', 'hitsPerGame', 'blockedShotsPerGame', 'missedShotsPerGame', 'shotsPerGame']
         tobenorm_rs =   ['penaltyMinutes', 'assists', 'goals', 'gameWinningGoals', 'points', 'shots', 'otGoals', 'missedShots', 'hits', 'takeaways', 'faceoffsWon', 'blockedShots', 'faceoffsLost', 'giveaways', 'faceoffs']
@@ -76,14 +95,13 @@ class PlayerStatsFetcher(object):
         allStat     =   pd.DataFrame( columns = columns+['player', 'position', 'gmPl'] )
 
         import datetime
+        if verbose>0:
+            stdout.write('\r')
         secs_begin_total = datetime.datetime.now().timestamp()
         for pl in plNames:
             entry_timestamp = datetime.datetime.now().timestamp()
             # Load stats file
-            if depickle:
-                plStat = get_data_maybe_update_cache(file_name=pl.replace(' ', '_')+'.p')
-            else:
-                plStat      =   all_pl[pl]
+            plStat          =   all_pl[pl]
             # Sort table by date
             plStat['date']  =   [x.split('T')[0] for x in list(plStat['gameDate'])]
             plStat          =   plStat.sort_values(by='date', ascending=False)
@@ -116,19 +134,21 @@ class PlayerStatsFetcher(object):
                     newDF['player']     =   pl
                     newDF['position']   =  plStat.loc[0,'playerPositionCode']
                     newDF['gmPl']       =   np.sum(plStat['gamesPlayed'])
-                    print("[%s] ********* CALCULATIONS took %.5f ms." % (pl, (datetime.datetime.now().timestamp() - dddd) * 1000))
+                    if verbose>1:
+                        print("[%s] ********* CALCULATIONS took %.5f ms." % (pl, (datetime.datetime.now().timestamp() - dddd) * 1000))
             # Add to DB
             allStat =   pd.concat( (allStat, newDF), axis=0, ignore_index=True )
-            print("===================>>>> Player '%s' stats took %.5f secs." % (pl, datetime.datetime.now().timestamp() - entry_timestamp))
+            if verbose>1:
+                print("===================>>>> Player '%s' stats took %.5f secs." % (pl, datetime.datetime.now().timestamp() - entry_timestamp))
 
             count+=1
-            if count % 500 == 0:
-                stdout.write('\r')
+            if count % 500 == 0 and verbose>0:
                 # the exact output you're looking for:
                 stdout.write("Player %i/%i - %s: [%-40s] %d%%, completed" % (count, len(plNames), pl, '=' * int(count / len(plNames) * 40), 100 * count / len(plNames)))
                 stdout.flush()
 
-        print("===================>>>> ALL Player stats took %.5f secs." % (datetime.datetime.now().timestamp() - secs_begin_total))
+        if verbose>1:
+            print("===================>>>> ALL Player stats took %.5f secs." % (datetime.datetime.now().timestamp() - secs_begin_total))
         allStat     =   allStat.set_index('player')
         return allStat, columns
 
@@ -230,7 +250,7 @@ def do_manual_classification(repoPSt, repoPbP, upto, nGames):
     return PLclass, PQuart_off.index
 
 
-def get_training_data(repoPSt, repoPbP, season, minGames=0):
+def get_training_data(repoPSt, repoPbP, season, stats_fetcher, minGames=0):
     X_train     =   pd.DataFrame()
     Y_train     =   pd.DataFrame()
     X_all       =   pd.DataFrame()
@@ -243,7 +263,7 @@ def get_training_data(repoPSt, repoPbP, season, minGames=0):
         sea_strt=   sea_name[:4] + '-09-01'
         sea_end =   sea_name[-4:] + '-07-01'
         # Pull stats
-        sea_stats, dtCols   =   pull_stats(repoPSt, repoPbP, asof=sea_strt, upto=sea_end)
+        sea_stats, dtCols   =   stats_fetcher.pull_stats(asof=sea_strt, upto=sea_end)
         sea_stats           =   sea_stats[sea_stats['gmPl']>=minGames]
         # Pull Selke and Ross nominees for that season
         with open(path.join(repoPSt.replace('player', 'raw'), sea_name, 'trophy_nominees.p'), 'rb') as f:
@@ -327,14 +347,17 @@ def do_reduce_data(X, pca=None, mu=None, sigma=None, nComp=None):
     return annInput, pca
 
 
-def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=None, minGames=0):
+def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=None, minGames=0, stats_fetcher='default'):
     # --- GET TRAINING DATASET
     if allS_p is None:
         # List non-lockout seasons
-        allS_p  =   ut_find_folders(repoPbP, True)
+        allS_p          =   ut_find_folders(repoPbP, True)
+
+    if stats_fetcher=='default':
+        stats_fetcher   =   PlayerStatsFetcher(repoPSt, repoPbP, True)
 
     # Get data
-    X,Y, X_all,POS_all,PLD_all, colNm=   get_training_data(repoPSt, repoPbP, allS_p, minGames=minGames)
+    X,Y, X_all,POS_all,PLD_all, colNm=   get_training_data(repoPSt, repoPbP, allS_p, stats_fetcher, minGames=minGames)
     """
     with open( path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/trainingData.p'), 'wb') as f:
         pickle.dump({'X':X, 'Y':Y, 'X_all':X_all, 'colNm':colNm, 'POS_all':POS_all}, f)
@@ -351,27 +374,29 @@ def do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, allS_p=None, minGames
     Y, X, POS_all, PLD_all, X_all =   ut_sanitize_matrix(Y, X), ut_sanitize_matrix(X), ut_sanitize_matrix(POS_all, X_all), ut_sanitize_matrix(PLD_all, X_all), ut_sanitize_matrix(X_all)
     # --- KEEP >N GAMES
     if minGames > 0 and minGames < 1:  # Fraction on the max
-        minGames = (np.max(PLD_all) / 5).astype('int')[0]
-    X_all       =   X_all[(PLD_all>=minGames).values]
-    POS_all     =   POS_all[(PLD_all>=minGames).values]
-    X_all_S, Nrm=   do_normalize_data(X_all[(POS_all!='D').values])
-    X_S, _      =   do_normalize_data(X, normalizer=Nrm)
-    _, pca      =   do_reduce_data(X_all_S, nComp=18)
-    X_S_P, _    =   do_reduce_data(X_S, pca=pca, nComp=18)
+        minGames    =   (np.max(PLD_all) / 5).astype('int')[0]
+    X_all           =   X_all[(PLD_all>=minGames).values]
+    POS_all         =   POS_all[(PLD_all>=minGames).values]
+    X_all_S, Nrm    =   do_normalize_data(X_all[(POS_all!='D').values])
+    X_S, _          =   do_normalize_data(X, normalizer=Nrm)
+    _, pca          =   do_reduce_data(X_all_S, nComp=18)
+    X_S_P, _        =   do_reduce_data(X_S, pca=pca, nComp=18)
     # --- BUILD THE NETWORK
-    nNodes  =   [X_S_P.shape[1], 15, Y.shape[1]]
-    CLS     =   ANN_classifier(deepcopy(nNodes))
+    nNodes          =   [X_S_P.shape[1], 15, Y.shape[1]]
+    CLS             =   ANN_classifier(deepcopy(nNodes))
     # --- TRAIN THE NETWORK
-    nIter   =   50
+    nIter           =   50
     CLS.ann_train_network(nIter, X_S_P, Y.values, svname=repoModel)
     # --- DISPLAY NETWORK ACCURACY
     #CLS.ann_display_accuracy()
     return Nrm, pca, colNm, CLS
 
 
-def do_ANN_classification(repoModel, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80, minGames=0):
+def do_ANN_classification(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80, minGames=0, plFetcher='default'):
     # --- RETRIEVE DATA
-    DT, _       =   pull_stats(repoPSt, repoPbP, upto=upto, asof=asof, nGames=nGames)     #   sea_pos,
+    if plFetcher=='default':
+        plFetcher   =   PlayerStatsFetcher(repoPSt, repoPbP, True)
+    DT, _       =   plFetcher.pull_stats(upto=upto, asof=asof, nGames=nGames)     #   sea_pos,
     DT          =   DT[DT['gmPl']>=minGames]
     # --- PRE-PROCESS DATA
     DT[dtCols]  =   ut_sanitize_matrix(DT[dtCols])
@@ -421,8 +446,8 @@ def do_clustering(data, classes, upto, root):
     return clusters, centers, selke_id, ross_id
 
 
-def get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80, minGames=1):
-    DT, DT_n, pCl   =   do_ANN_classification(repoModel, dtCols, normalizer, pca, upto=upto, asof=asof, nGames=nGames, minGames=minGames)
+def get_data_for_clustering(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, upto='2016-07-01', asof='2015-09-01', nGames=80, minGames=1, plFetcher='default'):
+    DT, DT_n, pCl   =   do_ANN_classification(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, upto=upto, asof=asof, nGames=nGames, minGames=minGames, plFetcher=plFetcher)
     pCl         =   pd.DataFrame(pCl, index=DT.index, columns=['OFF', 'DEF'])
     # Filter players - keep forwards only
     isForward   =   [x != 'D' for x in DT['position'].values]
@@ -433,7 +458,7 @@ def get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto='2016-07-01
     return fwd_dt, fwd_cl
 
 
-def do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root):
+def do_clustering_multiyear(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, root, plFetcher='default'):
     # Make constraints
     allS_p      =   ut_find_folders(repoPbP, True)
     years       =   [[x.split('_')[1][:4], x.split('_')[1][4:]] for x in allS_p]
@@ -449,7 +474,7 @@ def do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root):
     all_centers =   []
     for iy in years:
         # Get data
-        data, classes   =   get_data_for_clustering(repoModel, dtCols, normalizer, pca, upto=iy[1]+'-07-01', asof=iy[0]+'-09-01', nGames=81)
+        data, classes   =   get_data_for_clustering(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, upto=iy[1]+'-07-01', asof=iy[0]+'-09-01', nGames=81, plFetcher=plFetcher)
         # Get trophy nominees
         selke       =   to_pandas_selke( path.join(root, 'Databases/Hockey/PlayerStats/raw/' + ''.join(iy) + '/trophy_selke_nominees.csv') )
         selke       =   selke[~selke.index.duplicated(keep='first')]
@@ -492,7 +517,7 @@ def do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root):
         allCla  =   pd.concat((allCla, classes), axis=0)
         allCls  =   allCls + clusters
         allCtr  =   [list(x) for x in np.mean(np.array(all_centers),axis=0)]
-        display_clustering(classes, clusters, centers, ross_id, selke_id)
+        #display_clustering(classes, clusters, centers, ross_id, selke_id)
     #print('year: ', iy, 'cost: ', np.sum(cost))
     display_clustering(allCla, allCls, allCtr, allROS, allSLK)
 
@@ -606,7 +631,7 @@ repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVS
 normalizer, pca, dtCols, CLS    =   do_ANN_training(repoPSt, repoPbP, repoCode, repoModel, minGames=-1)     # Nrm is the normalizing terms for the raw player features
 CLS.ann_display_accuracy()
 # Classify player data : MULTIPLE YEARS
-global_centers  =   do_clustering_multiyear(repoModel, dtCols, normalizer, pca, root)
+global_centers  =   do_clustering_multiyear(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, root)
 # ============================================
 """
 
