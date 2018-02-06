@@ -11,7 +11,7 @@ from shutil import copyfile
 from Utils.programming.ut_find_folders import *
 from Utils.programming.ut_clone_directory import  *
 from ReinforcementLearning.NHL.playbyplay.state_space_data import HockeySS
-from ReinforcementLearning.NHL.playerstats.nhl_player_stats import do_ANN_training, do_clustering_multiyear
+from ReinforcementLearning.NHL.playerstats.nhl_player_stats import do_ANN_training, do_clustering_multiyear, PlayerStatsFetcher
 from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Season, Game
 
 
@@ -42,7 +42,7 @@ def get_players_classes(repoModel, data_for_game, preprocessing, classifier, num
 
 # ==== NEXT     :   SET POINTERS
 root        =   '/Users/younes_zerouali/Documents/Stradigi'
-root        =   '/home/younesz/Documents'
+#root        =   '/home/younesz/Documents'
 root_db     =   path.join(root, 'Databases', 'Hockey')
 repoPSt     =   path.join(root_db, 'PlayerStats/player')
 repoPbP     =   path.join(root_db, 'PlayByPlay')
@@ -57,10 +57,13 @@ for iSea in seasons:
 
     print('\t%s (%i/%i), ' %(iSea, seasons.index(iSea)+1, len(seasons)))    
     # == step1: Train the model for players classification
+    # Initiate the fetcher
+    plFETCH                     =   PlayerStatsFetcher(repoPSt, repoPbP, True)
+    _                           =   plFETCH.pull_raw()
     # Compute the model
     keep_seasons                =   list( set(seasons).difference(iSea) )
-    normalizer, pca, dtCols, _  =   do_ANN_training( repoPSt, repoPbP, repoCode, repoModel, allS_p=keep_seasons)
-    global_centers              =   do_clustering_multiyear(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, root)
+    normalizer, pca, dtCols, _  =   do_ANN_training( repoPSt, repoPbP, repoCode, repoModel, allS_p=keep_seasons, stats_fetcher=plFETCH)
+    global_centers              =   do_clustering_multiyear(repoModel, repoPSt, repoPbP, dtCols, normalizer, pca, root, plFetcher=plFETCH)
     # Make sure the model is backed up for future use
     dst = path.join(repoModel.replace(path.basename(repoModel), ''), 'MODELS', 'MODEL_perceptron_1layer_10units_relu_LOO_'+iSea)
     ut_clone_directory(repoModel, dst)
@@ -71,7 +74,7 @@ for iSea in seasons:
     repoSave    =   path.join(root_db, 'processed')
     HSS         =   HockeySS(root_db)
     HSS.list_all_games()
-    HSS.pull_RL_data(repoModel, repoSave)
+    HSS.pull_RL_data(repoModel, repoSave, fetcher=plFETCH)
     HSS.teach_RL_agent(repoSave)
     # Backup Q-table
     lsFiles     =   listdir(repoSave)
