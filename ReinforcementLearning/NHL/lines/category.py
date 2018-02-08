@@ -9,8 +9,15 @@ def get_class_of_player_by_id(data_for_game, player_id: int) -> PlayerType:
 
 class CategoryFetcher(object):
 
-    def __init__(self, data_for_game):
+    def __init__(self, data_for_game, cache_ids: bool = True):
         self.data_for_game = data_for_game
+        self.cache_ids = cache_ids
+        self.cache_player_ids = {} # cache for ids
 
     def category_of_player(self, player_id: int) -> PlayerType:
-        return get_class_of_player_by_id(self.data_for_game, player_id)
+        if self.cache_ids:
+            if player_id not in self.cache_player_ids:
+                self.cache_player_ids[player_id] = get_class_of_player_by_id(self.data_for_game, player_id)
+            return self.cache_player_ids[player_id]
+        else:
+            return get_class_of_player_by_id(self.data_for_game, player_id)
