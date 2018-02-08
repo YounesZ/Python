@@ -111,7 +111,7 @@ def do_it_together():
 
     home_lines_rec = line_rec.recommend_lines_maximize_average(
                                     home_team_players_ids=get_MTL_players(players_classes),
-                                    away_team_lines = away_lines, examine_max_first_lines=2)
+                                    away_team_lines = away_lines, examine_max_first_lines=None)
     print(home_lines_rec)
 
 if __name__ == '__main__':
