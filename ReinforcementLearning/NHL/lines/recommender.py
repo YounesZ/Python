@@ -90,12 +90,14 @@ class LineRecommender(object):
 
 
             how_many_first_lines_tried += 1
-            if (best_formation_found or
-                    (examine_max_first_lines is not None and (how_many_first_lines_tried >= examine_max_first_lines))):
+            all_done = (examine_max_first_lines is not None and (how_many_first_lines_tried >= examine_max_first_lines))
+            if (best_formation_found or all_done):
                 time_it_took = datetime.datetime.now().timestamp() - entry_timestamp
                 time_per_cycle = time_it_took / how_many_first_lines_tried
                 print("=======> Took %.2f secs. to look at %d first-lines; I think we have around %.2f secs. to go" % (
                 time_it_took, how_many_first_lines_tried, (220 - how_many_first_lines_tried) * time_per_cycle))
+            if all_done:
+                break
 
         print("ALL DONE!!!!!!")
         print("================================")
