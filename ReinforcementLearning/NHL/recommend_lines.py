@@ -117,6 +117,20 @@ def do_it_together():
                                     away_team_lines = away_lines, examine_max_first_lines=None)
     print(home_lines_rec)
 
+    # let's translate these numbers into names:
+    # input is ~ [(656, 27, 31), (1380, 389, 1035), (8, 9, 1164), (281, 13, 14)]
+    line_no = 1
+    for a_line in home_lines_rec:
+        first_guy, second_guy, third_guy = a_line
+        print("Line %d: %s, %s, %s" % (
+            line_no,
+            mtlott.rf_wc[mtlott.rf_wc['player.id'] == first_guy]['numfirstlast'].tolist()[0],
+            mtlott.rf_wc[mtlott.rf_wc['player.id'] == second_guy]['numfirstlast'].tolist()[0],
+            mtlott.rf_wc[mtlott.rf_wc['player.id'] == third_guy]['numfirstlast'].tolist()[0],
+        ))
+        line_no += 1
+
+
 if __name__ == '__main__':
     import cProfile
     cProfile.run('do_it_together()', '/tmp/restats')
