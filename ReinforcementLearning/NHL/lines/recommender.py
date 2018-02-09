@@ -1,4 +1,6 @@
 import itertools
+import datetime
+
 from typing import List, Callable, Set, Optional
 
 from ReinforcementLearning.NHL.player.player_type import PlayerType
@@ -31,7 +33,21 @@ class LineRecommender(object):
         def cats_from_ids(home_line_1_ids: List[int]) -> List[PlayerType]:
             return list(map(self.player_category_fetcher.category_of_player, home_line_1_ids))
 
-        import datetime
+        def formation_used_more_often(a_formation: List[List[int]], another_formation: Optional[List[List[int]]]):
+            "Is one formtion used more often than another?"
+            if another_formation is None:
+                return True
+            else:
+                # TODO: get 'temps de glace' for each one of the lines, sum thenm up.
+                return False # True
+
+        def get_q_value(home_line, away_line) -> float:
+            "let's see how these lines fare against each other in different circumstances"
+            all_period_diffs = itertools.product(range(3), range(-2, 3))
+            return sum(
+                [self.q_values_fetcher.get(period_diff[0], period_diff[1], home_line, away_line)
+                 for period_diff in all_period_diffs])
+
         assert len(home_team_players_ids) == len(set(home_team_players_ids)), "There are repeated ids in the home team"
         assert len(away_team_lines) == 4, "I need a formation (ie, 4 lines) for away team"
 
@@ -56,14 +72,17 @@ class LineRecommender(object):
                         # print(home_formation)
                         # get lines with CATEGORY of players
                         home_line_4 = cats_from_ids(home_line_4_ids)
-                        # ok, then:
-                        qs = [self.q_values_fetcher.get(home_line_1, away_line_1),
-                              self.q_values_fetcher.get(home_line_2, away_line_2),
-                              self.q_values_fetcher.get(home_line_3, away_line_3),
-                              self.q_values_fetcher.get(home_line_4, away_line_4)]
+                        # ok, then; let's see how these lines fare against each other in different circumstances:
+
+                        qs = [get_q_value(home_line_1, away_line_1),
+                              get_q_value(home_line_2, away_line_2),
+                              get_q_value(home_line_3, away_line_3),
+                              get_q_value(home_line_4, away_line_4)]
                         fitness = comb_q_values(qs)
                         # print(qs)
-                        if (best_fitness is None) or (fitness > best_fitness):
+                        if (best_fitness is None) or \
+                                (fitness > best_fitness) or \
+                                ((fitness == best_fitness) and formation_used_more_often(home_formation, best_formation)):
                             best_fitness = fitness
                             best_formation = home_formation
                             best_formation_found = True
@@ -71,14 +90,12 @@ class LineRecommender(object):
 
 
             how_many_first_lines_tried += 1
-            # if best_formation_found:
-            time_it_took = datetime.datetime.now().timestamp() - entry_timestamp
-            time_per_cycle = time_it_took / how_many_first_lines_tried
-            print("=======> Took %.2f secs. to look at %d first-lines; I think we have around %.2f secs. to go" % (
-            time_it_took, how_many_first_lines_tried, (220 - how_many_first_lines_tried) * time_per_cycle))
-            if examine_max_first_lines is not None and (how_many_first_lines_tried >= examine_max_first_lines):
-                print("Examined enough. Breaking away.")
-                break
+            if (best_formation_found or
+                    (examine_max_first_lines is not None and (how_many_first_lines_tried >= examine_max_first_lines))):
+                time_it_took = datetime.datetime.now().timestamp() - entry_timestamp
+                time_per_cycle = time_it_took / how_many_first_lines_tried
+                print("=======> Took %.2f secs. to look at %d first-lines; I think we have around %.2f secs. to go" % (
+                time_it_took, how_many_first_lines_tried, (220 - how_many_first_lines_tried) * time_per_cycle))
 
         print("ALL DONE!!!!!!")
         print("================================")

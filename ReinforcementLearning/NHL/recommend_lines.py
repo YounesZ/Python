@@ -24,10 +24,10 @@ from os import path
 
 import numpy as np
 
-from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Season, Game
+from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Season
 from ReinforcementLearning.NHL.player.player_type import PlayerType
 from ReinforcementLearning.NHL.lines.category import CategoryFetcher
-from ReinforcementLearning.NHL.lines.valuation import QValuesFetcherFromDict
+from ReinforcementLearning.NHL.lines.valuation import QValuesFetcherFromDict, QValuesFetcherFromGameData
 from ReinforcementLearning.NHL.lines.recommender import LineRecommender
 
 from typing import Set
@@ -105,9 +105,12 @@ def do_it_together():
         1),
     ]
 
+    q_values_fetcher_from_game_data = QValuesFetcherFromGameData(game_data=mtlott, lines_dict=linedict, q_values=Qvalues)
+    q_values_fetcher_from_tuples = QValuesFetcherFromDict.from_tuples(q_value_tuples)
+
     line_rec = LineRecommender(
         player_category_fetcher=CategoryFetcher(data_for_game=mtlott),
-        q_values_fetcher=QValuesFetcherFromDict.from_tuples(q_value_tuples))
+        q_values_fetcher=q_values_fetcher_from_game_data) # q_values_fetcher_from_tuples)
 
     home_lines_rec = line_rec.recommend_lines_maximize_average(
                                     home_team_players_ids=get_MTL_players(players_classes),
