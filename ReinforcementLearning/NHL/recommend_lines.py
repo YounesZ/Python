@@ -30,11 +30,6 @@ from ReinforcementLearning.NHL.lines.category import CategoryFetcher
 from ReinforcementLearning.NHL.lines.valuation import QValuesFetcherFromDict, QValuesFetcherFromGameData
 from ReinforcementLearning.NHL.lines.recommender import LineRecommender
 
-from typing import Set
-
-def get_MTL_players(players_classes) -> Set[int]:
-    return set(players_classes[players_classes["team"] == "MTL"].index)
-
 def do_it_together():
     from ReinforcementLearning.NHL.playbyplay.state_space_data import HockeySS
     """Initialization"""
@@ -47,10 +42,10 @@ def do_it_together():
                                'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
 
     # Now lets get game data
-    season = Season(db_root=db_root, year_begin=2012)  # Season.from_year_begin(2012) # '20122013'
+    season = Season(db_root=db_root, year_begin=2012, repo_model=repoModel)  # Season.from_year_begin(2012) # '20122013'
     mtlott = season.pick_game(gameId)
 
-    players_classes = mtlott.pull_players_classes_from_repo_address(True, True, 20, repoModel, number_of_games=30)
+    # players_classes = mtlott.pull_players_classes_from_repo_address(True, True, 20, repoModel, number_of_games=30)
 
     # prediction of the lines that the 'away' team will use:
     df, away_lines = mtlott.get_away_lines(accept_repeated=True)
@@ -80,8 +75,9 @@ def do_it_together():
     lineShifts = mtlott.lineShifts.as_df(team='both', equal_strength=mtlott.shifts_equal_strength,
                                        regular_time=mtlott.shifts_regular_time, min_duration=20)
 
-    plList = list(mtlott.player_classes.loc[lineShifts['playersID'].iloc[iShift][0]]['firstlast'].values) + \
-             list(mtlott.player_classes.loc[lineShifts['playersID'].iloc[iShift][1]]['firstlast'].values)
+    player_classes = mtlott.players_classes_mgr.get(equal_strength=True, regular_time=True, min_duration=20, nGames=30) # TODO: why these parameters?
+    plList = list(player_classes.loc[lineShifts['playersID'].iloc[iShift][0]]['firstlast'].values) + \
+             list(player_classes.loc[lineShifts['playersID'].iloc[iShift][1]]['firstlast'].values)
     diff = mtlott.recode_differential(lineShifts.iloc[iShift].differential)
     period = mtlott.recode_period(lineShifts.iloc[iShift].period)
     q_values = Qvalues[period, diff, linesCode[iShift, 0], linesCode[iShift, 1]]
@@ -113,8 +109,8 @@ def do_it_together():
         q_values_fetcher=q_values_fetcher_from_game_data) # q_values_fetcher_from_tuples)
 
     home_lines_rec = line_rec.recommend_lines_maximize_average(
-                                    home_team_players_ids=get_MTL_players(players_classes),
-                                    away_team_lines = away_lines, examine_max_first_lines=None)
+                                    home_team_players_ids=mtlott.get_home_players(repoModel),
+                                    away_team_lines = away_lines, examine_max_first_lines=2) # None)
     print(home_lines_rec)
 
     # let's translate these numbers into names:

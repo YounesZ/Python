@@ -63,10 +63,12 @@ class HockeySS:
 
                 # Check if some data was retrieved:
                 if len(iGame.df_wc)>0:
-                    lineSHFT    =   iGame.pull_players_classes(True, True, 20, self.players_model, self.classifier, nGames=30, stats_fetcher=fetcher)
-
+                    iGame.players_classes_mgr.set_stats_fetcher = fetcher
+                    player_classes = iGame.players_classes_mgr.get(equal_strength=True, regular_time=True, min_duration=20, nGames=30)
+                    # update shifts to reflect the same parameters
+                    lineSHFT = iGame.as_df('both', True, True, 20)
                     # Check if some data was retrieved:
-                    if len(iGame.player_classes)>0:
+                    if len(player_classes)>0:
                         # Add game identifier data
                         lineSHFT['season']      =   iy
                         lineSHFT['gameCode']    =   ic
@@ -80,7 +82,7 @@ class HockeySS:
                         RL_data     =   pd.concat((RL_data, pd.DataFrame(df_ic, columns=['state', 'action', 'reward'])), axis=0)
                         GAME_data   =   pd.concat((GAME_data, lineSHFT[coded]), axis=0)
                         # Players data
-                        plDT        =   iGame.player_classes
+                        plDT        =   player_classes
                         plDT['season']  =   iy
                         plDT['gameCode']=   ic
                         PLAYER_data     =   pd.concat((PLAYER_data, plDT), axis=0)
