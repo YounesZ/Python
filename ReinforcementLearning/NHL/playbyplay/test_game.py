@@ -1,6 +1,8 @@
 import unittest
 from os import path
-from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Season, Game
+from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game
+from ReinforcementLearning.NHL.playbyplay.season import Season
+
 
 class TestGame(unittest.TestCase):
     """Testing definitions of Game's."""
@@ -17,7 +19,7 @@ class TestGame(unittest.TestCase):
 
         # Now lets get game data
         self.season = Season(year_begin=2012)  # Season.from_year_begin(2012) # '20122013'
-        self.mtlott = Game(self.db_root, self.season, gameId=gameId)
+        self.mtlott = Game(self.season, gameId=gameId)
 
     def test1(self):
         # Visualize all player's classes: 0=def, 1=off, 2=neutral

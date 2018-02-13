@@ -1,62 +1,15 @@
-import pickle
 from copy import deepcopy
+from os import path
 
 import numpy as np
 import pandas as pd
 from typing import List, Tuple, Set
-from os import path
 
-from ReinforcementLearning.NHL.playerstats.nhl_player_stats import PlayerStatsFetcher
-from ReinforcementLearning.NHL.player.player_type import PlayerType
 from ReinforcementLearning.NHL.playbyplay.players import players_classes
+from ReinforcementLearning.NHL.playbyplay.season import Season
+from ReinforcementLearning.NHL.player.player_type import PlayerType
+from ReinforcementLearning.NHL.playerstats.nhl_player_stats import PlayerStatsFetcher
 
-class Season:
-    """Encapsulates all elements for a season."""
-
-    def __init__(self, db_root: str, repo_model: str, year_begin: int):
-        self.db_root    =   db_root
-        self.repo_model = repo_model
-        self.year_begin =   year_begin
-        self.year_end   =   self.year_begin + 1
-
-        # List games and load season data
-        self.list_game_ids()
-
-    def list_game_ids(self):
-        self.repoPbP    =   path.join(self.db_root, 'PlayByPlay')
-        self.repoPSt    =   path.join(self.db_root, "PlayerStats", "player")
-        # Get data - long
-        self.load_data()
-        # Get game IDs
-        self.games_id   =   self.dataFrames['playbyplay'].drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
-
-    def load_data(self):
-        dataPath        =   path.join(self.repoPbP, 'Season_%d%d' % (self.year_begin, self.year_end),'converted_data.p')
-        self.dataFrames =   pickle.load(open(dataPath, 'rb'))
-
-    def pick_game(self, gameId):
-        return Game(self, gameId, self.repo_model)
-
-    def __str__(self):
-        return "Season %d-%d" % (self.year_begin, self.year_end)
-
-
-    @classmethod
-    def get_game_id(cls, db_root: str, home_team_abbr: str, date_as_str: str) -> int:
-        """
-        let's convert game date to game code.
-        For example Montreal received Ottawa on march 13, 2013 =>
-            gameId = get_game_id(home_team_abbr='MTL', date_as_str='2013-03-13')
-        """
-        # TODO: make it fit with the class signature. For now it's pretty much standalone.
-        try:
-            gameInfo    =   pickle.load( open(path.join(db_root, 'processed', 'gamesInfo.p'), 'rb') )
-            gameInfo    =   gameInfo[gameInfo['gameDate']==date_as_str][gameInfo['teamAbbrev']==home_team_abbr]
-            gameId      =   gameInfo['gameId']
-            gameId      =   int( gameId.values.astype('str')[0][5:] )
-            return gameId
-        except Exception as e:
-            raise IndexError("There was no game for '%s' on '%s'" % (home_team_abbr, date_as_str))
 
 class LineShifts(object):
     """Encapsulates queries done to determine line shifts."""
@@ -193,7 +146,7 @@ class LineShifts(object):
 
 class Game:
 
-    def __init__(self, season: Season, gameId: int, repo_model: str):
+    def __init__(self, season: Season, gameId: int):
         # Retrieve game info
         self.season =   season
         self.gameId =   gameId
@@ -223,7 +176,7 @@ class Game:
         self.teams_label_for_shift  =   "" # 'home', 'away' or 'both'
         #
         self.players_classes_cache = {} # cache for players' classes.
-        self.players_classes_mgr = players_classes.from_repo(game_data=self, repoModel=repo_model)
+        self.players_classes_mgr = players_classes.from_repo(game_data=self, repoModel=season.repo_model)
 
     def get_away_lines(self, accept_repeated=False) -> Tuple[pd.DataFrame, List[List[PlayerType]]]:
         """

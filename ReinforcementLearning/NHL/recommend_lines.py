@@ -24,11 +24,13 @@ from os import path
 
 import numpy as np
 
-from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Season
+from ReinforcementLearning.NHL.playbyplay.season import Season
 from ReinforcementLearning.NHL.player.player_type import PlayerType
 from ReinforcementLearning.NHL.lines.category import CategoryFetcher
 from ReinforcementLearning.NHL.lines.valuation import QValuesFetcherFromDict, QValuesFetcherFromGameData
 from ReinforcementLearning.NHL.lines.recommender import LineRecommender
+from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game
+
 
 def do_it_together():
     from ReinforcementLearning.NHL.playbyplay.state_space_data import HockeySS
@@ -43,7 +45,8 @@ def do_it_together():
 
     # Now lets get game data
     season = Season(db_root=db_root, year_begin=2012, repo_model=repoModel)  # Season.from_year_begin(2012) # '20122013'
-    mtlott = season.pick_game(gameId)
+    mtlott = Game(season, gameId)
+    # mtlott = season.pick_game(gameId)
 
     # players_classes = mtlott.pull_players_classes_from_repo_address(True, True, 20, repoModel, number_of_games=30)
 
