@@ -20,6 +20,7 @@ Todo:
 
 """
 import pickle
+import datetime
 from os import path
 
 import numpy as np
@@ -37,16 +38,15 @@ def do_it_together():
     """Initialization"""
     db_root = '/Users/luisd/dev/NHL_stats/data'
     repoCode = '/Users/luisd/dev/NHL_stats'
-    # Montreal received Ottawa on march 13, 2013, let's convert game date to game code
-    gameId = Season.get_game_id(db_root=db_root, home_team_abbr='MTL', date_as_str='2013-03-13')
 
     repoModel = path.join(repoCode,
                                'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
 
     # Now lets get game data
     season = Season(db_root=db_root, year_begin=2012, repo_model=repoModel)  # Season.from_year_begin(2012) # '20122013'
+    # Montreal received Ottawa on march 13, 2013, let's convert game date to game code
+    gameId = season.get_game_id(home_team_abbr='MTL', game_date=datetime.date(year=2013, month=3, day=13))
     mtlott = Game(season, gameId)
-    # mtlott = season.pick_game(gameId)
 
     # players_classes = mtlott.pull_players_classes_from_repo_address(True, True, 20, repoModel, number_of_games=30)
 
