@@ -3,8 +3,9 @@ from ReinforcementLearning.NHL.player.player_type import PlayerType
 
 def get_class_of_player_by_id(data_for_game, player_id: int) -> PlayerType:
     try:
-        return PlayerType.from_int(int(data_for_game.player_classes[data_for_game.player_classes.index == player_id]["class"]))
-    except:
+        player_classes=data_for_game.players_classes_mgr.get(equal_strength=True, regular_time=True, min_duration=20, nGames=30) # TODO: why these parameters?
+        return PlayerType.from_int(int(player_classes[player_classes.index == player_id]["class"]))
+    except IndexError as ie:
         raise IndexError("Player %d did not play on this game" % (player_id))
 
 class CategoryFetcher(object):
