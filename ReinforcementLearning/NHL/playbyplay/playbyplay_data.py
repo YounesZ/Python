@@ -225,13 +225,6 @@ class Game:
         self.players_classes_cache = {} # cache for players' classes.
         self.players_classes_mgr = players_classes.from_repo(game_data=self, repoModel=repo_model)
 
-    # This is deprecated: this functionality is now Season()'s job
-    """
-    def get_game_ids(self):
-        "List all game numbers"
-        return np.unique(self.df['gcode'])
-    """
-
     def get_away_lines(self, accept_repeated=False) -> Tuple[pd.DataFrame, List[List[PlayerType]]]:
         """
         Calculates top lines used by opposing team. 
@@ -265,20 +258,6 @@ class Game:
         """Returns classes of members of a line given their id's."""
         player_classes = self.players_classes_mgr.get(equal_strength=True, regular_time=True, min_duration=20, nGames=30)
         return list(map(PlayerType.from_int, player_classes.loc[list(a)]["class"].values))
-
-    def pick_game(self, gameId=None, gameQty=None):
-        dataFrame   =   self.df
-        # Filter game
-        if not gameQty is None:
-            # List all game numbers
-            gNums   =   self.get_game_ids()
-            gNums   =   np.where(dataFrame['gcode'] == gNums)[0][0] - 1
-            dataFrame   =   dataFrame.loc[:gNums]
-        if not gameId is None:
-            # Keep only gameId
-            dataFrame   =   dataFrame[dataFrame.loc[:, 'gcode'] == int(gameId)]
-        # Store output
-        self.df_wc  =   dataFrame
 
     def __get_players_from__(self, repoModel:str, team_name: str) -> Set[int]:
         players_classes = self.players_classes_mgr.get(True, True, 20, nGames=30)
