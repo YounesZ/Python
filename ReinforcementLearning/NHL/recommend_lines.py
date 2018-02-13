@@ -42,11 +42,24 @@ def do_it_together():
     repoModel = path.join(repoCode,
                                'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
 
-    # Now lets get game data
+
     season = Season(db_root=db_root, year_begin=2012, repo_model=repoModel)  # Season.from_year_begin(2012) # '20122013'
-    # Montreal received Ottawa on march 13, 2013, let's convert game date to game code
-    gameId = season.get_game_id(home_team_abbr='MTL', game_date=datetime.date(year=2013, month=3, day=13))
+
+    # Now lets get game data
+    base_date = datetime.date(year=2013, month=3, day=13)
+    result = season.get_game_at_or_just_before(game_date=base_date, home_team_abbr='MTL')
+    assert (result is not None)
+    gameId, d = result
+    print("Fetched game %d, played on %s" % (gameId, d))
     mtlott = Game(season, gameId)
+
+    #
+    #
+    #
+    #
+    # # Montreal received Ottawa on march 13, 2013, let's convert game date to game code
+    # gameId = season.get_game_id(home_team_abbr='MTL', game_date=datetime.date(year=2013, month=3, day=13))
+    # mtlott = Game(season, gameId)
 
     # players_classes = mtlott.pull_players_classes_from_repo_address(True, True, 20, repoModel, number_of_games=30)
 
@@ -113,7 +126,7 @@ def do_it_together():
 
     home_lines_rec = line_rec.recommend_lines_maximize_average(
                                     home_team_players_ids=mtlott.get_home_players(repoModel),
-                                    away_team_lines = away_lines, examine_max_first_lines=2) # None)
+                                    away_team_lines = away_lines, examine_max_first_lines=None)
     print(home_lines_rec)
 
     # let's translate these numbers into names:
