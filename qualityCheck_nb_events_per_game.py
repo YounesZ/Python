@@ -1,8 +1,5 @@
-import pickle
-import matplotlib.pyplot as plt
-from ReinforcementLearning.NHL.playerstats.nhl_player_stats import *
-from ReinforcementLearning.NHL.playbyplay.playbyplay_data import *
 from ReinforcementLearning.NHL.playbyplay.state_space_data import *
+from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game
 
 # =======================
 # ==== FIRST SET POINTERS
@@ -34,7 +31,7 @@ for iS in seasons:
 
     print('\tAnalysing season %s (%i/%i): ' % (iS, seasons.index(iS) + 1, len(seasons)))
     # List all games
-    iSea    =   Season(db_root, int(iS.replace('Season_','')[:4]) )
+    iSea    =   Season(db_root, repo_model=repoModel, year_begin=int(iS.replace('Season_','')[:4]) )
     games   =   iSea.games_id
 
     # Loop on games
@@ -42,7 +39,7 @@ for iS in seasons:
     for iG in games['gcode']:
 
         # pull data
-        iGame   =   iSea.pick_game(iG)
+        iGame = Game(iSea, gameId=iG)
         iGame.pull_line_shifts('both', minduration=20)
         allE =  len(iGame.lineShifts)
 

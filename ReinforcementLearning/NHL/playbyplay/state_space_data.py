@@ -1,16 +1,13 @@
-import pickle
-from os import path
 from random import shuffle
 from sys import stdout
 
-import numpy as np
 import pandas as pd
-import tensorflow as tf
 
 from ReinforcementLearning.NHL.playerstats.ann_classifier import *
 from ReinforcementLearning.NHL.playbyplay.agent import Agent
-from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Season
+from ReinforcementLearning.NHL.playbyplay.season import Season
 from Utils.programming.ut_find_folders import ut_find_folders
+from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game
 
 
 class HockeySS:
@@ -59,7 +56,7 @@ class HockeySS:
             for ic, ih, ia in zip(games['gcode'].values, games['hometeam'].values, games['awayteam'].values):
 
                 # Extract game data
-                iGame   =   iSea.pick_game(ic)
+                iGame = Game(iSea, gameId=ic)
 
                 # Check if some data was retrieved:
                 if len(iGame.df_wc)>0:

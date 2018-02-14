@@ -120,7 +120,7 @@ for iG in range(len(HSS.games_lst)):
     gameCode    =   HSS.games_lst.iloc[iG]['gcode']
 
     # Get game data
-    gameData    =   Game(repoPbP, repoPSt, season, gameCode)
+    gameData    =   Game(season, gameCode)
     gameData.pull_line_shifts('both', minduration=20)
     gameData.pick_regulartime()
     gameData.pick_equalstrength()
