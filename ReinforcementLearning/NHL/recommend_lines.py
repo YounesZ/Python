@@ -43,7 +43,7 @@ def do_it_together():
                                'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
 
 
-    season = Season(db_root=db_root, year_begin=2012, repo_model=repoModel)  # Season.from_year_begin(2012) # '20122013'
+    season = Season(db_root=db_root, year_begin=2012, repo_model=repoModel)
 
     # Now lets get game data
     base_date = datetime.date(year=2013, month=3, day=13)
@@ -51,20 +51,10 @@ def do_it_together():
     assert (result is not None)
     gameId, d = result
     print("Fetched game %d, played on %s" % (gameId, d))
-    mtlott = Game(season, gameId)
-
-    #
-    #
-    #
-    #
-    # # Montreal received Ottawa on march 13, 2013, let's convert game date to game code
-    # gameId = season.get_game_id(home_team_abbr='MTL', game_date=datetime.date(year=2013, month=3, day=13))
-    # mtlott = Game(season, gameId)
-
-    # players_classes = mtlott.pull_players_classes_from_repo_address(True, True, 20, repoModel, number_of_games=30)
+    data_for_a_game = Game(season, gameId)
 
     # prediction of the lines that the 'away' team will use:
-    df, away_lines = mtlott.get_away_lines(accept_repeated=True)
+    df, away_lines = data_for_a_game.get_away_lines(accept_repeated=True)
 
     # === Now we get the indices in the Q-values tables corresponding to lines
 
@@ -74,8 +64,8 @@ def do_it_together():
     linedict  = linedict.line_dictionary
 
     # Get lines and translate them
-    playersCode  =   mtlott.encode_line_players()
-    linesCode    =   np.array( [[mtlott.recode_line(linedict, a) for a in b] for b in playersCode] )
+    playersCode  =   data_for_a_game.encode_line_players()
+    linesCode    =   np.array( [[data_for_a_game.recode_line(linedict, a) for a in b] for b in playersCode] )
 
 
     # Load the Qvalues table
@@ -88,14 +78,14 @@ def do_it_together():
 
     # Get the Q-value for that specific line
     iShift = 0  # First shift
-    lineShifts = mtlott.lineShifts.as_df(team='both', equal_strength=mtlott.shifts_equal_strength,
-                                       regular_time=mtlott.shifts_regular_time, min_duration=20)
+    lineShifts = data_for_a_game.lineShifts.as_df(team='both', equal_strength=data_for_a_game.shifts_equal_strength,
+                                       regular_time=data_for_a_game.shifts_regular_time, min_duration=20)
 
-    player_classes = mtlott.players_classes_mgr.get(equal_strength=True, regular_time=True, min_duration=20, nGames=30) # TODO: why these parameters?
+    player_classes = data_for_a_game.players_classes_mgr.get(equal_strength=True, regular_time=True, min_duration=20, nGames=30) # TODO: why these parameters?
     plList = list(player_classes.loc[lineShifts['playersID'].iloc[iShift][0]]['firstlast'].values) + \
              list(player_classes.loc[lineShifts['playersID'].iloc[iShift][1]]['firstlast'].values)
-    diff = mtlott.recode_differential(lineShifts.iloc[iShift].differential)
-    period = mtlott.recode_period(lineShifts.iloc[iShift].period)
+    diff = data_for_a_game.recode_differential(lineShifts.iloc[iShift].differential)
+    period = data_for_a_game.recode_period(lineShifts.iloc[iShift].period)
     q_values = Qvalues[period, diff, linesCode[iShift, 0], linesCode[iShift, 1]]
     print('[diff = %d, period = %d] First shift: \n\thome team: %s, %s, %s \n\taway team: %s, %s, %s \n\tQvalue: %.2f' % (
     diff, period, plList[0], plList[1], plList[2], plList[3], plList[4], plList[5], q_values))
@@ -117,30 +107,20 @@ def do_it_together():
         1),
     ]
 
-    q_values_fetcher_from_game_data = QValuesFetcherFromGameData(game_data=mtlott, lines_dict=linedict, q_values=Qvalues)
+    q_values_fetcher_from_game_data = QValuesFetcherFromGameData(game_data=data_for_a_game, lines_dict=linedict, q_values=Qvalues)
     q_values_fetcher_from_tuples = QValuesFetcherFromDict.from_tuples(q_value_tuples)
 
     line_rec = LineRecommender(
-        player_category_fetcher=CategoryFetcher(data_for_game=mtlott),
+        game=data_for_a_game,
+        player_category_fetcher=CategoryFetcher(data_for_game=data_for_a_game),
         q_values_fetcher=q_values_fetcher_from_game_data) # q_values_fetcher_from_tuples)
 
     home_lines_rec = line_rec.recommend_lines_maximize_average(
-                                    home_team_players_ids=mtlott.get_home_players(repoModel),
+                                    home_team_players_ids=data_for_a_game.get_ids_of_home_players(),
                                     away_team_lines = away_lines, examine_max_first_lines=None)
     print(home_lines_rec)
 
-    # let's translate these numbers into names:
-    # input is ~ [(656, 27, 31), (1380, 389, 1035), (8, 9, 1164), (281, 13, 14)]
-    line_no = 1
-    for a_line in home_lines_rec:
-        first_guy, second_guy, third_guy = a_line
-        print("Line %d: %s, %s, %s" % (
-            line_no,
-            mtlott.rf_wc[mtlott.rf_wc['player.id'] == first_guy]['numfirstlast'].tolist()[0],
-            mtlott.rf_wc[mtlott.rf_wc['player.id'] == second_guy]['numfirstlast'].tolist()[0],
-            mtlott.rf_wc[mtlott.rf_wc['player.id'] == third_guy]['numfirstlast'].tolist()[0],
-        ))
-        line_no += 1
+    print(data_for_a_game.formation_ids_to_str(home_lines_rec))
 
 
 if __name__ == '__main__':

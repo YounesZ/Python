@@ -39,9 +39,15 @@ class Season:
         date_as_str = str(game_date)
         earliest_date_as_str = str(earliest_date)
         try:
+            # gameInfo = self.games_info[
+            #     (self.games_info['gameDate'] <= date_as_str) & (self.games_info['gameDate'] >= earliest_date_as_str)
+            # ][self.games_info['teamAbbrev'] == home_team_abbr]
             gameInfo = self.games_info[
-                (self.games_info['gameDate'] <= date_as_str) & (self.games_info['gameDate'] >= earliest_date_as_str)
-            ][self.games_info['teamAbbrev'] == home_team_abbr]
+                (self.games_info['gameDate'] <= date_as_str) &
+                (self.games_info['gameDate'] >= earliest_date_as_str) &
+                (self.games_info['teamAbbrev'] == home_team_abbr)]
+            # I should have 1 id per row, without repetitions:
+            assert len(gameInfo["gameId"].unique()) == len(gameInfo.index)
             gameInfo = gameInfo.head(1)
             gameId = gameInfo['gameId']
             top_game_date_as_str = gameInfo['gameDate'].values.astype('str')[0]

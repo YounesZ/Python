@@ -6,13 +6,14 @@ from typing import List, Callable, Set, Optional
 from ReinforcementLearning.NHL.player.player_type import PlayerType
 from ReinforcementLearning.NHL.lines.category import CategoryFetcher
 from ReinforcementLearning.NHL.lines.valuation import QValuesFetcher
+from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game
 
 class LineRecommender(object):
 
-    def __init__(self, player_category_fetcher: CategoryFetcher, q_values_fetcher: QValuesFetcher):
+    def __init__(self, game: Game, player_category_fetcher: CategoryFetcher, q_values_fetcher: QValuesFetcher):
         self.player_category_fetcher=player_category_fetcher
         self.q_values_fetcher=q_values_fetcher
-
+        self.game = game
 
     def recommend_lines(
             self,
@@ -86,8 +87,7 @@ class LineRecommender(object):
                             best_fitness = fitness
                             best_formation = home_formation
                             best_formation_found = True
-                            print("Best fitness: %.2f by formation %s" % (best_fitness, best_formation))
-
+                            print("Best fitness: %.2f by formation \n%s" % (best_fitness, self.game.formation_ids_to_str(best_formation)))
 
             how_many_first_lines_tried += 1
             all_done = (examine_max_first_lines is not None and (how_many_first_lines_tried >= examine_max_first_lines))

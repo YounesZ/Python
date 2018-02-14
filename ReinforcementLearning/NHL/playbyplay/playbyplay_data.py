@@ -172,7 +172,8 @@ class Game:
         self.shifts_equal_strength  =   True
         self.shifts_regular_time    =   True
         self.lineShifts             =   LineShifts(self)
-        self.teams                  =   None
+        self.home_team = self.df_wc["hometeam"].unique()[0]
+        self.away_team = self.df_wc["awayteam"].unique()[0]
         self.teams_label_for_shift  =   "" # 'home', 'away' or 'both'
         #
         self.players_classes_cache = {} # cache for players' classes.
@@ -212,15 +213,34 @@ class Game:
         player_classes = self.players_classes_mgr.get(equal_strength=True, regular_time=True, min_duration=20, nGames=30)
         return list(map(PlayerType.from_int, player_classes.loc[list(a)]["class"].values))
 
-    def __get_players_from__(self, repoModel:str, team_name: str) -> Set[int]:
-        players_classes = self.players_classes_mgr.get(True, True, 20, nGames=30)
+    def __get_players_from__(self, team_name: str) -> Set[int]:
+        players_classes = self.players_classes_mgr.get(True, True, 20, nGames=30) # TODO: why this specific call?
         return set(players_classes[players_classes["team"] == team_name].index)
 
-    def get_home_players(self, repoModel:str) -> Set[int]:
-        return self.__get_players_from__(repoModel, team_name=self.df_wc['hometeam'].iloc[0])
+    def get_ids_of_home_players(self) -> Set[int]:
+        return self.__get_players_from__(team_name=self.home_team)
 
-    def get_away_players(self, repoModel:str) -> Set[int]:
-        return self.__get_players_from__(repoModel, team_name=self.df_wc['awayteam'].iloc[0])
+    def get_ids_of_away_players(self) -> Set[int]:
+        return self.__get_players_from__(team_name=self.away_team)
+
+    def player_id_to_name(self, player_id: int) -> str:
+        return self.rf_wc[self.rf_wc['player.id'] == player_id]['numfirstlast'].tolist()[0]
+
+    def formation_ids_to_names(self, formation: List[List[int]]) -> List[List[str]]:
+        ids = self.get_ids_of_home_players()
+        # let's translate these numbers into names:
+        # input is ~ [(656, 27, 31), (1380, 389, 1035), (8, 9, 1164), (281, 13, 14)]
+        return list(map(lambda a_line: list(map(self.player_id_to_name, a_line)), formation))
+
+    def formation_ids_to_str(self, formation: List[List[int]]) -> str:
+        result = []
+        lines_with_names = self.formation_ids_to_names(formation)
+        line_no = 1
+        for a_line in lines_with_names:
+            first_guy, second_guy, third_guy = a_line
+            result.append("Line %d: %s, %s, %s" % (line_no, first_guy, second_guy, third_guy))
+            line_no += 1
+        return '\n'.join(result)
 
     def pull_offensive_players(self, dfRow, team='h'):
         # Get player IDs
