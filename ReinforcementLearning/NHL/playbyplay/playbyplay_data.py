@@ -179,7 +179,21 @@ class Game:
         self.players_classes_cache = {} # cache for players' classes.
         self.players_classes_mgr = players_classes.from_repo(game_data=self, repoModel=season.repo_model)
 
-    def get_away_lines(self, accept_repeated=False) -> Tuple[pd.DataFrame, List[List[PlayerType]]]:
+    def get_away_lines(self, accept_repeated=False) -> \
+            List[Tuple[Tuple[int, int, int], Tuple[PlayerType, PlayerType, PlayerType], float]]:
+        """
+        
+        Args:
+            accept_repeated: if true, lines can have repeating players.
+
+        Returns: A sorted list where each element contains:
+        * the line as id's
+        * the line as categories
+        * the number of seconds played. The higher the number of seconds played the higher this element is.
+
+        """
+
+
         """
         Calculates top lines used by opposing team. 
         Each line returned contains the CATEGORY of each player.
@@ -193,20 +207,29 @@ class Game:
 
         a_dict = df.to_dict()['iceduration']
         sorted_tuples_and_secs = sorted(a_dict.items(), key=lambda x: x[1], reverse=True)
-        players_used = set()
-        lines_chosen = []
-        for line, secs in sorted_tuples_and_secs:
-            # is this line using players already present?
-            line_as_set = set(line)
-            if (not 1 in line_as_set) and (accept_repeated or (len(players_used.intersection(line_as_set)) == 0)):
-                lines_chosen.append(line)
-                players_used = players_used.union(line_as_set)
-                if len(lines_chosen) == 4:
-                    break # horrible, but effective
-        # Here the sort is to make sure that the conversion from player categories to line categories can be done
-        # without enumerating all possible combinations of the same players in the dictionary
-        # for example, lines [2,0,1], [1,2,0], [0,2,1] and [0,1,2] can be represented by a single line category in the dict
-        return (df, list(map(list, [np.sort(self.classes_of_line(a)) for a in lines_chosen])))
+        if accept_repeated:
+            # result_no_classes = dict(sorted_tuples_and_secs[:4])
+            result_no_classes = sorted_tuples_and_secs[:4]
+        else:
+            players_used = set()
+            lines_chosen = []
+            for line, secs in sorted_tuples_and_secs:
+                # is this line using players already present?
+                line_as_set = set(line)
+                if (not 1 in line_as_set) and (accept_repeated or (len(players_used.intersection(line_as_set)) == 0)):
+                    lines_chosen.append((line, a_dict[line]))
+                    players_used = players_used.union(line_as_set)
+                    if len(lines_chosen) == 4:
+                        break # horrible, but effective
+            # result_no_classes = dict(lines_chosen[:4])
+            result_no_classes = lines_chosen[:4]
+        result_with_classes = list(map(
+            # Here the sort is to make sure that the conversion from player categories to line categories can be done
+            # without enumerating all possible combinations of the same players in the dictionary
+            # for example, lines [2,0,1], [1,2,0], [0,2,1] and [0,1,2] can be represented by a single line category in the dict
+            lambda line_with_secs: (line_with_secs[0], tuple(np.sort(self.classes_of_line(line_with_secs[0]))), line_with_secs[1]),
+            result_no_classes))
+        return result_with_classes
 
     def classes_of_line(self, a: List[int]) -> List[PlayerType]:
         """Returns classes of members of a line given their id's."""
