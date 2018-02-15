@@ -54,7 +54,24 @@ def do_it_together():
     data_for_a_game = Game(season, gameId)
 
     # prediction of the lines that the 'away' team will use:
-    df, away_lines = data_for_a_game.get_away_lines(accept_repeated=True)
+    num_games_back = 5
+    ids = season.get_last_n_away_games_since(base_date, n=num_games_back, team_abbrev=data_for_a_game.away_team)
+    lines_dict = {}
+    for game_id in ids:
+        print("Processing game %d" % (game_id))
+        g = Game(season, gameId=game_id)
+        result_as_list = g.get_away_lines()
+        for line_as_ids, line_as_types, secs_played in result_as_list:
+            if line_as_ids in lines_dict:
+                # update number of seconds played
+                lines_dict[line_as_ids] = (line_as_types, lines_dict[line_as_ids][1] + secs_played)
+            else:
+                # seed entry in dictionary
+                lines_dict[line_as_ids] = (line_as_types, secs_played)
+    # ok, now sort by seconds played, keep top 4:
+    flat_list = list(map(lambda x: (x[0], x[1][0], x[1][1]), lines_dict.items()))
+    result_as_list = sorted(flat_list, key=lambda x: x[2], reverse=True)[:4]
+    away_lines = list(map(lambda x: x[1], result_as_list)) # as categories
 
     # === Now we get the indices in the Q-values tables corresponding to lines
 
