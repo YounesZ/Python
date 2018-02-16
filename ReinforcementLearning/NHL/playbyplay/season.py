@@ -2,7 +2,7 @@ import pickle
 import datetime
 
 from os import path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Set
 
 class Season:
     """Encapsulates all elements for a season."""
@@ -28,6 +28,10 @@ class Season:
         self.games_info = self.games_info.sort_values(by=['gameDate'], ascending=False)
 
 
+    def __strip_game_id__(self, game_id_as_str: str) -> str:
+        "A game id of 23456 for year 2012 will be shown as '2012023456'. This function strips it."
+        return game_id_as_str[5:]
+
     def get_game_at_or_just_before(self, game_date: datetime.date, home_team_abbr: str, delta_in_days: int = 3) -> Optional[Tuple[int, datetime.date]]:
         """
         let's convert game date to game code.
@@ -39,9 +43,15 @@ class Season:
         date_as_str = str(game_date)
         earliest_date_as_str = str(earliest_date)
         try:
+            # gameInfo = self.games_info[
+            #     (self.games_info['gameDate'] <= date_as_str) & (self.games_info['gameDate'] >= earliest_date_as_str)
+            # ][self.games_info['teamAbbrev'] == home_team_abbr]
             gameInfo = self.games_info[
-                (self.games_info['gameDate'] <= date_as_str) & (self.games_info['gameDate'] >= earliest_date_as_str)
-            ][self.games_info['teamAbbrev'] == home_team_abbr]
+                (self.games_info['gameDate'] <= date_as_str) &
+                (self.games_info['gameDate'] >= earliest_date_as_str) &
+                (self.games_info['teamAbbrev'] == home_team_abbr)]
+            # I should have 1 id per row, without repetitions:
+            assert len(gameInfo["gameId"].unique()) == len(gameInfo.index)
             gameInfo = gameInfo.head(1)
             gameId = gameInfo['gameId']
             top_game_date_as_str = gameInfo['gameDate'].values.astype('str')[0]
@@ -63,6 +73,19 @@ class Season:
             raise IndexError("There was no game for '%s' on '%s'" % (home_team_abbr, str(game_date)))
         gameId, _ = result
         return gameId
+
+    def get_last_n_home_games_for(self, n: int, team_abbrev: str) -> Set[int]:
+        raise NotImplementedError("lala")
+
+    def get_last_n_away_games_since(self, a_date: datetime.date, n: int, team_abbrev: str) -> Set[int]:
+        date_as_str = str(a_date)
+        games = self.games_info[
+            (self.games_info['gameDate'] <= date_as_str) &
+            (self.games_info['opponentTeamAbbrev'] == team_abbrev)]
+        games = games.head(n)
+        r = games['gameId'].values.astype('str')
+        return set(map(lambda f_v: int(f_v[5:]), r))
+
 
     def __str__(self):
         return "Season %d-%d" % (self.year_begin, self.year_end)

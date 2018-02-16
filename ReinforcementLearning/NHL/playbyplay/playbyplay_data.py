@@ -172,13 +172,28 @@ class Game:
         self.shifts_equal_strength  =   True
         self.shifts_regular_time    =   True
         self.lineShifts             =   LineShifts(self)
-        self.teams                  =   None
+        self.home_team = self.df_wc["hometeam"].unique()[0]
+        self.away_team = self.df_wc["awayteam"].unique()[0]
         self.teams_label_for_shift  =   "" # 'home', 'away' or 'both'
         #
         self.players_classes_cache = {} # cache for players' classes.
         self.players_classes_mgr = players_classes.from_repo(game_data=self, repoModel=season.repo_model)
 
-    def get_away_lines(self, accept_repeated=False) -> Tuple[pd.DataFrame, List[List[PlayerType]]]:
+    def get_away_lines(self, accept_repeated=False) -> \
+            List[Tuple[Tuple[int, int, int], Tuple[PlayerType, PlayerType, PlayerType], float]]:
+        """
+        
+        Args:
+            accept_repeated: if true, lines can have repeating players.
+
+        Returns: A sorted list where each element contains:
+        * the line as id's
+        * the line as categories
+        * the number of seconds played. The higher the number of seconds played the higher this element is.
+
+        """
+
+
         """
         Calculates top lines used by opposing team. 
         Each line returned contains the CATEGORY of each player.
@@ -192,35 +207,63 @@ class Game:
 
         a_dict = df.to_dict()['iceduration']
         sorted_tuples_and_secs = sorted(a_dict.items(), key=lambda x: x[1], reverse=True)
-        players_used = set()
-        lines_chosen = []
-        for line, secs in sorted_tuples_and_secs:
-            # is this line using players already present?
-            line_as_set = set(line)
-            if (not 1 in line_as_set) and (accept_repeated or (len(players_used.intersection(line_as_set)) == 0)):
-                lines_chosen.append(line)
-                players_used = players_used.union(line_as_set)
-                if len(lines_chosen) == 4:
-                    break # horrible, but effective
-        # Here the sort is to make sure that the conversion from player categories to line categories can be done
-        # without enumerating all possible combinations of the same players in the dictionary
-        # for example, lines [2,0,1], [1,2,0], [0,2,1] and [0,1,2] can be represented by a single line category in the dict
-        return (df, list(map(list, [np.sort(self.classes_of_line(a)) for a in lines_chosen])))
+        if accept_repeated:
+            # result_no_classes = dict(sorted_tuples_and_secs[:4])
+            result_no_classes = sorted_tuples_and_secs[:4]
+        else:
+            players_used = set()
+            lines_chosen = []
+            for line, secs in sorted_tuples_and_secs:
+                # is this line using players already present?
+                line_as_set = set(line)
+                if (not 1 in line_as_set) and (accept_repeated or (len(players_used.intersection(line_as_set)) == 0)):
+                    lines_chosen.append((line, a_dict[line]))
+                    players_used = players_used.union(line_as_set)
+                    if len(lines_chosen) == 4:
+                        break # horrible, but effective
+            # result_no_classes = dict(lines_chosen[:4])
+            result_no_classes = lines_chosen[:4]
+        result_with_classes = list(map(
+            # Here the sort is to make sure that the conversion from player categories to line categories can be done
+            # without enumerating all possible combinations of the same players in the dictionary
+            # for example, lines [2,0,1], [1,2,0], [0,2,1] and [0,1,2] can be represented by a single line category in the dict
+            lambda line_with_secs: (line_with_secs[0], tuple(np.sort(self.classes_of_line(line_with_secs[0]))), line_with_secs[1]),
+            result_no_classes))
+        return result_with_classes
 
     def classes_of_line(self, a: List[int]) -> List[PlayerType]:
         """Returns classes of members of a line given their id's."""
         player_classes = self.players_classes_mgr.get(equal_strength=True, regular_time=True, min_duration=20, nGames=30)
         return list(map(PlayerType.from_int, player_classes.loc[list(a)]["class"].values))
 
-    def __get_players_from__(self, repoModel:str, team_name: str) -> Set[int]:
-        players_classes = self.players_classes_mgr.get(True, True, 20, nGames=30)
+    def __get_players_from__(self, team_name: str) -> Set[int]:
+        players_classes = self.players_classes_mgr.get(True, True, 20, nGames=30) # TODO: why this specific call?
         return set(players_classes[players_classes["team"] == team_name].index)
 
-    def get_home_players(self, repoModel:str) -> Set[int]:
-        return self.__get_players_from__(repoModel, team_name=self.df_wc['hometeam'].iloc[0])
+    def get_ids_of_home_players(self) -> Set[int]:
+        return self.__get_players_from__(team_name=self.home_team)
 
-    def get_away_players(self, repoModel:str) -> Set[int]:
-        return self.__get_players_from__(repoModel, team_name=self.df_wc['awayteam'].iloc[0])
+    def get_ids_of_away_players(self) -> Set[int]:
+        return self.__get_players_from__(team_name=self.away_team)
+
+    def player_id_to_name(self, player_id: int) -> str:
+        return self.rf_wc[self.rf_wc['player.id'] == player_id]['numfirstlast'].tolist()[0]
+
+    def formation_ids_to_names(self, formation: List[List[int]]) -> List[List[str]]:
+        ids = self.get_ids_of_home_players()
+        # let's translate these numbers into names:
+        # input is ~ [(656, 27, 31), (1380, 389, 1035), (8, 9, 1164), (281, 13, 14)]
+        return list(map(lambda a_line: list(map(self.player_id_to_name, a_line)), formation))
+
+    def formation_ids_to_str(self, formation: List[List[int]]) -> str:
+        result = []
+        lines_with_names = self.formation_ids_to_names(formation)
+        line_no = 1
+        for a_line in lines_with_names:
+            first_guy, second_guy, third_guy = a_line
+            result.append("Line %d: %s, %s, %s" % (line_no, first_guy, second_guy, third_guy))
+            line_no += 1
+        return '\n'.join(result)
 
     def pull_offensive_players(self, dfRow, team='h'):
         # Get player IDs
