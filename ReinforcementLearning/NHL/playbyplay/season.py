@@ -4,6 +4,8 @@ import datetime
 from os import path
 from typing import Tuple, Optional, Set
 
+from ReinforcementLearning.NHL.playbyplay.players import get_model_and_classifier_from
+
 class Season:
     """Encapsulates all elements for a season."""
 
@@ -12,6 +14,10 @@ class Season:
         self.repo_model = repo_model
         self.year_begin =   year_begin
         self.year_end   =   self.year_begin + 1
+
+        # Need to load the data pre-processing variables
+        self.preprocessing, self.classifier = get_model_and_classifier_from(self.repo_model)
+
 
         # List games and load season data
         self.repoPbP    =   path.join(self.db_root, 'PlayByPlay')
