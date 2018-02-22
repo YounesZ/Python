@@ -9,6 +9,26 @@ from Utils.base import hashable_dict
 from ReinforcementLearning.NHL.playerstats.nhl_player_stats import PlayerStatsFetcher, do_normalize_data, do_reduce_data
 from Utils.programming.ut_sanitize_matrix import ut_sanitize_matrix
 
+def get_model_and_classifier_from(repoModel: str):
+    """
+
+    Args:
+        repoModel: the place where the model is saved.
+
+    Returns: A tuple (model, classifier
+
+    """
+    # Need to load the data pre-processing variables
+    preprocessing = pickle.load(open(path.join(repoModel, 'baseVariables.p'), 'rb'))
+
+    # Need to load the classification model (for players' predicted ranking on trophies voting lists)
+    classifier = {'sess': tf.Session(), 'annX': [], 'annY': []}
+    saver = tf.train.import_meta_graph(path.join(repoModel, path.basename(repoModel) + '.meta'))
+    graph = classifier['sess'].graph
+    classifier['annX'] = graph.get_tensor_by_name('Input_to_the_network-player_features:0')
+    classifier['annY'] = graph.get_tensor_by_name('prediction:0')
+    saver.restore(classifier['sess'], tf.train.latest_checkpoint(path.join(repoModel, './')))
+    return (preprocessing, classifier)
 
 class players_classes(object):
 
@@ -23,15 +43,16 @@ class players_classes(object):
     @classmethod
     def from_repo(cls, game_data, repoModel: str):
         # Need to load the data pre-processing variables
-        preprocessing = pickle.load(open(path.join(repoModel, 'baseVariables.p'), 'rb'))
-
-        # Need to load the classification model (for players' predicted ranking on trophies voting lists)
-        classifier = {'sess': tf.Session(), 'annX': [], 'annY': []}
-        saver = tf.train.import_meta_graph(path.join(repoModel, path.basename(repoModel) + '.meta'))
-        graph = classifier['sess'].graph
-        classifier['annX'] = graph.get_tensor_by_name('Input_to_the_network-player_features:0')
-        classifier['annY'] = graph.get_tensor_by_name('prediction:0')
-        saver.restore(classifier['sess'], tf.train.latest_checkpoint(path.join(repoModel, './')))
+        preprocessing, classifier = get_model_and_classifier_from(repoModel)
+        # preprocessing = pickle.load(open(path.join(repoModel, 'baseVariables.p'), 'rb'))
+        #
+        # # Need to load the classification model (for players' predicted ranking on trophies voting lists)
+        # classifier = {'sess': tf.Session(), 'annX': [], 'annY': []}
+        # saver = tf.train.import_meta_graph(path.join(repoModel, path.basename(repoModel) + '.meta'))
+        # graph = classifier['sess'].graph
+        # classifier['annX'] = graph.get_tensor_by_name('Input_to_the_network-player_features:0')
+        # classifier['annY'] = graph.get_tensor_by_name('prediction:0')
+        # saver.restore(classifier['sess'], tf.train.latest_checkpoint(path.join(repoModel, './')))
 
         return cls(game_data, model=preprocessing, classifier=classifier)
 
