@@ -30,7 +30,7 @@ from ReinforcementLearning.NHL.player.player_type import PlayerType
 from ReinforcementLearning.NHL.lines.category import CategoryFetcher
 from ReinforcementLearning.NHL.lines.valuation import QValuesFetcherFromDict, QValuesFetcherFromGameData
 from ReinforcementLearning.NHL.lines.recommender import LineRecommender
-from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game
+from ReinforcementLearning.NHL.playbyplay.game import Game, get_lines_for
 
 
 def do_it_together():
@@ -54,24 +54,11 @@ def do_it_together():
     data_for_a_game = Game(season, gameId)
 
     # prediction of the lines that the 'away' team will use:
-    num_games_back = 5
-    ids = season.get_last_n_away_games_since(base_date, n=num_games_back, team_abbrev=data_for_a_game.away_team)
-    lines_dict = {}
-    for game_id in ids:
-        print("Processing game %d" % (game_id))
-        g = Game(season, gameId=game_id)
-        result_as_list = g.get_away_lines()
-        for line_as_ids, line_as_types, secs_played in result_as_list:
-            if line_as_ids in lines_dict:
-                # update number of seconds played
-                lines_dict[line_as_ids] = (line_as_types, lines_dict[line_as_ids][1] + secs_played)
-            else:
-                # seed entry in dictionary
-                lines_dict[line_as_ids] = (line_as_types, secs_played)
-    # ok, now sort by seconds played, keep top 4:
-    flat_list = list(map(lambda x: (x[0], x[1][0], x[1][1]), lines_dict.items()))
-    result_as_list = sorted(flat_list, key=lambda x: x[2], reverse=True)[:4]
-    away_lines = list(map(lambda x: x[1], result_as_list)) # as categories
+    formation = get_lines_for(season, base_date, how_many_days_back=1, team_abbrev=data_for_a_game.away_team)
+    away_lines_names = formation.as_names
+    away_lines = formation.as_categories
+    print(away_lines_names)
+    print(away_lines)
 
     # === Now we get the indices in the Q-values tables corresponding to lines
 
@@ -107,25 +94,7 @@ def do_it_together():
     print('[diff = %d, period = %d] First shift: \n\thome team: %s, %s, %s \n\taway team: %s, %s, %s \n\tQvalue: %.2f' % (
     diff, period, plList[0], plList[1], plList[2], plList[3], plList[4], plList[5], q_values))
 
-
-
-    q_value_tuples = [
-        ([PlayerType.NEUTRAL, PlayerType.NEUTRAL, PlayerType.OFFENSIVE],
-         [PlayerType.OFFENSIVE, PlayerType.DEFENSIVE, PlayerType.DEFENSIVE],
-        25),
-        ([PlayerType.NEUTRAL, PlayerType.NEUTRAL, PlayerType.OFFENSIVE],
-         [PlayerType.NEUTRAL, PlayerType.NEUTRAL, PlayerType.NEUTRAL],
-        12),
-        ([PlayerType.NEUTRAL, PlayerType.NEUTRAL, PlayerType.NEUTRAL],
-         [PlayerType.OFFENSIVE, PlayerType.DEFENSIVE, PlayerType.DEFENSIVE],
-        20),
-        ([PlayerType.NEUTRAL, PlayerType.NEUTRAL, PlayerType.NEUTRAL],
-         [PlayerType.NEUTRAL, PlayerType.NEUTRAL, PlayerType.NEUTRAL],
-        1),
-    ]
-
     q_values_fetcher_from_game_data = QValuesFetcherFromGameData(game_data=data_for_a_game, lines_dict=linedict, q_values=Qvalues)
-    q_values_fetcher_from_tuples = QValuesFetcherFromDict.from_tuples(q_value_tuples)
 
     line_rec = LineRecommender(
         game=data_for_a_game,
@@ -134,11 +103,34 @@ def do_it_together():
 
     home_lines_rec = line_rec.recommend_lines_maximize_average(
                                     home_team_players_ids=data_for_a_game.get_ids_of_home_players(),
-                                    away_team_lines = away_lines, examine_max_first_lines=None)
+                                    away_team_lines = away_lines, examine_max_first_lines=2) # None)
     print(home_lines_rec)
 
     print(data_for_a_game.formation_ids_to_str(home_lines_rec))
 
+    # let's examine actual decisions and how it compares with optimal:
+    seconds = {'bad': 0, 'good': 0}
+    for data in lineShifts[['home_line', 'away_line', 'iceduration']].itertuples():
+        home_line = data.home_line
+        away_line = data.away_line
+        num_seconds = data.iceduration
+        away_line_cats = data_for_a_game.classes_of_line(away_line)
+        if None in away_line_cats:
+            print("Can't get category of one of away players")
+        else:
+            away_line_cats = tuple(np.sort(away_line_cats))
+            if away_line_cats not in away_lines:
+                print("%s (categories %s): no optimal calculated" % (away_line, away_line_cats))
+            else:
+                idx_of_away = away_lines.index(away_line_cats)
+                cats_of_optimal = data_for_a_game.classes_of_line(home_lines_rec[idx_of_away])
+                home_line_cats = data_for_a_game.classes_of_line(home_line)
+                if set(cats_of_optimal) == set(home_line_cats):
+                    seconds['good'] += num_seconds
+                else:
+                    seconds['bad'] += num_seconds
+    print(seconds)
+    print("Home coach's score (in [0,1]) is %.2f" % (seconds['good'] / (seconds['good'] + seconds['bad'])))
 
 if __name__ == '__main__':
     import cProfile
