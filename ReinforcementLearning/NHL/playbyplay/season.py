@@ -26,7 +26,8 @@ class Season:
         dataPath        =   path.join(self.repoPbP, 'Season_%d%d' % (self.year_begin, self.year_end),'converted_data.p')
         self.dataFrames =   pickle.load(open(dataPath, 'rb'))
         # Get game IDs
-        self.games_id   =   self.dataFrames['playbyplay'].drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
+        self.games_id   =   self.dataFrames['playbyplay'].\
+            drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
         #
         self.games_info = pickle.load(open(path.join(self.db_root, 'processed', 'gamesInfo.p'), 'rb'))
         self.games_info = self.games_info[
@@ -37,6 +38,10 @@ class Season:
     def __strip_game_id__(self, game_id_as_str: str) -> str:
         "A game id of 23456 for year 2012 will be shown as '2012023456'. This function strips it."
         return game_id_as_str[5:]
+
+    def get_teams(self) -> Set[str]:
+        """Teams that played in this season."""
+        return set(self.games_id.hometeam.unique())
 
     def get_game_at_or_just_before(self, game_date: datetime.date, home_team_abbr: str, delta_in_days: int = 3) -> Optional[Tuple[int, datetime.date]]:
         """

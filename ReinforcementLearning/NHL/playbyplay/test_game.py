@@ -36,14 +36,16 @@ class TestGame(unittest.TestCase):
         """Are the differential for lines properly calculated?"""
 
         days_before = 20
+        all_teams = self.season.get_teams()
         for _ in range(10): # repeat this test 10 times
             random_date = datetime.date(year=2013, month=random.randint(1,4), day=random.randint(1,28))
-            result = self.season.get_game_at_or_just_before(random_date, home_team_abbr='MTL', delta_in_days=days_before)
+            random_team = random.sample(all_teams, 1)[0]
+            result = self.season.get_game_at_or_just_before(random_date, home_team_abbr=random_team, delta_in_days=days_before)
             if result is None:
-                print("WARNING => No home game for MTL up to %d days before %s" % (days_before, random_date))
+                print("WARNING => No home game for '%s' up to %d days before %s" % (random_team, days_before, random_date))
             else:
                 random_game_id, game_date = result
-                print("Examining game %d (from %s)" % (random_game_id, game_date))
+                print("[home team: '%s'] Examining game %d (from %s)" % (random_team, random_game_id, game_date))
                 random_game = Game(self.season, gameId=random_game_id)
                 df_differential = random_game.lineShifts.shifts['differential'].reset_index() # ?
                 idxs_change_differential = df_differential.diff()[df_differential.diff().differential != 0].index.values
@@ -55,14 +57,16 @@ class TestGame(unittest.TestCase):
         """Are the differential for lines properly calculated?"""
 
         days_before = 20
+        all_teams = self.season.get_teams()
         for _ in range(10): # repeat this test 10 times
             random_date = datetime.date(year=2013, month=random.randint(1,4), day=random.randint(1,28))
-            result = self.season.get_game_at_or_just_before(random_date, home_team_abbr='MTL', delta_in_days=days_before)
+            random_team = random.sample(all_teams, 1)[0]
+            result = self.season.get_game_at_or_just_before(random_date, home_team_abbr=random_team, delta_in_days=days_before)
             if result is None:
-                print("WARNING => No home game for MTL up to %d days before %s" % (days_before, random_date))
+                print("WARNING => No home game for '%s' up to %d days before %s" % (random_team, days_before, random_date))
             else:
                 random_game_id, game_date = result
-                print("Examining game %d (from %s)" % (random_game_id, game_date))
+                print("[home team: '%s'] Examining game %d (from %s)" % (random_team, random_game_id, game_date))
                 random_game = Game(self.season, gameId=random_game_id)
                 df_goals = random_game.lineShifts.shifts['GOAL'].reset_index()
                 idxs_goals = [a_val for a_val in df_goals[df_goals.GOAL != 0].index.values if a_val > 0]
