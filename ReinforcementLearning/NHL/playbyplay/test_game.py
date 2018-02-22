@@ -11,7 +11,7 @@ import unittest
 import datetime
 import random
 from os import path
-from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game
+from ReinforcementLearning.NHL.playbyplay.game import Game
 from ReinforcementLearning.NHL.playbyplay.season import Season
 
 

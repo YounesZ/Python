@@ -12,7 +12,7 @@ from Utils.programming.ut_find_folders import *
 from Utils.programming.ut_clone_directory import  *
 from ReinforcementLearning.NHL.playbyplay.state_space_data import HockeySS
 from ReinforcementLearning.NHL.playerstats.nhl_player_stats import do_ANN_training, do_clustering_multiyear, PlayerStatsFetcher
-from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game
+from ReinforcementLearning.NHL.playbyplay.game import Game
 from ReinforcementLearning.NHL.playbyplay.season import Season
 
 

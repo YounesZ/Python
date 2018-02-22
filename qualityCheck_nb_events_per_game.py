@@ -1,5 +1,5 @@
 from ReinforcementLearning.NHL.playbyplay.state_space_data import *
-from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game
+from ReinforcementLearning.NHL.playbyplay.game import Game
 
 # =======================
 # ==== FIRST SET POINTERS

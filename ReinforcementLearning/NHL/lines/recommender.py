@@ -6,7 +6,7 @@ from typing import List, Callable, Set, Optional
 from ReinforcementLearning.NHL.player.player_type import PlayerType
 from ReinforcementLearning.NHL.lines.category import CategoryFetcher
 from ReinforcementLearning.NHL.lines.valuation import QValuesFetcher
-from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game
+from ReinforcementLearning.NHL.playbyplay.game import Game
 
 class LineRecommender(object):
 
