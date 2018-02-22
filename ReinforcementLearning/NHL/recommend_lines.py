@@ -28,7 +28,7 @@ import numpy as np
 from ReinforcementLearning.NHL.playbyplay.season import Season
 from ReinforcementLearning.NHL.player.player_type import PlayerType
 from ReinforcementLearning.NHL.lines.category import CategoryFetcher
-from ReinforcementLearning.NHL.lines.valuation import QValuesFetcherFromDict, QValuesFetcherFromGameData
+from ReinforcementLearning.NHL.lines.valuation import QValuesFetcherFromGameData
 from ReinforcementLearning.NHL.lines.recommender import LineRecommender
 from ReinforcementLearning.NHL.playbyplay.game import Game, get_lines_for
 
