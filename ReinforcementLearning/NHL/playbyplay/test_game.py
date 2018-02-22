@@ -50,3 +50,27 @@ class TestGame(unittest.TestCase):
                 for idx in idxs_change_differential[1:]: # skip fist one, because it's a NaN
                     self.assertNotEqual(random_game.lineShifts.shifts.iloc[idx]['GOAL'], 0,
                                         "Differential is %d but there was no goal scored" % (random_game.lineShifts.shifts.iloc[idx]['differential']))
+
+    def test_shifts_goals_generate_differential(self):
+        """Are the differential for lines properly calculated?"""
+
+        days_before = 20
+        for _ in range(10): # repeat this test 10 times
+            random_date = datetime.date(year=2013, month=random.randint(1,4), day=random.randint(1,28))
+            result = self.season.get_game_at_or_just_before(random_date, home_team_abbr='MTL', delta_in_days=days_before)
+            if result is None:
+                print("WARNING => No home game for MTL up to %d days before %s" % (days_before, random_date))
+            else:
+                random_game_id, game_date = result
+                print("Examining game %d (from %s)" % (random_game_id, game_date))
+                random_game = Game(self.season, gameId=random_game_id)
+                df_goals = random_game.lineShifts.shifts['GOAL'].reset_index()
+                idxs_goals = [a_val for a_val in df_goals[df_goals.GOAL != 0].index.values if a_val > 0]
+                for idx in idxs_goals:
+                    diff = random_game.lineShifts.shifts.iloc[idx]['differential']
+                    diff_before = random_game.lineShifts.shifts.iloc[idx-1]['differential']
+                    goals_now = random_game.lineShifts.shifts.iloc[idx]['GOAL']
+                    goals_before = random_game.lineShifts.shifts.iloc[idx - 1]['GOAL']
+                    expected_result = diff_before + goals_now
+                    self.assertEqual(diff,expected_result,
+                                        "\n%s\n [index: %d] Differential is %d but it should be => %d (== (diff before) %d + %d (goals now))" % (random_game.lineShifts.shifts.iloc[idx-2:idx+2][['GOAL', 'differential']], idx, diff, expected_result, diff_before, goals_now))

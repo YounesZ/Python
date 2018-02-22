@@ -104,7 +104,7 @@ class LineShifts(object):
         LINES['differential'].append(np.sum(LINES['GOAL']))
 
         # ok, now let's buid it:
-        self.shifts = pd.DataFrame.from_dict(LINES)
+        self.shifts = pd.DataFrame.from_dict(LINES).reset_index()
         # # all done, then:
         # return (team, teams, lineShifts)
 
