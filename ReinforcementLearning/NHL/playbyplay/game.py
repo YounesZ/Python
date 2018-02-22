@@ -220,6 +220,7 @@ Formation = collections.namedtuple('Formation', 'as_names as_categories')
 def get_lines_for(season: Season, base_date: datetime.date, how_many_days_back: int, team_abbrev: str) -> Formation:
     """prediction of the lines that the 'away' team will use."""
     assert(how_many_days_back >= 0)
+    assert(team_abbrev in season.get_teams())
     ids = season.get_last_n_away_games_since(base_date, n=how_many_days_back, team_abbrev=team_abbrev)
     lines_dict = {}
     for game_id in ids:
