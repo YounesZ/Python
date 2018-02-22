@@ -7,7 +7,7 @@ from ReinforcementLearning.NHL.playerstats.ann_classifier import *
 from ReinforcementLearning.NHL.playbyplay.agent import Agent
 from ReinforcementLearning.NHL.playbyplay.season import Season
 from Utils.programming.ut_find_folders import ut_find_folders
-from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game
+from ReinforcementLearning.NHL.playbyplay.game import Game
 
 
 class HockeySS:

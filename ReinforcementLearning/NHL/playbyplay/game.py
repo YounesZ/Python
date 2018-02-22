@@ -1,6 +1,8 @@
 from os import path
 
 import numpy as np
+import datetime
+import collections
 from typing import List, Tuple, Set
 
 from ReinforcementLearning.NHL.playbyplay.players import players_classes
@@ -44,7 +46,9 @@ class Game:
         #
         self.players_classes_cache = {} # cache for players' classes.
         self.players_classes_mgr = players_classes(game_data=self, model=self.season.preprocessing, classifier=self.season.classifier)
-        # self.players_classes_mgr = players_classes.from_repo(game_data=self, repoModel=season.repo_model)
+
+    def __str__(self):
+        return "%s: game %d" % (self.season, self.gameId)
 
     def get_away_lines(self, accept_repeated=False) -> \
             List[Tuple[Tuple[int, int, int], Tuple[PlayerType, PlayerType, PlayerType], float]]:
@@ -210,6 +214,45 @@ class Game:
         # Reward
         reward          =   self.recode_reward(lineShifts[remL])
         return state, action, reward, nstates, nactions, remL
+
+Formation = collections.namedtuple('Formation', 'as_names as_categories')
+
+def get_lines_for(season: Season, base_date: datetime.date, how_many_days_back: int, team_abbrev: str) -> Formation:
+    """prediction of the lines that the 'away' team will use."""
+    assert(how_many_days_back >= 0)
+    ids = season.get_last_n_away_games_since(base_date, n=how_many_days_back, team_abbrev=team_abbrev)
+    lines_dict = {}
+    for game_id in ids:
+        g = Game(season, gameId=game_id)
+        print("Processing game %s" % (g))
+        result_as_list = g.get_away_lines()
+        for line_as_ids, line_as_types, secs_played in result_as_list:
+            line_as_ids = tuple(map(g.player_id_to_name, line_as_ids))
+            if line_as_ids in lines_dict:
+                # update number of seconds played
+                lines_dict[line_as_ids] = (line_as_types, lines_dict[line_as_ids][1] + secs_played)
+            else:
+                # seed entry in dictionary
+                lines_dict[line_as_ids] = (line_as_types, secs_played)
+    print("DONE")
+
+    # for k, v in lines_dict.items():
+    #     print(k, v)
+    # ok, now sort by seconds played, keep top 4:
+    flat_list = list(map(lambda x: (x[0], x[1][0], x[1][1]), lines_dict.items()))
+    result_as_list = sorted(flat_list, key=lambda x: x[2], reverse=True)
+    print("%d lines used consistently" % (len(result_as_list)))
+    for a_line, a_cat, num_secs in result_as_list:
+        print("%s played %.2f secs" % (a_line, num_secs))
+    top_4_as_list = result_as_list[:4]
+    print("Keeping top 4:")
+    for a_line, a_cat, num_secs in top_4_as_list:
+        print("%s played %.2f secs" % (a_line, num_secs))
+    away_lines_names = list(map(lambda x: x[0], top_4_as_list))  # as names
+    # print(away_lines_names)
+    away_lines = list(map(lambda x: x[1], top_4_as_list))  # as categories
+    # print(away_lines)
+    return Formation(as_names=away_lines_names, as_categories=away_lines)
 
 
 """     

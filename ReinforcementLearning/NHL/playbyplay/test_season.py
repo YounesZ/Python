@@ -3,7 +3,7 @@ import datetime
 from random import randint
 from os import path
 from ReinforcementLearning.NHL.playbyplay.season import Season
-from ReinforcementLearning.NHL.playbyplay.playbyplay_data import Game
+from ReinforcementLearning.NHL.playbyplay.game import Game
 
 
 class TestSeason(unittest.TestCase):
