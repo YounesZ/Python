@@ -41,6 +41,12 @@ class TestSeason(unittest.TestCase):
                              "Expected: %s as home. But maybe it's away: %s?" % (home_team, the_game.df_wc["awayteam"].unique()[0]))
 
 
+    def test_fetch_teams(self):
+        """Fetching the team for a season."""
+        all_teams = self.season.get_teams()
+        self.assertTrue(len(all_teams) > 0)
+        # Montreal has always been there, so:
+        self.assertTrue('MTL' in all_teams)
 
     def test_get_game_id(self):
         home_team='MTL'
