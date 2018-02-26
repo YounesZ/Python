@@ -1,5 +1,6 @@
 import pickle
 import datetime
+import logging
 
 from os import path
 from typing import Tuple, Optional, Set
@@ -9,7 +10,8 @@ from ReinforcementLearning.NHL.playbyplay.players import get_model_and_classifie
 class Season:
     """Encapsulates all elements for a season."""
 
-    def __init__(self, db_root: str, repo_model: str, year_begin: int):
+    def __init__(self, alogger: logging.Logger, db_root: str, repo_model: str, year_begin: int):
+        self.alogger = alogger
         self.db_root    =   db_root
         self.repo_model = repo_model
         self.year_begin =   year_begin

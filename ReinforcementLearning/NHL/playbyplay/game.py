@@ -225,7 +225,7 @@ def get_lines_for(season: Season, base_date: datetime.date, how_many_days_back: 
     lines_dict = {}
     for game_id in ids:
         g = Game(season, gameId=game_id)
-        print("Processing game %s" % (g))
+        season.alogger.info("Processing game %s" % (g))
         result_as_list = g.get_away_lines()
         for line_as_ids, line_as_types, secs_played in result_as_list:
             line_as_ids = tuple(map(g.player_id_to_name, line_as_ids))
@@ -235,24 +235,22 @@ def get_lines_for(season: Season, base_date: datetime.date, how_many_days_back: 
             else:
                 # seed entry in dictionary
                 lines_dict[line_as_ids] = (line_as_types, secs_played)
-    print("DONE")
+    season.alogger.info("DONE")
 
     # for k, v in lines_dict.items():
-    #     print(k, v)
+    #     self.season.alogger.info(k, v)
     # ok, now sort by seconds played, keep top 4:
     flat_list = list(map(lambda x: (x[0], x[1][0], x[1][1]), lines_dict.items()))
     result_as_list = sorted(flat_list, key=lambda x: x[2], reverse=True)
-    print("%d lines used consistently" % (len(result_as_list)))
+    season.alogger.info("%d lines used consistently" % (len(result_as_list)))
     for a_line, a_cat, num_secs in result_as_list:
-        print("%s played %.2f secs" % (a_line, num_secs))
+        season.alogger.info("%s played %.2f secs" % (a_line, num_secs))
     top_4_as_list = result_as_list[:4]
-    print("Keeping top 4:")
+    season.alogger.info("Keeping top 4:")
     for a_line, a_cat, num_secs in top_4_as_list:
-        print("%s played %.2f secs" % (a_line, num_secs))
+        season.alogger.info("%s played %.2f secs" % (a_line, num_secs))
     away_lines_names = list(map(lambda x: x[0], top_4_as_list))  # as names
-    # print(away_lines_names)
     away_lines = list(map(lambda x: x[1], top_4_as_list))  # as categories
-    # print(away_lines)
     return Formation(as_names=away_lines_names, as_categories=away_lines)
 
 

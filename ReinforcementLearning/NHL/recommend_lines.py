@@ -60,15 +60,19 @@ def get_teams_coach_performance(
 
     assert (how_many_games > 0)
     last_game_date_accounted_for = None
-    seconds = {'bad': 0, 'good': 0}  # result will be stored here.
+    seconds = { # result will be stored here.
+        'does_not_match_optimal': 0, # number of seconds the action of coach did not match the optimal
+        'matches_optimal': 0, # number of seconds the action of coach matched the optimal
+        'unknown_adversary': 0 # number of seconds we can't determine the value of the action of coach
+    }
     while how_many_games > 0:
-        print("games left: %d; so far: %s" % (how_many_games, seconds))
+        season.alogger.info("games left: %d; so far: %s" % (how_many_games, seconds))
         how_many_games -= 1
         if last_game_date_accounted_for is None:
             base_date = maybe_a_starting_date if maybe_a_starting_date is not None else params["first_day_of_season"]
             result = season.get_game_at_or_just_before(game_date=base_date, home_team_abbr=team_abbr, delta_in_days=20)
             if result is None:
-                print("There is no game for '%s' just before %s" % (team_abbr, base_date))
+                season.alogger.info("There is no game for '%s' just before %s" % (team_abbr, base_date))
                 return seconds
             gameId, d = result
             base_date = base_date + datetime.timedelta(days=1)  # convenient for next cycle of computation
@@ -82,19 +86,19 @@ def get_teams_coach_performance(
                 gameId, d = result
                 base_date = base_date + datetime.timedelta(days=1)  # convenient for next cycle of computation
                 found = (d != last_game_date_accounted_for)
-        print("Fetched game %d, played on %s" % (gameId, d))
+            season.alogger.info("Fetched game %d, played on %s" % (gameId, d))
         data_for_a_game = Game(season, gameId)
 
         home_players = data_for_a_game.get_ids_of_home_players()
         if len(home_players) < 12:
-            print("Can't get enough info for home players (WEIRD!!). Ignoring game %d" % (data_for_a_game.gameId))
+            season.alogger.info("Can't get enough info for home players (WEIRD!!). Ignoring game %d" % (data_for_a_game.gameId))
         else:
             # prediction of the lines that the 'away' team will use:
             formation = get_lines_for(season, d - datetime.timedelta(days=1), how_many_days_back=params["games_to_predict_away_lines"], team_abbrev=data_for_a_game.away_team)
             away_lines_names = formation.as_names
             away_lines = formation.as_categories
-            print(away_lines_names)
-            print(away_lines)
+            season.alogger.info(away_lines_names)
+            season.alogger.info(away_lines)
 
             # === Now we get the indices in the Q-values tables corresponding to lines
 
@@ -114,7 +118,7 @@ def get_teams_coach_performance(
             diff = data_for_a_game.recode_differential(lineShifts.iloc[iShift].differential)
             period = data_for_a_game.recode_period(lineShifts.iloc[iShift].period)
             q_values = Qvalues[period, diff, linesCode[iShift, 0], linesCode[iShift, 1]]
-            print('[diff = %d, period = %d] First shift: \n\thome team: %s, %s, %s \n\taway team: %s, %s, %s \n\tQvalue: %.2f' % (
+            season.alogger.info('[diff = %d, period = %d] First shift: \n\thome team: %s, %s, %s \n\taway team: %s, %s, %s \n\tQvalue: %.2f' % (
             diff, period, plList[0], plList[1], plList[2], plList[3], plList[4], plList[5], q_values))
 
             q_values_fetcher_from_game_data = QValuesFetcherFromGameData(game_data=data_for_a_game, lines_dict=line_dict, q_values=Qvalues)
@@ -128,9 +132,9 @@ def get_teams_coach_performance(
                 home_team_players_ids=data_for_a_game.get_ids_of_home_players(),
                 away_team_lines = away_lines,
                 examine_max_first_lines=params["optimal_examine_num_first_lines"])
-            print(home_lines_rec)
+            season.alogger.info(home_lines_rec)
 
-            print(data_for_a_game.formation_ids_to_str(home_lines_rec))
+            season.alogger.info(data_for_a_game.formation_ids_to_str(home_lines_rec))
 
             # let's examine actual decisions and how it compares with optimal:
             for data in lineShifts[['home_line', 'away_line', 'iceduration']].itertuples():
@@ -139,61 +143,28 @@ def get_teams_coach_performance(
                 num_seconds = data.iceduration
                 away_line_cats = data_for_a_game.classes_of_line(away_line)
                 if None in away_line_cats:
-                    print("Can't get category of one of away players")
+                    season.alogger.info("Can't get category of one of away players")
                 else:
                     away_line_cats = tuple(np.sort(away_line_cats))
                     if away_line_cats not in away_lines:
-                        print("%s (categories %s): no optimal calculated" % (away_line, away_line_cats))
+                        # season.alogger.debug("%s (categories %s): no optimal calculated" % (away_line, away_line_cats))
+                        seconds['unknown_adversary'] += num_seconds
                     else:
                         idx_of_away = away_lines.index(away_line_cats)
                         cats_of_optimal = data_for_a_game.classes_of_line(home_lines_rec[idx_of_away])
                         home_line_cats = data_for_a_game.classes_of_line(home_line)
                         if set(cats_of_optimal) == set(home_line_cats):
-                            seconds['good'] += num_seconds
+                            seconds['matches_optimal'] += num_seconds
                         else:
-                            seconds['bad'] += num_seconds
+                            seconds['does_not_match_optimal'] += num_seconds
     return seconds
 
 def evaluate_mtl_coach():
-    from ReinforcementLearning.NHL.playbyplay.state_space_data import HockeySS
+    common_logger = get_logger(name="common_logger", debug_log_file_name="common_logger.log")
+    evaluate_all_coaches(common_logger, season_year_begin=2012, teams_opt=['MTL'], n_games=10)
 
-    """Initialization"""
-    db_root = '/Users/luisd/dev/NHL_stats/data'
-    repoCode = '/Users/luisd/dev/NHL_stats'
-
-    repoModel = path.join(repoCode,
-                               'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
-
-    season = Season(db_root=db_root, year_begin=2012, repo_model=repoModel)
-
-    # Line translation table
-    linedict  = HockeySS(db_root)
-    linedict.make_line_dictionary()
-    linedict  = linedict.line_dictionary
-
-    # Load the Qvalues table
-    Qvalues = \
-    pickle.load(open(path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data/stable/RL_action_values.p'), 'rb'))[
-        'action_values']
-
-    # Visualize it dimensions (period x differential x away line's code x home line's code)
-    print('Q-table dimensions: ', Qvalues.shape)
-
-
-    mtl_seconds = get_teams_coach_performance(
-        season,
-        team_abbr = 'MTL',
-        maybe_a_starting_date= datetime.date(year=2013, month=3, day=13),
-        line_dict=linedict,
-        Qvalues=Qvalues,
-        how_many_games=5)
-    print(mtl_seconds)
-    if mtl_seconds["good"] == mtl_seconds["bad"] == 0:
-        print("No evidence for coach to be evaluated on.")
-    else:
-        print("Home coach's score (in [0,1]) is %d (secs. optimal) / %d (secs. total) = %.2f" % (mtl_seconds['good'], mtl_seconds['good'] + mtl_seconds['bad'], mtl_seconds['good'] / (mtl_seconds['good'] + mtl_seconds['bad'])))
-
-def evaluate_all_coaches(season_year_begin: int, teams_opt: Optional[List[str]]):
+import logging
+def evaluate_all_coaches(alogger: logging.Logger, season_year_begin: int, teams_opt: Optional[List[str]], n_games: int):
     from ReinforcementLearning.NHL.playbyplay.state_space_data import HockeySS
 
     """Initialization"""
@@ -207,7 +178,7 @@ def evaluate_all_coaches(season_year_begin: int, teams_opt: Optional[List[str]])
     repoModel = path.join(repoCode,
                                'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
 
-    season = Season(db_root=db_root, year_begin=season_year_begin, repo_model=repoModel)
+    season = Season(alogger, db_root=db_root, year_begin=season_year_begin, repo_model=repoModel)
 
     # Line translation table
     linedict  = HockeySS(db_root)
@@ -232,14 +203,21 @@ def evaluate_all_coaches(season_year_begin: int, teams_opt: Optional[List[str]])
             maybe_a_starting_date=None,
             line_dict=linedict,
             Qvalues=Qvalues,
-            how_many_games=30)
+            how_many_games=n_games)
         print(seconds)
-        if seconds["good"] == seconds["bad"] == 0:
+
+        seconds = {  # result will be stored here.
+            'does_not_match_optimal': 0,  # number of seconds the action of coach did not match the optimal
+            'matches_optimal': 0,  # number of seconds the action of coach matched the optimal
+            'unknown_adversary': 0  # number of seconds we can't determine the value of the action of coach
+        }
+
+        if seconds["does_not_match_optimal"] == seconds["matches_optimal"] == 0:
             print("[team: '%s'] No evidence for coach to be evaluated on." % (a_team))
         else:
-            total_secs = seconds['good'] + seconds['bad']
+            total_secs = seconds['matches_optimal'] + seconds['does_not_match_optimal']
             print("[team: '%s'] Home coach's score (in [0,1]) is %d (secs. optimal) / %d (secs. total) = %.2f" %
-                  (a_team, seconds['good'], total_secs, seconds['good'] / total_secs))
+                  (a_team, seconds['matches_optimal'], total_secs, seconds['matches_optimal'] / total_secs))
         file_to_save = os.path.join(base_dir, a_team + ".pkl")
         print("Saving data for '%s' in file %s" % (a_team, file_to_save))
         with open(file_to_save, 'wb') as dict_file:
@@ -260,13 +238,18 @@ def read_and_display_coaches_evals():
         extension = the_split[1]
         with open(filename, 'rb') as pkl_file:
             a_perf = pickle.load(pkl_file)
-            if a_perf['good'] == a_perf['bad'] == 0:
+            if a_perf['matches_optimal'] == a_perf['does_not_match_optimal'] == 0:
                 print("%s: %s" % (name, a_perf))
             else:
-                print("%s: %s; performance is %.2f" % (name, a_perf, a_perf['good'] / (a_perf['good'] + a_perf['bad'])))
+                print("%s: %s; performance is %.2f" % (name, a_perf, a_perf['matches_optimal'] / (a_perf['matches_optimal'] + a_perf['does_not_match_optimal'])))
 
 if __name__ == '__main__':
-    evaluate_all_coaches(season_year_begin = 2012, teams_opt=None) # ['PHX'])
+    from Utils.base import get_logger
+
+    common_logger = get_logger(name="common_logger", debug_log_file_name="common_logger.log")
+    print("Debug will be written in {}".format(common_logger.handlers[1].baseFilename))
+
+    evaluate_all_coaches(common_logger, season_year_begin = 2012, teams_opt=['MTL'], n_games=2) # 10) # ['PHX'])
     # read_and_display_coaches_evals()
     # import cProfile
     # cProfile.run('evaluate_mtl_coach()', '/tmp/restats')
