@@ -50,6 +50,7 @@ class LineRecommender(object):
                  for period_diff in all_period_diffs])
 
         assert len(home_team_players_ids) == len(set(home_team_players_ids)), "There are repeated ids in the home team"
+        assert len(home_team_players_ids) >= 12, "Only %d players available for home team" % (len(home_team_players_ids))
         assert len(away_team_lines) == 4, "I need a formation (ie, 4 lines) for away team"
 
         away_line_1, away_line_2, away_line_3, away_line_4 = away_team_lines
