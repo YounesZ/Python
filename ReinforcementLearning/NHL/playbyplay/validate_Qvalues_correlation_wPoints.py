@@ -1,7 +1,7 @@
 from Utils.base import get_git_root
 from ReinforcementLearning.NHL.playerstats.nhl_player_stats import *
 from ReinforcementLearning.NHL.playbyplay.game import *
-
+from ReinforcementLearning.NHL.config import Config
 
 def get_game_id(home_team_abbr, date_as_str):
     """
@@ -74,7 +74,7 @@ def get_model(repoModel):
 # === Set pointers
 # Pointers to the data
 repoCode    =   get_git_root()
-db_root     =   '/home/younesz/Documents/Databases/Hockey'        #This is the location of the Hockey database
+db_root = Config().data_dir #This is the location of the Hockey database
 # db_root     =   '/Users/younes_zerouali/Documents/Stradigi/Databases/Hockey'
 # db_root     =   '/Users/luisd/dev/NHL_stats/data'
 repoPbP     =   path.join(db_root, 'PlayByPlay')

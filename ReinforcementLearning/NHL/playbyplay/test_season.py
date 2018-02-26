@@ -5,14 +5,14 @@ from os import path
 from Utils.base import get_git_root
 from ReinforcementLearning.NHL.playbyplay.season import Season
 from ReinforcementLearning.NHL.playbyplay.game import Game
-
+from ReinforcementLearning.NHL.config import Config
 
 class TestSeason(unittest.TestCase):
     """Testing definitions of Season's."""
 
     def setUp(self):
         """Initialization"""
-        self.db_root = '/Users/luisd/dev/NHL_stats/data'
+        self.db_root = Config().data_dir
         self.repoCode = get_git_root()
         self.repoModel = path.join(self.repoCode,
                               'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
