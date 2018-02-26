@@ -1,6 +1,7 @@
 # backups
 *~
 .ipynb_checkpoints/
+**/checkpoint
 
 # Idea stuff
 .idea/

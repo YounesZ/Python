@@ -1,2 +1,0 @@
-model_checkpoint_path: "/Users/luisd/dev/NHL_stats/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu/MODEL_perceptron_1layer_10units_relu"
-all_model_checkpoint_paths: "/Users/luisd/dev/NHL_stats/ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu/MODEL_perceptron_1layer_10units_relu"
