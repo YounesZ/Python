@@ -4,41 +4,7 @@ number of points a team gets for a given season/set of games
 """
 
 # ==== FIRST    :   IMPORT MODULES
-import pickle
-import numpy as np
-from os import path, makedirs
-from shutil import copyfile
-from Utils.programming.ut_find_folders import *
-from Utils.programming.ut_clone_directory import  *
-from ReinforcementLearning.NHL.playbyplay.state_space_data import HockeySS
-from ReinforcementLearning.NHL.playerstats.nhl_player_stats import do_ANN_training, do_clustering_multiyear, PlayerStatsFetcher
-from ReinforcementLearning.NHL.playbyplay.game import Game
-from ReinforcementLearning.NHL.playbyplay.season import Season
-
-
-def get_players_classes(repoModel, data_for_game, preprocessing, classifier, number_of_games):
-    """
-    Calculates (dataframe with) all player's classes.
-    Updates the 'data for game' structure with it; also returns it.
-    Usage:
-        repoModel = ... # here goes the directory where your model is saved.
-        # Montreal received Ottawa on march 13, 2013
-        gameId = get_game_id(home_team_abbr='MTL', date_as_str='2013-03-13')
-        season      =   '20122013'
-        mtlott      =   Game(repoPbP, repoPSt, season, gameId=gameId )
-        #
-        players_classes = get_players_classes(repoModel, mtlott, number_of_games=30)
-        # this is equivalent to ask 'mtlott' for the data; so:
-        assert players_classes.equals(mtlott.player_classes)
-    """
-    # Pick players stats - last 'n' games
-    data_for_game.pull_line_shifts(team='both', minduration=20)
-    data_for_game.pick_regulartime()
-    data_for_game.pick_equalstrength()
-    data_for_game.pull_players_classes(preprocessing, classifier, nGames=number_of_games)
-    return data_for_game
-
-
+from os import path
 
 # ==== NEXT     :   SET POINTERS
 root        =   '/Users/younes_zerouali/Documents/Stradigi'
@@ -50,6 +16,18 @@ repoCode    =   path.join(root, 'Code', 'NHL_stats_SL')
 repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
 
 """
+import pickle
+import numpy as np
+from os import path, makedirs
+from shutil import copyfile
+from Utils.programming.ut_find_folders import *
+from Utils.programming.ut_clone_directory import  *
+
+from ReinforcementLearning.NHL.playbyplay.state_space_data import HockeySS
+from ReinforcementLearning.NHL.playerstats.nhl_player_stats import do_ANN_training, do_clustering_multiyear, PlayerStatsFetcher
+from ReinforcementLearning.NHL.playbyplay.game import Game
+from ReinforcementLearning.NHL.playbyplay.season import Season
+
 # ==== NEXT     :   LOOP ON SEASONS, LEAVE-ONE-OUT
 seasons     =   ut_find_folders( path.join(root_db, 'PlayByPlay'), True )
 print('*** LAUNCHED predictive analysis\n')
@@ -108,7 +86,8 @@ for iSea in seasons:
 
         # Get game data
         gameData    =   loo_sea.pick_game(iG)
-        gameData    =   get_players_classes(repoModel, gameData, preprocessing, classifier, 30)
+        gameData = Game(season=loo_sea, gameId=iG)
+        # gameData    =   get_players_classes(repoModel, gameData, preprocessing, classifier, 30)
 
         # Get game score
         homeTeam    =   HSS.games_lst.iloc[iG]['hometeam']
