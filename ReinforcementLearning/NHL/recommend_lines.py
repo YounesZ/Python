@@ -34,6 +34,7 @@ from ReinforcementLearning.NHL.lines.category import CategoryFetcher
 from ReinforcementLearning.NHL.lines.valuation import QValuesFetcherFromGameData
 from ReinforcementLearning.NHL.lines.recommender import LineRecommender
 from ReinforcementLearning.NHL.playbyplay.game import Game, get_lines_for
+from ReinforcementLearning.NHL.config import Config
 
 
 def get_teams_coach_performance(
@@ -172,8 +173,11 @@ def evaluate_all_coaches(alogger: logging.Logger, season_year_begin: int, teams_
     import os
     base_dir = "~/data/hockey/coaches_perf"
     os.makedirs(base_dir, exist_ok=True)
+    my_config=Config()
+    print("Data configured to be in '%s'" % (my_config.data_dir))
 
-    db_root = '/Users/luisd/dev/NHL_stats/data'
+
+    db_root = my_config.data_dir
     repoCode = get_git_root()
 
     repoModel = path.join(repoCode,
