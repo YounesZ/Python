@@ -1,3 +1,4 @@
+from Utils.base import get_git_root
 from ReinforcementLearning.NHL.playerstats.nhl_player_stats import *
 from ReinforcementLearning.NHL.playbyplay.game import *
 
@@ -72,9 +73,7 @@ def get_model(repoModel):
 # ========
 # === Set pointers
 # Pointers to the data
-# repoCode    =   '/Users/younes_zerouali/Documents/Stradigi/Code/NHL_stats_SL'
-# repoCode    =   '/Users/luisd/dev/NHL_stats'
-repoCode    =   '/home/younesz/Documents/Code/NHL_stats_SL'
+repoCode    =   get_git_root()
 db_root     =   '/home/younesz/Documents/Databases/Hockey'        #This is the location of the Hockey database
 # db_root     =   '/Users/younes_zerouali/Documents/Stradigi/Databases/Hockey'
 # db_root     =   '/Users/luisd/dev/NHL_stats/data'

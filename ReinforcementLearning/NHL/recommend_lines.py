@@ -27,6 +27,7 @@ from os import path
 import numpy as np
 
 from typing import Optional, List
+from Utils.base import get_git_root
 from ReinforcementLearning.NHL.playbyplay.season import Season
 from ReinforcementLearning.NHL.player.player_type import PlayerType
 from ReinforcementLearning.NHL.lines.category import CategoryFetcher
@@ -173,7 +174,7 @@ def evaluate_all_coaches(alogger: logging.Logger, season_year_begin: int, teams_
     os.makedirs(base_dir, exist_ok=True)
 
     db_root = '/Users/luisd/dev/NHL_stats/data'
-    repoCode = '/Users/luisd/dev/NHL_stats'
+    repoCode = get_git_root()
 
     repoModel = path.join(repoCode,
                                'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')

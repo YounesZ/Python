@@ -2,6 +2,7 @@ import unittest
 import datetime
 from random import randint
 from os import path
+from Utils.base import get_git_root
 from ReinforcementLearning.NHL.playbyplay.season import Season
 from ReinforcementLearning.NHL.playbyplay.game import Game
 
@@ -12,7 +13,7 @@ class TestSeason(unittest.TestCase):
     def setUp(self):
         """Initialization"""
         self.db_root = '/Users/luisd/dev/NHL_stats/data'
-        self.repoCode = '/Users/luisd/dev/NHL_stats'
+        self.repoCode = get_git_root()
         self.repoModel = path.join(self.repoCode,
                               'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
         self.season = Season(db_root=self.db_root, repo_model=self.repoModel, year_begin=2012)  # Season.from_year_begin(2012) # '20122013'
