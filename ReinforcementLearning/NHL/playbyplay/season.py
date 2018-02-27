@@ -101,13 +101,16 @@ class Season:
         r = games['gameId'].values.astype('str')
         return set(map(lambda f_v: int(f_v[5:]), r))
 
-    def get_lines_for(self, base_date: datetime.date, how_many_days_back: int, team_abbrev: str) -> Formation:
+    def get_lines_for(self, base_date: datetime.date, how_many_games_back: int, team_abbrev: str) -> Optional[Formation]:
         """prediction of the lines that the 'away' team will use."""
         from ReinforcementLearning.NHL.playbyplay.game import Game
 
-        assert (how_many_days_back >= 0)
+        assert (how_many_games_back >= 0)
         assert (team_abbrev in self.get_teams())
-        ids = self.get_last_n_away_games_since(base_date, n=how_many_days_back, team_abbrev=team_abbrev)
+        ids = self.get_last_n_away_games_since(base_date, n=how_many_games_back, team_abbrev=team_abbrev)
+        if len(ids) == 0:
+            self.alogger.debug("I couldn't find %d games away for %s before %s" % (how_many_games_back, team_abbrev, base_date))
+            return None
         lines_dict = {}
         for game_id in ids:
             entry_timestamp = datetime.datetime.now().timestamp()
