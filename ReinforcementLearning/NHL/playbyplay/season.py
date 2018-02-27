@@ -1,11 +1,13 @@
 import pickle
 import datetime
 import logging
-
+import collections
 from os import path
 from typing import Tuple, Optional, Set
 
 from ReinforcementLearning.NHL.playbyplay.players import get_model_and_classifier_from
+
+Formation = collections.namedtuple('Formation', 'as_names as_categories')
 
 class Season:
     """Encapsulates all elements for a season."""
@@ -35,7 +37,7 @@ class Season:
         self.games_info = self.games_info[
             (self.games_info['gameDate'] >= ('%d-09-01' % (self.year_begin))) & (self.games_info['gameDate'] <= ('%d-07-01' % (self.year_end)))] # take games only for this season
         self.games_info = self.games_info.sort_values(by=['gameDate'], ascending=False)
-
+        self.away_lines_per_game = {}
 
     def __strip_game_id__(self, game_id_as_str: str) -> str:
         "A game id of 23456 for year 2012 will be shown as '2012023456'. This function strips it."
@@ -99,6 +101,51 @@ class Season:
         r = games['gameId'].values.astype('str')
         return set(map(lambda f_v: int(f_v[5:]), r))
 
+    def get_lines_for(self, base_date: datetime.date, how_many_days_back: int, team_abbrev: str) -> Formation:
+        """prediction of the lines that the 'away' team will use."""
+        from ReinforcementLearning.NHL.playbyplay.game import Game
+
+        assert (how_many_days_back >= 0)
+        assert (team_abbrev in self.get_teams())
+        ids = self.get_last_n_away_games_since(base_date, n=how_many_days_back, team_abbrev=team_abbrev)
+        lines_dict = {}
+        for game_id in ids:
+            entry_timestamp = datetime.datetime.now().timestamp()
+            self.alogger.info("Processing game %d" % (game_id))
+            if game_id in self.away_lines_per_game:
+                self.alogger.debug(" => game cached")
+                (g, result_as_list) = self.away_lines_per_game[game_id]
+            else:
+                g = Game(self, gameId=game_id)
+                result_as_list = g.get_away_lines()
+                self.away_lines_per_game[game_id] = (g, result_as_list)
+            time_it_took = datetime.datetime.now().timestamp() - entry_timestamp
+            self.alogger.debug("Fetching away lines took %.2f secs." % (time_it_took))
+            for line_as_ids, line_as_types, secs_played in result_as_list:
+                line_as_ids = tuple(map(g.player_id_to_name, line_as_ids))
+                if line_as_ids in lines_dict:
+                    # update number of seconds played
+                    lines_dict[line_as_ids] = (line_as_types, lines_dict[line_as_ids][1] + secs_played)
+                else:
+                    # seed entry in dictionary
+                    lines_dict[line_as_ids] = (line_as_types, secs_played)
+        self.alogger.info("DONE")
+
+        # for k, v in lines_dict.items():
+        #     self.season.alogger.info(k, v)
+        # ok, now sort by seconds played, keep top 4:
+        flat_list = list(map(lambda x: (x[0], x[1][0], x[1][1]), lines_dict.items()))
+        result_as_list = sorted(flat_list, key=lambda x: x[2], reverse=True)
+        self.alogger.info("%d lines used consistently" % (len(result_as_list)))
+        for a_line, a_cat, num_secs in result_as_list:
+            self.alogger.info("%s played %.2f secs" % (a_line, num_secs))
+        top_4_as_list = result_as_list[:4]
+        self.alogger.info("Keeping top 4:")
+        for a_line, a_cat, num_secs in top_4_as_list:
+            self.alogger.info("%s played %.2f secs" % (a_line, num_secs))
+        away_lines_names = list(map(lambda x: x[0], top_4_as_list))  # as names
+        away_lines = list(map(lambda x: x[1], top_4_as_list))  # as categories
+        return Formation(as_names=away_lines_names, as_categories=away_lines)
 
     def __str__(self):
         return "Season %d-%d" % (self.year_begin, self.year_end)
