@@ -1,5 +1,7 @@
 from ReinforcementLearning.NHL.playbyplay.state_space_data import *
 from ReinforcementLearning.NHL.playbyplay.game import Game
+from Utils.base import get_logger, get_git_root
+from ReinforcementLearning.NHL.config import Config
 
 # =======================
 # ==== FIRST SET POINTERS
@@ -7,8 +9,8 @@ from ReinforcementLearning.NHL.playbyplay.game import Game
 # Pointers to the data
 # repoCode    =   '/Users/younes_zerouali/Documents/Stradigi/Code/NHL_stats_SL'
 # repoCode    =   '/Users/luisd/dev/NHL_stats'
-repoCode    =   '/home/younesz/Documents/Code/NHL_stats_SL'
-db_root     =   '/home/younesz/Documents/Databases/Hockey'        #This is the location of the Hockey database
+repoCode    =   get_git_root()
+db_root     =   Config().data_dir        #This is the location of the Hockey database
 # db_root     =   '/Users/younes_zerouali/Documents/Stradigi/Databases/Hockey'
 # db_root     =   '/Users/luisd/dev/NHL_stats/data'
 repoPbP     =   path.join(db_root, 'PlayByPlay')
@@ -17,6 +19,8 @@ repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVS
 repoModel   =   path.join(repoCode, 'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
 repoSave    =   None #path.join(repoCode, 'ReinforcementLearning/NHL/playbyplay/data')
 
+a_logger = get_logger(name="a_logger", debug_log_file_name="/tmp/a_logger.log")
+print("Debug will be written in {}".format(a_logger.handlers[1].baseFilename))
 
 # =======================
 # ==== RETRIEVE INFOS
@@ -31,12 +35,12 @@ for iS in seasons:
 
     print('\tAnalysing season %s (%i/%i): ' % (iS, seasons.index(iS) + 1, len(seasons)))
     # List all games
-    iSea    =   Season(db_root, repo_model=repoModel, year_begin=int(iS.replace('Season_','')[:4]) )
-    games   =   iSea.games_id
+    iSea    =   Season(a_logger, db_root, repo_model=repoModel, year_begin=int(iS.replace('Season_','')[:4]) )
 
     # Loop on games
     count   =   0
-    for iG in games['gcode']:
+    num_games = len(iSea.games_info)
+    for iG in iSea.games_info['gcode']:
 
         # pull data
         iGame = Game(iSea, gameId=iG)
@@ -55,7 +59,7 @@ for iS in seasons:
         if count % 50 == 0:
             # the exact output you're looking for:
             stdout.write("Game %i/%i: [%-40s] %d%%, completed" % (
-            count, len(games), '=' * int(count / len(games) * 40), 100 * count / len(games)))
+            count, num_games, '=' * int(count / num_games * 40), 100 * count / num_games))
             stdout.flush()
 
     print('done\n')

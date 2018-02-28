@@ -1,11 +1,12 @@
 import unittest
 import datetime
-from random import randint
+from random import randint, choice
 from os import path
 from Utils.base import get_git_root
 from ReinforcementLearning.NHL.playbyplay.season import Season
 from ReinforcementLearning.NHL.playbyplay.game import Game
 from ReinforcementLearning.NHL.config import Config
+from ReinforcementLearning.NHL.playbyplay import global_logger
 
 class TestSeason(unittest.TestCase):
     """Testing definitions of Season's."""
@@ -16,7 +17,44 @@ class TestSeason(unittest.TestCase):
         self.repoCode = get_git_root()
         self.repoModel = path.join(self.repoCode,
                               'ReinforcementLearning/NHL/playerstats/offVSdef/Automatic_classification/MODEL_perceptron_1layer_10units_relu')
-        self.season = Season(db_root=self.db_root, repo_model=self.repoModel, year_begin=2012)  # Season.from_year_begin(2012) # '20122013'
+        # self.season = Season(global_logger, db_root=self.db_root, repo_model=self.repoModel, year_begin=2012)
+
+    def test_games_before_january_2012(self):
+        """Can I fetch games for home teams on the months October-December of a season?"""
+        year_begin = 2012
+        for _ in range(10): # number of time to do the test
+            # year_begin = randint(2005, 2014)
+            season = Season(global_logger, db_root=self.db_root, repo_model=self.repoModel, year_begin=year_begin)
+            home_team = choice(list(season.get_teams()))
+            the_month=randint(11,12) # in 2012, we only had games after November.
+            the_day=randint(15,30)
+            base_date=datetime.date(year=season.year_begin, month=the_month, day=the_day)
+            delta_in_days = randint(20, 40) # let's make this large enough for a game to always exist.
+            # print("[base: %s] Trying to fetch games for '%s', up until %d days before" % (base_date, home_team, delta_in_days))
+            result = season.get_game_at_or_just_before(game_date=base_date, home_team_abbr=home_team, delta_in_days=delta_in_days)
+            if result is None:
+                season.get_game_at_or_just_before(game_date=base_date, home_team_abbr=home_team,
+                                                  delta_in_days=delta_in_days)
+            self.assertIsNotNone(result, "[%s] Impossible to find a game for '%s' up to %d days before %s" % (season, home_team, delta_in_days, base_date))
+
+
+    def test_games_before_january_not_2012(self):
+        """Can I fetch games for home teams on the months October-December of a season?"""
+        for _ in range(20): # number of time to do the test
+            year_begin = choice(list(set(range(2005, 2014)) - { 2012 }))
+            # year_begin = randint(2005, 2014)
+            season = Season(global_logger, db_root=self.db_root, repo_model=self.repoModel, year_begin=year_begin)
+            home_team = choice(list(season.get_teams()))
+            the_month=randint(10,12)
+            the_day=randint(15,30)
+            base_date=datetime.date(year=season.year_begin, month=the_month, day=the_day)
+            delta_in_days = randint(20, 40) # let's make this large enough for a game to always exist.
+            # print("[base: %s] Trying to fetch games for '%s', up until %d days before" % (base_date, home_team, delta_in_days))
+            result = season.get_game_at_or_just_before(game_date=base_date, home_team_abbr=home_team, delta_in_days=delta_in_days)
+            if result is None:
+                season.get_game_at_or_just_before(game_date=base_date, home_team_abbr=home_team,
+                                                  delta_in_days=delta_in_days)
+            self.assertIsNotNone(result, "[%s] Impossible to find a game for '%s' up to %d days before %s" % (season, home_team, delta_in_days, base_date))
 
     def test_consistency(self):
         """Is there something weird with 'season'?"""
@@ -28,7 +66,7 @@ class TestSeason(unittest.TestCase):
             delta_in_days = randint(20, 40) # let's make this large enough for a game to always exist.
             print("[base: %s] Trying to fetch games for '%s', up until %d days before" % (base_date, home_team, delta_in_days))
             result = self.season.get_game_at_or_just_before(game_date=base_date, home_team_abbr=home_team, delta_in_days=delta_in_days)
-            self.assertIsNotNone(result)
+            self.assertIsNotNone(result, "Impossible to find a game for '%s' up to %d days before %s" % (home_team, delta_in_days, base_date))
             game_id, d = result
             # ok. Now get game:
             the_game = Game(self.season, gameId=game_id)

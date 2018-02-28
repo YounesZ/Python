@@ -2,6 +2,7 @@ import pickle
 import datetime
 import logging
 import collections
+import pandas as pd
 from os import path
 from typing import Tuple, Optional, Set
 
@@ -22,7 +23,6 @@ class Season:
         # Need to load the data pre-processing variables
         self.preprocessing, self.classifier = get_model_and_classifier_from(self.repo_model)
 
-
         # List games and load season data
         self.repoPbP    =   path.join(self.db_root, 'PlayByPlay')
         self.repoPSt    =   path.join(self.db_root, "PlayerStats", "player")
@@ -30,22 +30,41 @@ class Season:
         dataPath        =   path.join(self.repoPbP, 'Season_%d%d' % (self.year_begin, self.year_end),'converted_data.p')
         self.dataFrames =   pickle.load(open(dataPath, 'rb'))
         # Get game IDs
-        self.games_id   =   self.dataFrames['playbyplay'].\
-            drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
+        # Getting rid of this because 'games_info' is giving the sme information - but with potentially different
+        # values on the names of the teams.
+        # Should have gotten rid of this code (because we can get it back from github if need be). TODO: do it!
+        # self.games_id   =   self.dataFrames['playbyplay'].\
+        #     drop_duplicates(subset=['season', 'gcode'], keep='first')[['season', 'gcode', 'refdate', 'hometeam', 'awayteam']]
         #
         self.games_info = pickle.load(open(path.join(self.db_root, 'processed', 'gamesInfo.p'), 'rb'))
+
         self.games_info = self.games_info[
             (self.games_info['gameDate'] >= ('%d-09-01' % (self.year_begin))) & (self.games_info['gameDate'] <= ('%d-07-01' % (self.year_end)))] # take games only for this season
+        # add 'gcode'
+        self.games_info['gcode'] = pd.Series(list(map(self.__strip_game_id__, self.games_info["gameId"].values)), index=self.games_info.index)
+        # add season id
+        self.games_info['season'] = '%d%d' % (self.year_begin, self.year_end)
         self.games_info = self.games_info.sort_values(by=['gameDate'], ascending=False)
         self.away_lines_per_game = {}
+        # # internal sanity check: are the teams on both structures the same?
+        # teams_on_games_id = set(self.games_id.hometeam.unique())
+        # teams_on_games_info = set(self.games_info.teamAbbrev.unique())
+        # do_fail = False
+        # extra_on_games_id = teams_on_games_id - teams_on_games_info
+        # extra_on_games_info = teams_on_games_info - teams_on_games_id
+        # if len(extra_on_games_id) > 0:
+        #     self.alogger.error("Teams '%s' are on games_id but not on games_info" % (extra_on_games_id))
+        # if len(extra_on_games_info) > 0:
+        #     self.alogger.error("Teams '%s' are on games_info but not on games_id" % (extra_on_games_info))
+        # assert len(extra_on_games_id) == 0 and len(extra_on_games_info)
 
     def __strip_game_id__(self, game_id_as_str: str) -> str:
         "A game id of 23456 for year 2012 will be shown as '2012023456'. This function strips it."
-        return game_id_as_str[5:]
+        return str(game_id_as_str)[5:]
 
     def get_teams(self) -> Set[str]:
         """Teams that played in this season."""
-        return set(self.games_id.hometeam.unique())
+        return set(self.games_info.teamAbbrev.unique())
 
     def get_game_at_or_just_before(self, game_date: datetime.date, home_team_abbr: str, delta_in_days: int = 3) -> Optional[Tuple[int, datetime.date]]:
         """
@@ -65,6 +84,8 @@ class Season:
                 (self.games_info['gameDate'] <= date_as_str) &
                 (self.games_info['gameDate'] >= earliest_date_as_str) &
                 (self.games_info['teamAbbrev'] == home_team_abbr)]
+            if (len(gameInfo) == 0):
+                self.alogger.info("No games found with current settings.")
             # I should have 1 id per row, without repetitions:
             assert len(gameInfo["gameId"].unique()) == len(gameInfo.index)
             gameInfo = gameInfo.head(1)
@@ -74,7 +95,7 @@ class Season:
             gameId = int(gameId.values.astype('str')[0][5:])
             return (gameId, top_game_date)
         except Exception as e:
-            # TODO: write in log e.get_message()
+            self.alogger.error(e)
             return None
 
     def get_game_id(self, home_team_abbr: str, game_date: datetime.date) -> int:
