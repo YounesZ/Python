@@ -24,7 +24,7 @@ class HockeySS:
         games_lst       =   pd.DataFrame()
         for iy in self.seasons:
             iSea        =   Season( self.db_root, int(iy.replace('Season_', '')[:4]) )
-            games_lst   =   pd.concat( (games_lst, iSea.games_id), axis=0 )
+            games_lst   =   pd.concat( (games_lst, iSea.games_info), axis=0 )
         self.games_lst  =   games_lst
 
 
