@@ -1,0 +1,2 @@
+model_checkpoint_path: "MODEL_perceptron_1layer_10units_relu"
+all_model_checkpoint_paths: "MODEL_perceptron_1layer_10units_relu"

@@ -1,0 +1,651 @@
+2017-10-28 22:12:32.385111
+[Okay] Retrieved HTML data from: https://www.kijiji.ca/b-autos-camions/grand-montreal/2014__/c174l80002a68?kilometres=__50000&boite-de-vitesse=2
+
+2017-10-28 22:13:59.693996
+[Okay] Retrieved HTML data from: https://www.kijiji.ca/b-autos-camions/grand-montreal/2014__/c174l80002a68?kilometres=__50000&boite-de-vitesse=2
+
+2017-10-28 22:14:52.963028
+[Okay] Retrieved HTML data from: http://www.kijiji.ca/b-cars-trucks/calgary/convertible__coupe__hatchback__other+body+type__sedan__wagon-mazda-mx5miata/c174l1700199a138a54a1000054
+
+2017-10-28 23:04:18.616949
+[Okay] Retrieved HTML data from: https://www.kijiji.ca/b-autos-camions/grand-montreal/2014__/page-2/c174l80002a68?kilometres=__50000&boite-de-vitesse=2
+
+2017-10-28 23:04:18.968835
+[Okay] New ad found! Ad id: 1308865893
+
+2017-10-28 23:04:18.974157
+[Okay] New ad found! Ad id: 1308868267
+
+2017-10-28 23:04:18.978772
+[Okay] New ad found! Ad id: 1308864834
+
+2017-10-28 23:04:18.984143
+[Okay] New ad found! Ad id: 1308865278
+
+2017-10-28 23:04:18.989835
+[Okay] New ad found! Ad id: 1308865280
+
+2017-10-28 23:04:18.995200
+[Okay] New ad found! Ad id: 1308857857
+
+2017-10-28 23:04:19.000983
+[Okay] New ad found! Ad id: 1308844948
+
+2017-10-28 23:04:19.007150
+[Okay] New ad found! Ad id: 1308844994
+
+2017-10-28 23:04:19.012579
+[Okay] New ad found! Ad id: 1308779452
+
+2017-10-28 23:04:19.017166
+[Okay] New ad found! Ad id: 1308846504
+
+2017-10-28 23:04:19.021986
+[Okay] New ad found! Ad id: 1308848150
+
+2017-10-28 23:04:19.027484
+[Okay] New ad found! Ad id: 1308844831
+
+2017-10-28 23:04:19.033107
+[Okay] New ad found! Ad id: 1308844830
+
+2017-10-28 23:04:19.038417
+[Okay] New ad found! Ad id: 1308846480
+
+2017-10-28 23:04:19.044437
+[Okay] New ad found! Ad id: 1308846435
+
+2017-10-28 23:04:19.049783
+[Okay] New ad found! Ad id: 1308846478
+
+2017-10-28 23:04:19.054667
+[Okay] New ad found! Ad id: 1308846095
+
+2017-10-28 23:04:19.060294
+[Okay] New ad found! Ad id: 1308845709
+
+2017-10-28 23:04:19.066512
+[Okay] New ad found! Ad id: 1308845014
+
+2017-10-28 23:04:19.074509
+[Okay] New ad found! Ad id: 1308845015
+
+2017-10-28 23:04:19.079673
+[Okay] Ad 1308865893 written to database.
+
+2017-10-28 23:04:19.079814
+[Okay] Ad 1308868267 written to database.
+
+2017-10-28 23:04:19.079960
+[Okay] Ad 1308864834 written to database.
+
+2017-10-28 23:04:19.080106
+[Okay] Ad 1308865278 written to database.
+
+2017-10-28 23:04:19.080251
+[Okay] Ad 1308865280 written to database.
+
+2017-10-28 23:04:19.080392
+[Okay] Ad 1308857857 written to database.
+
+2017-10-28 23:04:19.080538
+[Okay] Ad 1308844948 written to database.
+
+2017-10-28 23:04:19.080684
+[Okay] Ad 1308844994 written to database.
+
+2017-10-28 23:04:19.080829
+[Okay] Ad 1308779452 written to database.
+
+2017-10-28 23:04:19.080983
+[Okay] Ad 1308846504 written to database.
+
+2017-10-28 23:04:19.081135
+[Okay] Ad 1308848150 written to database.
+
+2017-10-28 23:04:19.081290
+[Okay] Ad 1308844831 written to database.
+
+2017-10-28 23:04:19.081497
+[Okay] Ad 1308844830 written to database.
+
+2017-10-28 23:04:19.081637
+[Okay] Ad 1308846480 written to database.
+
+2017-10-28 23:04:19.081798
+[Okay] Ad 1308846435 written to database.
+
+2017-10-28 23:04:19.081933
+[Okay] Ad 1308846478 written to database.
+
+2017-10-28 23:04:19.082067
+[Okay] Ad 1308846095 written to database.
+
+2017-10-28 23:04:19.082204
+[Okay] Ad 1308845709 written to database.
+
+2017-10-28 23:04:19.082341
+[Okay] Ad 1308845014 written to database.
+
+2017-10-28 23:04:19.082479
+[Okay] Ad 1308845015 written to database.
+
+2017-10-28 23:04:19.085220
+[Okay] Database succesfully reloaded.
+
+2017-10-28 23:20:42.705164
+[Okay] Retrieved HTML data from: https://www.kijiji.ca/b-autos-camions/grand-montreal/2014__/page-2/c174l80002a68?kilometres=__50000&boite-de-vitesse=2
+
+2017-10-28 23:20:43.030309
+[Okay] New ad found! Ad id: 1308865893
+
+2017-10-28 23:20:43.035604
+[Okay] New ad found! Ad id: 1308868267
+
+2017-10-28 23:20:43.040148
+[Okay] New ad found! Ad id: 1308864834
+
+2017-10-28 23:20:43.045134
+[Okay] New ad found! Ad id: 1308865278
+
+2017-10-28 23:20:43.050788
+[Okay] New ad found! Ad id: 1308865280
+
+2017-10-28 23:20:43.056146
+[Okay] New ad found! Ad id: 1308857857
+
+2017-10-28 23:20:43.061265
+[Okay] New ad found! Ad id: 1308844948
+
+2017-10-28 23:20:43.067334
+[Okay] New ad found! Ad id: 1308844994
+
+2017-10-28 23:20:43.072754
+[Okay] New ad found! Ad id: 1308779452
+
+2017-10-28 23:20:43.077514
+[Okay] New ad found! Ad id: 1308846504
+
+2017-10-28 23:20:43.082343
+[Okay] New ad found! Ad id: 1308848150
+
+2017-10-28 23:20:43.088949
+[Okay] New ad found! Ad id: 1308844831
+
+2017-10-28 23:20:43.094800
+[Okay] New ad found! Ad id: 1308844830
+
+2017-10-28 23:20:43.100195
+[Okay] New ad found! Ad id: 1308846480
+
+2017-10-28 23:20:43.104809
+[Okay] New ad found! Ad id: 1308846478
+
+2017-10-28 23:20:43.109413
+[Okay] New ad found! Ad id: 1308846435
+
+2017-10-28 23:20:43.114294
+[Okay] New ad found! Ad id: 1308846095
+
+2017-10-28 23:20:43.119931
+[Okay] New ad found! Ad id: 1308845709
+
+2017-10-28 23:20:43.126780
+[Okay] New ad found! Ad id: 1308845014
+
+2017-10-28 23:20:43.133160
+[Okay] New ad found! Ad id: 1308845015
+
+2017-10-28 23:20:43.138000
+[Error] Unable to write ad(s) to database.
+
+2017-10-28 23:20:43.141455
+[Okay] Database succesfully reloaded.
+
+2017-10-28 23:21:53.838316
+[Okay] Retrieved HTML data from: https://www.kijiji.ca/b-autos-camions/grand-montreal/2014__/page-2/c174l80002a68?kilometres=__50000&boite-de-vitesse=2
+
+2017-10-28 23:21:54.185015
+[Okay] New ad found! Ad id: 1308865893
+
+2017-10-28 23:21:54.191647
+[Okay] New ad found! Ad id: 1308868267
+
+2017-10-28 23:21:54.197078
+[Okay] New ad found! Ad id: 1308864834
+
+2017-10-28 23:21:54.202333
+[Okay] New ad found! Ad id: 1308865278
+
+2017-10-28 23:21:54.208166
+[Okay] New ad found! Ad id: 1308865280
+
+2017-10-28 23:21:54.217699
+[Okay] New ad found! Ad id: 1308857857
+
+2017-10-28 23:21:54.223344
+[Okay] New ad found! Ad id: 1308844948
+
+2017-10-28 23:21:54.229870
+[Okay] New ad found! Ad id: 1308844994
+
+2017-10-28 23:21:54.235590
+[Okay] New ad found! Ad id: 1308779452
+
+2017-10-28 23:21:54.244569
+[Okay] New ad found! Ad id: 1308846504
+
+2017-10-28 23:21:54.251515
+[Okay] New ad found! Ad id: 1308848150
+
+2017-10-28 23:21:54.257364
+[Okay] New ad found! Ad id: 1308844831
+
+2017-10-28 23:21:54.263764
+[Okay] New ad found! Ad id: 1308844830
+
+2017-10-28 23:21:54.269578
+[Okay] New ad found! Ad id: 1308846480
+
+2017-10-28 23:21:54.274408
+[Okay] New ad found! Ad id: 1308846435
+
+2017-10-28 23:21:54.282513
+[Okay] New ad found! Ad id: 1308846478
+
+2017-10-28 23:21:54.293589
+[Okay] New ad found! Ad id: 1308846095
+
+2017-10-28 23:21:54.299560
+[Okay] New ad found! Ad id: 1308845709
+
+2017-10-28 23:21:54.306785
+[Okay] New ad found! Ad id: 1308845014
+
+2017-10-28 23:21:54.313478
+[Okay] New ad found! Ad id: 1308845015
+
+2017-10-28 23:21:54.318802
+[Error] Unable to write ad(s) to database.
+
+2017-10-28 23:21:54.321545
+[Okay] Database succesfully reloaded.
+
+2017-10-28 23:39:29.072897
+[Okay] Retrieved HTML data from: https://www.kijiji.ca/b-autos-camions/grand-montreal/2014__/page-2/c174l80002a68?kilometres=__50000&boite-de-vitesse=2
+
+2017-10-28 23:39:29.420219
+[Okay] New ad found! Ad id: 1308865893
+
+2017-10-28 23:39:29.425516
+[Okay] New ad found! Ad id: 1308868267
+
+2017-10-28 23:39:29.430103
+[Okay] New ad found! Ad id: 1308864834
+
+2017-10-28 23:39:29.435210
+[Okay] New ad found! Ad id: 1308865278
+
+2017-10-28 23:39:29.442148
+[Okay] New ad found! Ad id: 1308865280
+
+2017-10-28 23:39:29.448778
+[Okay] New ad found! Ad id: 1308857857
+
+2017-10-28 23:39:29.454153
+[Okay] New ad found! Ad id: 1308844948
+
+2017-10-28 23:39:29.460339
+[Okay] New ad found! Ad id: 1308844994
+
+2017-10-28 23:39:29.465759
+[Okay] New ad found! Ad id: 1308779452
+
+2017-10-28 23:39:29.471736
+[Okay] New ad found! Ad id: 1308846504
+
+2017-10-28 23:39:29.477310
+[Okay] New ad found! Ad id: 1308848150
+
+2017-10-28 23:39:29.482978
+[Okay] New ad found! Ad id: 1308844831
+
+2017-10-28 23:39:29.488605
+[Okay] New ad found! Ad id: 1308844830
+
+2017-10-28 23:39:29.493918
+[Okay] New ad found! Ad id: 1308846480
+
+2017-10-28 23:39:29.498620
+[Okay] New ad found! Ad id: 1308846435
+
+2017-10-28 23:39:29.503672
+[Okay] New ad found! Ad id: 1308846478
+
+2017-10-28 23:39:29.508682
+[Okay] New ad found! Ad id: 1308846095
+
+2017-10-28 23:39:29.514510
+[Okay] New ad found! Ad id: 1308845709
+
+2017-10-28 23:39:29.521108
+[Okay] New ad found! Ad id: 1308845014
+
+2017-10-28 23:39:29.527431
+[Okay] New ad found! Ad id: 1308845015
+
+2017-10-28 23:39:29.531999
+[Okay] Ad 1308865893 written to database.
+
+2017-10-28 23:39:29.532151
+[Okay] Ad 1308868267 written to database.
+
+2017-10-28 23:39:29.532330
+[Okay] Ad 1308864834 written to database.
+
+2017-10-28 23:39:29.532490
+[Okay] Ad 1308865278 written to database.
+
+2017-10-28 23:39:29.532647
+[Okay] Ad 1308865280 written to database.
+
+2017-10-28 23:39:29.532786
+[Okay] Ad 1308857857 written to database.
+
+2017-10-28 23:39:29.532963
+[Okay] Ad 1308844948 written to database.
+
+2017-10-28 23:39:29.533123
+[Okay] Ad 1308844994 written to database.
+
+2017-10-28 23:39:29.533284
+[Okay] Ad 1308779452 written to database.
+
+2017-10-28 23:39:29.533426
+[Okay] Ad 1308846504 written to database.
+
+2017-10-28 23:39:29.533592
+[Okay] Ad 1308848150 written to database.
+
+2017-10-28 23:39:29.533752
+[Okay] Ad 1308844831 written to database.
+
+2017-10-28 23:39:29.533916
+[Okay] Ad 1308844830 written to database.
+
+2017-10-28 23:39:29.534059
+[Okay] Ad 1308846480 written to database.
+
+2017-10-28 23:39:29.534208
+[Okay] Ad 1308846435 written to database.
+
+2017-10-28 23:39:29.534377
+[Okay] Ad 1308846478 written to database.
+
+2017-10-28 23:39:29.534808
+[Okay] Ad 1308846095 written to database.
+
+2017-10-28 23:39:29.534994
+[Okay] Ad 1308845709 written to database.
+
+2017-10-28 23:39:29.535146
+[Okay] Ad 1308845014 written to database.
+
+2017-10-28 23:39:29.535302
+[Okay] Ad 1308845015 written to database.
+
+2017-10-28 23:39:29.538630
+[Error] Unable to reload database.
+
+2017-10-28 23:39:51.831710
+[Okay] Retrieved HTML data from: https://www.kijiji.ca/b-autos-camions/grand-montreal/2014__/page-2/c174l80002a68?kilometres=__50000&boite-de-vitesse=2
+
+2017-10-28 23:39:52.192158
+[Okay] New ad found! Ad id: 1308865893
+
+2017-10-28 23:39:52.197532
+[Okay] New ad found! Ad id: 1308868267
+
+2017-10-28 23:39:52.202061
+[Okay] New ad found! Ad id: 1308864834
+
+2017-10-28 23:39:52.207135
+[Okay] New ad found! Ad id: 1308865278
+
+2017-10-28 23:39:52.213079
+[Okay] New ad found! Ad id: 1308865280
+
+2017-10-28 23:39:52.218422
+[Okay] New ad found! Ad id: 1308857857
+
+2017-10-28 23:39:52.223488
+[Okay] New ad found! Ad id: 1308844948
+
+2017-10-28 23:39:52.229636
+[Okay] New ad found! Ad id: 1308844994
+
+2017-10-28 23:39:52.235141
+[Okay] New ad found! Ad id: 1308779452
+
+2017-10-28 23:39:52.239777
+[Okay] New ad found! Ad id: 1308846504
+
+2017-10-28 23:39:52.244760
+[Okay] New ad found! Ad id: 1308848150
+
+2017-10-28 23:39:52.250185
+[Okay] New ad found! Ad id: 1308844831
+
+2017-10-28 23:39:52.256132
+[Okay] New ad found! Ad id: 1308844830
+
+2017-10-28 23:39:52.261616
+[Okay] New ad found! Ad id: 1308846480
+
+2017-10-28 23:39:52.266178
+[Okay] New ad found! Ad id: 1308846435
+
+2017-10-28 23:39:52.270824
+[Okay] New ad found! Ad id: 1308846478
+
+2017-10-28 23:39:52.275730
+[Okay] New ad found! Ad id: 1308846095
+
+2017-10-28 23:39:52.281340
+[Okay] New ad found! Ad id: 1308845709
+
+2017-10-28 23:39:52.287645
+[Okay] New ad found! Ad id: 1308845014
+
+2017-10-28 23:39:52.293781
+[Okay] New ad found! Ad id: 1308845015
+
+2017-10-28 23:39:52.298466
+[Okay] Ad 1308865893 written to database.
+
+2017-10-28 23:39:52.298625
+[Okay] Ad 1308868267 written to database.
+
+2017-10-28 23:39:52.298877
+[Okay] Ad 1308864834 written to database.
+
+2017-10-28 23:39:52.299091
+[Okay] Ad 1308865278 written to database.
+
+2017-10-28 23:39:52.299253
+[Okay] Ad 1308865280 written to database.
+
+2017-10-28 23:39:52.299395
+[Okay] Ad 1308857857 written to database.
+
+2017-10-28 23:39:52.299568
+[Okay] Ad 1308844948 written to database.
+
+2017-10-28 23:39:52.299736
+[Okay] Ad 1308844994 written to database.
+
+2017-10-28 23:39:52.299899
+[Okay] Ad 1308779452 written to database.
+
+2017-10-28 23:39:52.300042
+[Okay] Ad 1308846504 written to database.
+
+2017-10-28 23:39:52.300203
+[Okay] Ad 1308848150 written to database.
+
+2017-10-28 23:39:52.300372
+[Okay] Ad 1308844831 written to database.
+
+2017-10-28 23:39:52.300538
+[Okay] Ad 1308844830 written to database.
+
+2017-10-28 23:39:52.300690
+[Okay] Ad 1308846480 written to database.
+
+2017-10-28 23:39:52.300858
+[Okay] Ad 1308846435 written to database.
+
+2017-10-28 23:39:52.301030
+[Okay] Ad 1308846478 written to database.
+
+2017-10-28 23:39:52.301444
+[Okay] Ad 1308846095 written to database.
+
+2017-10-28 23:39:52.301635
+[Okay] Ad 1308845709 written to database.
+
+2017-10-28 23:39:52.301787
+[Okay] Ad 1308845014 written to database.
+
+2017-10-28 23:39:52.301944
+[Okay] Ad 1308845015 written to database.
+
+2017-10-28 23:39:52.304979
+[Error] Unable to reload database.
+
+2017-10-28 23:55:28.282700
+[Okay] Retrieved HTML data from: https://www.kijiji.ca/b-autos-camions/grand-montreal/2014__/page-2/c174l80002a68?kilometres=__50000&boite-de-vitesse=2
+
+2017-10-28 23:55:28.646071
+[Okay] New ad found! Ad id: 1308865893
+
+2017-10-28 23:55:28.651623
+[Okay] New ad found! Ad id: 1308868267
+
+2017-10-28 23:55:28.656213
+[Okay] New ad found! Ad id: 1308864834
+
+2017-10-28 23:55:28.662099
+[Okay] New ad found! Ad id: 1308865278
+
+2017-10-28 23:55:28.668217
+[Okay] New ad found! Ad id: 1308865280
+
+2017-10-28 23:55:28.673988
+[Okay] New ad found! Ad id: 1308857857
+
+2017-10-28 23:55:28.679550
+[Okay] New ad found! Ad id: 1308844948
+
+2017-10-28 23:55:28.686246
+[Okay] New ad found! Ad id: 1308844994
+
+2017-10-28 23:55:28.691990
+[Okay] New ad found! Ad id: 1308779452
+
+2017-10-28 23:55:28.697518
+[Okay] New ad found! Ad id: 1308846504
+
+2017-10-28 23:55:28.702488
+[Okay] New ad found! Ad id: 1308848150
+
+2017-10-28 23:55:28.708134
+[Okay] New ad found! Ad id: 1308844831
+
+2017-10-28 23:55:28.714663
+[Okay] New ad found! Ad id: 1308844830
+
+2017-10-28 23:55:28.720153
+[Okay] New ad found! Ad id: 1308846480
+
+2017-10-28 23:55:28.724965
+[Okay] New ad found! Ad id: 1308846435
+
+2017-10-28 23:55:28.730503
+[Okay] New ad found! Ad id: 1308846478
+
+2017-10-28 23:55:28.736942
+[Okay] New ad found! Ad id: 1308846095
+
+2017-10-28 23:55:28.743311
+[Okay] New ad found! Ad id: 1308845709
+
+2017-10-28 23:55:28.750230
+[Okay] New ad found! Ad id: 1308845014
+
+2017-10-28 23:55:28.756918
+[Okay] New ad found! Ad id: 1308845015
+
+2017-10-28 23:55:28.761695
+[Okay] Ad 1308865893 written to database.
+
+2017-10-28 23:55:28.761879
+[Okay] Ad 1308868267 written to database.
+
+2017-10-28 23:55:28.762034
+[Okay] Ad 1308864834 written to database.
+
+2017-10-28 23:55:28.762186
+[Okay] Ad 1308865278 written to database.
+
+2017-10-28 23:55:28.762334
+[Okay] Ad 1308865280 written to database.
+
+2017-10-28 23:55:28.762473
+[Okay] Ad 1308857857 written to database.
+
+2017-10-28 23:55:28.762712
+[Okay] Ad 1308844948 written to database.
+
+2017-10-28 23:55:28.762965
+[Okay] Ad 1308844994 written to database.
+
+2017-10-28 23:55:28.763416
+[Okay] Ad 1308779452 written to database.
+
+2017-10-28 23:55:28.763684
+[Okay] Ad 1308846504 written to database.
+
+2017-10-28 23:55:28.763887
+[Okay] Ad 1308848150 written to database.
+
+2017-10-28 23:55:28.764074
+[Okay] Ad 1308844831 written to database.
+
+2017-10-28 23:55:28.764268
+[Okay] Ad 1308844830 written to database.
+
+2017-10-28 23:55:28.764462
+[Okay] Ad 1308846480 written to database.
+
+2017-10-28 23:55:28.764621
+[Okay] Ad 1308846435 written to database.
+
+2017-10-28 23:55:28.766475
+[Okay] Ad 1308846478 written to database.
+
+2017-10-28 23:55:28.767147
+[Okay] Ad 1308846095 written to database.
+
+2017-10-28 23:55:28.767350
+[Okay] Ad 1308845709 written to database.
+
+2017-10-28 23:55:28.767503
+[Okay] Ad 1308845014 written to database.
+
+2017-10-28 23:55:28.767662
+[Okay] Ad 1308845015 written to database.
+
+2017-10-28 23:55:28.771082
+[Error] Unable to reload database.
+
